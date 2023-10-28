@@ -31,6 +31,7 @@ def weight_init_xavier_uniform(submodule):
 class NodeEmbedding(nn.Module):
     def __init__(self, feature_size, n_representation_obs, layers = [20, 30 ,40]):
         super(NodeEmbedding, self).__init__()
+
         self.feature_size = feature_size
         self.linears = OrderedDict()
         last_layer = self.feature_size

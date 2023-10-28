@@ -10,14 +10,16 @@ from datetime import datetime
 from actor2 import PtrNet1
 from critic import PtrNet2
 from jssp import Scheduler
+from cfg import get_cfg
 
+cfg = get_cfg()
+if cfg.vessl == True:
+    import vessl
+    vessl.init()
 # torch.autograd.set_detect_anomaly(True)
-torch.backends.cudnn.benchmark = True
-import vessl
-vessl.init()
 # machine, procesing time
 
-def train_model(params, log_path=None):
+def train_model( params, log_path=None):
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     date = datetime.now().strftime('%m%d_%H_%M')
     param_path = params["log_dir"] + '/ppo' + '/%s_%s_param.csv' % (date, "train")
@@ -28,7 +30,6 @@ def train_model(params, log_path=None):
     epoch = 0
     ave_act_loss = 0.0
     ave_cri_loss = 0.0
-    ave_makespan = 0.0
 
     act_model = PtrNet1(params).to(device)
     cri_model = PtrNet2(params).to(device)
@@ -39,18 +40,7 @@ def train_model(params, log_path=None):
         act_optim = optim.RMSprop(act_model.parameters(), lr=params["lr"])
         cri_optim = optim.RMSprop(cri_model.parameters(), lr=params["lr"])
 
-    if params["load_model"]:
-        checkpoint = torch.load(params["model_dir"] + "/ppo/" + "0821_21_36_step100000_act.pt")
-        act_model.load_state_dict(checkpoint['model_state_dict_actor'])
-        cri_model.load_state_dict(checkpoint['model_state_dict_critic'])
-        act_optim.load_state_dict(checkpoint['optimizer_state_dict_actor'])
-        cri_optim.load_state_dict(checkpoint['optimizer_state_dict_critic'])
-        epoch = checkpoint['epoch']
-        ave_act_loss = checkpoint['ave_act_loss']
-        ave_cri_loss = checkpoint['ave_cri_loss']
-        ave_makespan = checkpoint['ave_makespan']
-        act_model.train()
-        cri_model.train()
+
 
     if params["is_lr_decay"]:
         act_lr_scheduler = optim.lr_scheduler.StepLR(act_optim, step_size=params["lr_decay_step"],gamma=params["lr_decay"])
@@ -58,11 +48,8 @@ def train_model(params, log_path=None):
 
     mse_loss = nn.MSELoss()
     t1 = time()
-
+    ave_makespan = 0
     for s in range(epoch + 1, params["step"]):
-
-
-        #print(input_data.shape)
         """
         변수별 shape 
         inputs : batch_size X number_of_blocks X number_of_process
@@ -130,16 +117,17 @@ def train_model(params, log_path=None):
             new_input_data = torch.cat([encoded_data, input_data[:, :, 1:2]], dim=-1)
             input_data = new_input_data.repeat(params["batch_size"], 1, 1)
         pred_seq, ll_old, _ = act_model(input_data, device)
+        real_makespan = list()
+        for sequence in pred_seq:
+            scheduler = Scheduler(jobs_data)
+            scheduler.run(sequence.tolist())
+            makespan = scheduler.c_max / 150
+            real_makespan.append(makespan)
+        ave_makespan += sum(real_makespan)/(params["batch_size"]*params["log_step"])
+        if cfg.vessl == True:
+            vessl.log(step=s, payload={'makespan': sum(real_makespan)/params["batch_size"]})
 
         for k in range(params["iteration"]):  # K-epoch
-            real_makespan = list()
-
-            for sequence in pred_seq:
-                scheduler = Scheduler(jobs_data)
-                scheduler.run(sequence.tolist())
-                makespan = scheduler.c_max / 150
-                real_makespan.append(makespan)
-
             pred_makespan = cri_model(input_data, device).unsqueeze(-1)
             adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - pred_makespan.detach().to(device)
             cri_loss = mse_loss(pred_makespan, torch.tensor(real_makespan, dtype = torch.float).to(device).unsqueeze(1).detach())
@@ -157,9 +145,7 @@ def train_model(params, log_path=None):
 
             surr1 = ratio * adv
             surr2 = torch.clamp(ratio, 1 - params["epsilon"], 1 + params["epsilon"]) * adv
-
             act_loss = torch.max(surr1, surr2).mean()
-
             act_optim.zero_grad()
             act_loss.backward()
             act_optim.step()
@@ -168,12 +154,24 @@ def train_model(params, log_path=None):
                 act_lr_scheduler.step()
             ave_act_loss += act_loss.item()
 
-        ave_makespan += sum(real_makespan)/params["batch_size"]
+
 
         if s % params["log_step"] == 0:
-            vessl.log(step=s, payload={'makespan': ave_makespan / (s + 1)})
             t2 = time()
-            print('step:%d/%d, actic loss:%1.3f, crictic loss:%1.3f, L:%1.3f, %dmin%dsec' % (s, params["step"], ave_act_loss / ((s + 1) * params["iteration"]),ave_cri_loss / ((s + 1) * params["iteration"]), ave_makespan / (s + 1), (t2 - t1) // 60,(t2 - t1) % 60))
+
+
+            print('step:%d/%d, actic loss:%1.3f, crictic loss:%1.3f, L:%1.3f, %dmin%dsec' % (s, params["step"], ave_act_loss / ((s + 1) * params["iteration"]),ave_cri_loss / ((s + 1) * params["iteration"]), ave_makespan, (t2 - t1) // 60,(t2 - t1) % 60))
+            ave_makespan = 0
+            if log_path is None:
+                log_path = params["log_dir"] + '/ppo' + '/%s_train.csv' % date
+                with open(log_path, 'w') as f:
+                    f.write('step,actic loss, crictic loss, average makespan,time\n')
+            else:
+                with open(log_path, 'a') as f:
+                    f.write('%d,%1.4f,%1.4f,%1.4f,%dmin%dsec\n' % (
+                    s, ave_act_loss / ((s + 1) * params["iteration"]), ave_cri_loss / ((s + 1) * params["iteration"]),
+                    ave_makespan / (s + 1),
+                    (t2 - t1) // 60, (t2 - t1) % 60))
             t1 = time()
 
         # if s % params["save_step"] == 0:
@@ -207,39 +205,56 @@ if __name__ == '__main__':
     if not os.path.exists(model_dir + "/ppo"):
         os.makedirs(model_dir + "/ppo")
 
+    # parser.add_argument("--vessl", type=bool, default=False, help="vessl AI 사용여부")
+    # parser.add_argument("--step", type=int, default=400001, help="")
+    # parser.add_argument("--save_step", type=int, default=10, help="")
+    # parser.add_argument("--batch_size", type=int, default=24, help="")
+    # parser.add_argument("--n_hidden", type=int, default=1024, help="")
+    # parser.add_argument("--C", type=float, default=10, help="")
+    # parser.add_argument("--T", type=int, default=1, help="")
+    # parser.add_argument("--iteration", type=int, default=1, help="")
+    # parser.add_argument("--epsilon", type=float, default=0.18, help="")
+    # parser.add_argument("--n_glimpse", type=int, default=2, help="")
+    # parser.add_argument("--n_process", type=int, default=3, help="")
+    # parser.add_argument("--lr", type=float, default=1.2e-4, help="")
+    # parser.add_argument("--lr_decay", type=float, default=0.98, help="")
+    # parser.add_argument("--lr_decay_step", type=int, default=30000, help="")
+    # parser.add_argument("--layers", type=str, default="[128, 108 ,96]", help="")
+    # parser.add_argument("--n_embedding", type=int, default=128, help="")
+    # parser.add_argument("--graph_embedding_size", type=int, default=64, help="")
+
     params = {
         "num_of_process": 1,
         "num_of_blocks": 100,
-        "step": 400001,
-        "log_step": 10,
+        "step": cfg.step,
+        "log_step": cfg.log_step,
         "log_dir": log_dir,
-        "save_step": 1000,
+        "save_step": cfg.save_step,
         "model_dir": model_dir,
-        "batch_size": 24,
-        "n_hidden": 1024,
+        "batch_size": cfg.batch_size,
+        "n_hidden": cfg.n_hidden,
         "init_min": -0.08,
         "init_max": 0.08,
         "use_logit_clipping": True,
-        "C": 10,
-        "T": 1,
+        "C": cfg.C,
+        "T": cfg.T,
         "decode_type": "sampling",
-        "iteration": 1,
-        "epsilon": 0.2,
+        "iteration": cfg.iteration,
+        "epsilon": cfg.epsilon,
         "optimizer": "Adam",
-        "n_glimpse": 1,
-        "n_process": 3,
-        "lr": 1e-4,
+        "n_glimpse": cfg.n_glimpse,
+        "n_process": cfg.n_process,
+        "lr": cfg.lr,
         "is_lr_decay": True,
-        "lr_decay": 0.98,
+        "lr_decay": cfg.lr_decay,
         "num_machine": 10,
         "num_jobs": 10,
-        "lr_decay_step": 2000,
+        "lr_decay_step": cfg.lr_decay_step,
         "load_model": load_model,
         "gnn": True,
-        "layers":[1024, 256],
-        "n_embedding": 256,
-        "graph_embedding_size" : 128
+        "layers":eval(cfg.layers),
+        "n_embedding": cfg.n_embedding,
+        "graph_embedding_size" : cfg.graph_embedding_size
     }
 
-    #env = PanelBlockShop(params["num_of_process"], params["num_of_blocks"], distribution="lognormal")
     train_model(params)
