@@ -7,9 +7,9 @@ import numpy as np
 from time import time
 from datetime import datetime
 
-from agent.actor2 import PtrNet1
-from agent.critic import PtrNet2
-from environment.jssp import Scheduler
+from actor2 import PtrNet1
+from critic import PtrNet2
+from jssp import Scheduler
 
 # torch.autograd.set_detect_anomaly(True)
 torch.backends.cudnn.benchmark = True
