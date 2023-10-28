@@ -3,13 +3,6 @@ import collections
 import numpy as np
 import simpy
 import random
-import matplotlib.pyplot as plt
-import plotly
-import plotly.express as px
-import pandas as pd
-from collections import defaultdict
-import os
-import pickle
 import time
 
 start = time.time()
