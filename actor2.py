@@ -155,7 +155,8 @@ class PtrNet1(nn.Module):
                 next_block_index = self.block_selecter(log_p)
                 log_probabilities.append(log_p.gather(1, next_block_index.unsqueeze(1)))
                 self.block_indices.append(next_block_index)
-                next_block = self.sample_space[next_block_index].to(device)
+                sample_space = self.sample_space.to(device)
+                next_block = sample_space[next_block_index].to(device)
 
                 for b_prime in range(len(next_block.tolist())):
                     job = next_block[b_prime]
