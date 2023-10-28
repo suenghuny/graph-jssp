@@ -17,7 +17,7 @@ import vessl
 vessl.init()
 # machine, procesing time
 
-def train_model(env, params, log_path=None):
+def train_model(params, log_path=None):
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     date = datetime.now().strftime('%m%d_%H_%M')
     param_path = params["log_dir"] + '/ppo' + '/%s_%s_param.csv' % (date, "train")
@@ -174,16 +174,6 @@ def train_model(env, params, log_path=None):
             vessl.log(step=s, payload={'makespan': ave_makespan / (s + 1)})
             t2 = time()
             print('step:%d/%d, actic loss:%1.3f, crictic loss:%1.3f, L:%1.3f, %dmin%dsec' % (s, params["step"], ave_act_loss / ((s + 1) * params["iteration"]),ave_cri_loss / ((s + 1) * params["iteration"]), ave_makespan / (s + 1), (t2 - t1) // 60,(t2 - t1) % 60))
-            if log_path is None:
-                log_path = params["log_dir"] + '/ppo' + '/%s_train.csv' % date
-                with open(log_path, 'w') as f:
-                    f.write('step,actic loss, crictic loss, average makespan,time\n')
-            else:
-                with open(log_path, 'a') as f:
-                    f.write('%d,%1.4f,%1.4f,%1.4f,%dmin%dsec\n' % (
-                    s, ave_act_loss / ((s + 1) * params["iteration"]), ave_cri_loss / ((s + 1) * params["iteration"]),
-                    ave_makespan / (s + 1),
-                    (t2 - t1) // 60, (t2 - t1) % 60))
             t1 = time()
 
         # if s % params["save_step"] == 0:
@@ -251,5 +241,5 @@ if __name__ == '__main__':
         "graph_embedding_size" : 25
     }
 
-    env = PanelBlockShop(params["num_of_process"], params["num_of_blocks"], distribution="lognormal")
-    train_model(env, params)
+    #env = PanelBlockShop(params["num_of_process"], params["num_of_blocks"], distribution="lognormal")
+    train_model(params)
