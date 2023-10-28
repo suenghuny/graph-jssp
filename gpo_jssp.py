@@ -236,9 +236,9 @@ if __name__ == '__main__':
         "lr_decay_step": 2000,
         "load_model": load_model,
         "gnn": True,
-        "layers":[196, 128 , 96],
-        "n_embedding": 64,
-        "graph_embedding_size" : 48
+        "layers":[256, 196 , 128],
+        "n_embedding": 128,
+        "graph_embedding_size" : 96
     }
 
     #env = PanelBlockShop(params["num_of_process"], params["num_of_blocks"], distribution="lognormal")
