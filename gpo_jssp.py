@@ -13,8 +13,8 @@ from jssp import Scheduler
 
 # torch.autograd.set_detect_anomaly(True)
 torch.backends.cudnn.benchmark = True
-# import vessl
-# vessl.init()
+import vessl
+vessl.init()
 # machine, procesing time
 
 def train_model(params, log_path=None):
@@ -171,7 +171,7 @@ def train_model(params, log_path=None):
         ave_makespan += sum(real_makespan)/params["batch_size"]
 
         if s % params["log_step"] == 0:
-            #vessl.log(step=s, payload={'makespan': ave_makespan / (s + 1)})
+            vessl.log(step=s, payload={'makespan': ave_makespan / (s + 1)})
             t2 = time()
             print('step:%d/%d, actic loss:%1.3f, crictic loss:%1.3f, L:%1.3f, %dmin%dsec' % (s, params["step"], ave_act_loss / ((s + 1) * params["iteration"]),ave_cri_loss / ((s + 1) * params["iteration"]), ave_makespan / (s + 1), (t2 - t1) // 60,(t2 - t1) % 60))
             t1 = time()
