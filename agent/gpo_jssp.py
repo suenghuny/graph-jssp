@@ -245,8 +245,8 @@ if __name__ == '__main__':
         "lr_decay_step": 2000,
         "load_model": load_model,
         "gnn": True,
-        "layers":[20, 30 ,40],
-        "n_embedding": 128,
+        "layers":[196, 128 ,64],
+        "n_embedding": 32,
         "graph_embedding_size" : 25
     }
 
