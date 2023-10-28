@@ -253,6 +253,7 @@ if __name__ == '__main__':
         "load_model": load_model,
         "gnn": True,
         "layers":eval(cfg.layers),
+        "lr_critic": cfg.lr_critic,
         "n_embedding": cfg.n_embedding,
         "graph_embedding_size" : cfg.graph_embedding_size
     }
