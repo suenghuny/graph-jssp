@@ -35,10 +35,10 @@ def train_model( params, log_path=None):
     cri_model = PtrNet2(params).to(device)
     if params["optimizer"] == 'Adam':
         act_optim = optim.Adam(act_model.parameters(), lr=params["lr"])
-        cri_optim = optim.Adam(cri_model.parameters(), lr=params["lr"])
+        cri_optim = optim.Adam(cri_model.parameters(), lr=params["lr_critic"])
     elif params["optimizer"] == "RMSProp":
         act_optim = optim.RMSprop(act_model.parameters(), lr=params["lr"])
-        cri_optim = optim.RMSprop(cri_model.parameters(), lr=params["lr"])
+        cri_optim = optim.RMSprop(cri_model.parameters(), lr=params["lr_critic"])
 
 
 
