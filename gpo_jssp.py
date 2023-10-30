@@ -167,7 +167,7 @@ def train_model( params, log_path=None):
         for sequence in pred_seq:
             scheduler = Scheduler(jobs_data)
             scheduler.run(sequence.tolist())
-            makespan = scheduler.c_max / 150
+            makespan = scheduler.c_max / 15
             real_makespan.append(makespan)
         ave_makespan += sum(real_makespan)/(params["batch_size"]*params["log_step"])
         if cfg.vessl == True:
