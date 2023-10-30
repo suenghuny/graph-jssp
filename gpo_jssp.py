@@ -179,7 +179,7 @@ def train_model( params, log_path=None):
             cri_loss = mse_loss(pred_makespan, torch.tensor(real_makespan, dtype = torch.float).to(device).unsqueeze(1).detach())
             cri_optim.zero_grad()
             cri_loss.backward()
-            nn.utils.clip_grad_norm_(cri_model.parameters(), max_norm=1.0, norm_type=2)
+            nn.utils.clip_grad_norm_(cri_model.parameters(), max_norm=10.0, norm_type=2)
             cri_optim.step()
             if params["is_lr_decay"]:
                 cri_lr_scheduler.step()
@@ -195,7 +195,7 @@ def train_model( params, log_path=None):
             act_optim.zero_grad()
             act_loss.backward()
             act_optim.step()
-            nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=1.0, norm_type=2)
+            nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=10.0, norm_type=2)
             if params["is_lr_decay"]:
                 act_lr_scheduler.step()
             ave_act_loss += act_loss.item()
