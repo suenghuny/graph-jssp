@@ -218,9 +218,9 @@ class Scheduler:
             for k in range(len(job)):
                 #ops = job[k]
                 if k == len(job)-1:
-                    edge_index[0].append(len(self.jobs_data))
+                    edge_index[0].append(len(self.jobs_data)*len(self.jobs_data[0]))
                     edge_index[1].append(jk)
-                    edge_index[0].append(len(self.jobs_data))
+                    edge_index[0].append(len(self.jobs_data)*len(self.jobs_data[0]))
                     edge_index[1].append(jk)
                     jk += 1
                 else:
@@ -237,11 +237,13 @@ class Scheduler:
         for job in self.jobs_data:
             for k in range(len(job)):
                 if k == 0:
-                    edge_index[0].append(len(self.jobs_data)+1)
+                    edge_index[0].append(len(self.jobs_data)*len(self.jobs_data[0])+1)
                     edge_index[1].append(jk)
-                    edge_index[0].append(len(self.jobs_data)+1)
+                    edge_index[0].append(len(self.jobs_data)*len(self.jobs_data[0])+1)
                     edge_index[1].append(jk)
+
                     jk += 1
+
                 else:
                     #ops = job[k]
                     edge_index[0].append(jk)

@@ -61,7 +61,7 @@ class PtrNet1(nn.Module):
             self.params = params
             self.sample_space = [[j for i in range(params['num_machine'])] for j in range(params['num_jobs'])]
             self.sample_space = torch.tensor(self.sample_space).view(-1)
-            self.mask_debug = [[[-1e8 for i in range(params['num_machine'])] for j in range(params['num_jobs'])] for _ in range(params['batch_size'])]
+            self.mask_debug = [[[0 for i in range(params['num_machine'])] for j in range(params['num_jobs'])] for _ in range(params['batch_size'])]
             self.job_count = [[0 for j in range(params['num_jobs'])] for _ in range(params['batch_size'])]
             self.dummy_job_count = deepcopy(self.job_count)
         else:
@@ -93,7 +93,7 @@ class PtrNet1(nn.Module):
             self.params = params
             self.sample_space = [[j for i in range(params['num_machine'])] for j in range(params['num_jobs'])]
             self.sample_space = torch.tensor(self.sample_space).view(-1)
-            self.mask_debug = [[[-1e8 for i in range(params['num_machine'])] for j in range(params['num_jobs'])] for _ in range(params['batch_size'])]
+            self.mask_debug = [[[0 for i in range(params['num_machine'])] for j in range(params['num_jobs'])] for _ in range(params['batch_size'])]
             self.job_count = [[0 for j in range(params['num_jobs'])] for _ in range(params['batch_size'])]
             self.dummy_job_count = deepcopy(self.job_count)
         #print(self.job_count)
@@ -113,11 +113,12 @@ class PtrNet1(nn.Module):
         else:
             node_features, heterogeneous_edges = x
             node_features = torch.tensor(node_features).to(device)
-            embed_enc_inputs = self.Embedding(node_features)
-            embed = embed_enc_inputs.size(2)
+            # embed_enc_inputs = self.Embedding(node_features)
+
             batch = node_features.shape[0]
             block_num = node_features.shape[1]-2
             enc_h = self.GraphEmbedding(heterogeneous_edges,node_features,  mini_batch = True)
+            embed = enc_h.size(2)
             c = self.c_embedding(enc_h[:, -1].unsqueeze(0)).contiguous()
             h = self.h_embedding(enc_h[:, -2].unsqueeze(0)).contiguous()
             enc_h = enc_h[:, :-2]
@@ -128,20 +129,22 @@ class PtrNet1(nn.Module):
         log_probabilities = list()
         for i in range(block_num):
             job_count = torch.tensor(self.job_count)
-            mask2 = torch.tensor(deepcopy(self.mask_debug))
+            mask2 = torch.tensor(deepcopy(self.mask_debug), dtype = torch.float)
             for b in range(job_count.shape[0]):
                 for k in range(job_count.shape[1]):
                     try:
-                        mask2[b, k, job_count[b, k]] = 0
+                        mask2[b, k, job_count[b, k]] =1
                     except IndexError as IE:
                         pass
+
             mask2= mask2.view(self.params['batch_size'], -1).to(device)
+
+            #print(mask2)
             _, (h, c) = self.Decoder(dec_input, (h, c))
 
             query = h.squeeze(0)
             query = self.glimpse(query, ref, mask2)  # ref(enc_h)는 key이다.
             logits = self.pointer(query, ref, mask2)
-            #print(logits.shape)
             log_p = torch.log_softmax(logits / self.T, dim=-1)
             #print(log_p[0][0].tolist().count(-1.0101e+08))
             if y == None:
@@ -151,7 +154,6 @@ class PtrNet1(nn.Module):
                 self.block_indices.append(next_block_index)
                 sample_space = self.sample_space.to(device)
                 next_block = sample_space[next_block_index].to(device)
-
                 for b_prime in range(len(next_block.tolist())):
                     job = next_block[b_prime]
                     self.job_count[b_prime][job] += 1
@@ -162,18 +164,17 @@ class PtrNet1(nn.Module):
                 next_block = y[:, i].long()
 
 
-            dec_input = torch.gather(input=embed_enc_inputs, dim=1, index=next_block_index.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, embed)) # 다음 sequence의 input은 encoder의 output 중에서 현재 sequence에 해당하는 embedding이 된다.
-            log_p.detach().cpu()
+            dec_input = torch.gather(input=enc_h, dim=1, index=next_block_index.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, embed)) # 다음 sequence의 input은 encoder의 output 중에서 현재 sequence에 해당하는 embedding이 된다.
+            #log_p.detach().cpu()
             pi_list.append(next_block)
-            log_ps.append(log_p)
+            #log_ps.append(log_p)
 
         pi = torch.stack(pi_list, dim=1)
-        ps = torch.stack(log_ps, dim=1)
 
-        #print(torch.stack(log_ps, 1), torch.stack(self.block_indices, dim = 1).unsqueeze(0).to(device))
         if y == None:
             log_probabilities = torch.stack(log_probabilities, dim = 1)
             ll = log_probabilities.sum(dim=1)
+
         else:
             log_probabilities = torch.stack(log_probabilities, dim = 1)
             ll = log_probabilities.sum(dim=1)
@@ -181,7 +182,7 @@ class PtrNet1(nn.Module):
         #print(self.dummy_job_count)
         self.job_count = deepcopy(self.dummy_job_count)
         #print(self.job_count)
-        return pi, ll, ps
+        return pi, ll, _
 
     def glimpse(self, query, ref, mask, inf=1e8):
         """
@@ -193,8 +194,9 @@ class PtrNet1(nn.Module):
         V = self.Vec.unsqueeze(0).unsqueeze(0).repeat(ref.size(0), 1, 1)  #
         u = torch.bmm(V, torch.tanh(u1 + u2)).squeeze(1)
         # V: (batch, 1, 128) * u1+u2: (batch, 128, block_num) => u: (batch, 1, block_num) => (batch, block_num)
+        #print(u.shape, mask.unsqueeze(0).shape)
+        u = u.masked_fill(mask == 0, -1e8)
 
-        u = u + mask.unsqueeze(0)
         a = F.softmax(u, dim=1)
         #print(a.shape, a, a.sum(dim=1).shape)
         g = torch.bmm(a.squeeze().unsqueeze(1), ref).squeeze(1)
@@ -211,11 +213,12 @@ class PtrNet1(nn.Module):
         if self.use_logit_clipping:
             u = self.C * torch.tanh(u)
         # V: (batch, 1, 128) * u1+u2: (batch, 128, block_num) => u: (batch, 1, block_num) => (batch, block_num)
-        u = u + mask.unsqueeze(0)
-
+        #print(mask)
+        u = u.masked_fill(mask == 0, -1e8)
+        #print(mask[0][0])
+        #print(u[0])
         return u
 
     def get_log_likelihood(self, _log_p, pi):
         log_p = torch.gather(input=_log_p, dim=2, index=pi)
-        print(log_p.shape, torch.sum(log_p.squeeze(-1), dim = 2))
         return torch.sum(log_p.squeeze(-1), dim = 2)

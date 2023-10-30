@@ -63,6 +63,7 @@ class PtrNet2(nn.Module):
         embed = embed_enc_inputs.size(2)
         batch = node_features.shape[0]
         block_num = node_features.shape[1] - 2
+
         enc_h = self.GraphEmbedding(heterogeneous_edges, node_features, mini_batch=True)
         c = enc_h[:, -1].unsqueeze(0).contiguous()
         h = enc_h[:, -2].unsqueeze(0).contiguous()
