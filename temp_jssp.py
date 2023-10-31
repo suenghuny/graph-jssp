@@ -310,7 +310,7 @@ if __name__ == '__main__':
     # parser.add_argument("--graph_embedding_size", type=int, default=64, help="")
 
     params = {
-        "num_of_process": 2,
+        "num_of_process":3,
         "num_of_blocks": 100,
         "step": cfg.step,
         "log_step": cfg.log_step,
