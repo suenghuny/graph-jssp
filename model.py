@@ -7,7 +7,7 @@ import math
 from collections import OrderedDict
 import sys
 sys.path.append("..")  # 상위 폴더를 import할 수 있도록 경로 추가
-
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 print(torch.cuda.device_count())
 device =torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -58,6 +58,7 @@ class NodeEmbedding(nn.Module):
 class GCRN(nn.Module):
     def __init__(self, feature_size, embedding_size, graph_embedding_size, layers, num_edge_cat, attention = False):
         super(GCRN, self).__init__()
+        device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.num_edge_cat = num_edge_cat
         self.graph_embedding_size = graph_embedding_size
         self.embedding_size = embedding_size
@@ -70,32 +71,41 @@ class GCRN(nn.Module):
 
         self.Wv = []
         for i in range(num_edge_cat):
-            self.Wv.append(nn.Parameter(torch.Tensor(feature_size, graph_embedding_size)))
-        self.Wv = nn.ParameterList(self.Wv)
-        [glorot(W) for W in self.Wv]
+            self.Wv.append(nn.Linear(feature_size, graph_embedding_size, bias = True).to(device))
+            #self.Wv.append(nn.Parameter(torch.Tensor(feature_size, graph_embedding_size)))
+        #self.Wv = nn.ParameterList(self.Wv)
+        #[glorot(W) for W in self.Wv]
 
         self.Wq = []
         for i in range(num_edge_cat):
-            self.Wq.append(nn.Parameter(torch.Tensor(feature_size, graph_embedding_size)))
-        self.Wq = nn.ParameterList(self.Wq)
-        [glorot(W) for W in self.Wq]
+            self.Wq.append(nn.Linear(feature_size, graph_embedding_size, bias = True).to(device))
+            #self.Wq.append(nn.Parameter(torch.Tensor(feature_size, graph_embedding_size)))
+        #self.Wq = nn.ParameterList(self.Wq)
+        #[glorot(W) for W in self.Wq]
 
         self.embedding_layers = NodeEmbedding(graph_embedding_size*num_edge_cat, embedding_size, layers).to(device)
 
-
+        self.m = [nn.ELU() for _ in range(num_edge_cat)]
+        self.mv = [nn.ELU() for _ in range(num_edge_cat)]
+        self.mq = [nn.ELU() for _ in range(num_edge_cat)]
 
         self.a = [nn.Parameter(torch.empty(size=(2 * graph_embedding_size, 1))) for i in range(num_edge_cat)]
         [nn.init.xavier_uniform_(self.a[e].data, gain=1.414) for e in range(num_edge_cat)]
 
 
     #def forward(self, A, X, num_nodes=None, mini_batch=False):
-    def _prepare_attentional_mechanism_input(self, Wq, Wv,A, e, mini_batch):
+    def _prepare_attentional_mechanism_input(self, Wq, Wv,A,k, mini_batch):
         Wh1 = Wq
         Wh2 = Wv
-        e = Wh1 @ Wh2.T
+        #print(Wh1.shape, Wh2.shape)
 
-        return e*A
+        e = Wh1 @ Wh2.T
+        #print(e.shape, A.shape)
+        #print((e*A)[6])
+        print("ddd", self.m[k](e*A)[0], (e*A)[0])
+        return self.m[k](e*A)
     def forward(self, A, X, mini_batch, layer = 0):
+
         if mini_batch == False:
             temp = list()
             for e in range(len(A)):
@@ -104,12 +114,13 @@ class GCRN(nn.Module):
                 num_nodes = X.shape[0]
                 E = torch.sparse_coo_tensor(E, torch.ones(torch.tensor(E).shape[1]), (num_nodes, num_nodes)).to(device).to_dense()
 
-                Wh = X@self.Ws[e]
-                Wq = X @ self.Wq[e]
-                Wv = X @ self.Wv[e]
+                Wh = X @ self.Ws[e]
+                Wq = self.Wq[e](X)
+                Wv = self.Wv[e](X)
                 a = self._prepare_attentional_mechanism_input(Wq, Wv, E, e, mini_batch = mini_batch)
                 a = F.softmax(a, dim = 1)
                 H = a*E@Wh
+
                 temp.append(H)
             H = torch.cat(temp, dim = 1)
             #print(H.shape)
@@ -126,9 +137,11 @@ class GCRN(nn.Module):
                     E = torch.sparse_coo_tensor(A[b][e],
                                             torch.ones(torch.tensor(torch.tensor(A[b][e]).shape[1])),
                                             (num_nodes, num_nodes)).to(device).to_dense()
+                    # X_b = X[b].dou
+                    #print(X[b])
                     Wh = X[b] @ self.Ws[e]
-                    Wq = X[b] @ self.Wq[e]
-                    Wv = X[b] @ self.Wv[e]
+                    Wq =  self.mq[e](self.Wq[e](X[b]))
+                    Wv =  self.mv[e](self.Wv[e](X[b]))
                     a = self._prepare_attentional_mechanism_input(Wq, Wv,E, e, mini_batch=mini_batch)
 
                     a = F.softmax(a, dim=1)

@@ -183,11 +183,30 @@ class Scheduler:
 
     def get_node_feature(self):
         node_features = []
-        for job in self.jobs_data:
-            for ops in job:
-                node_features.append([float(ops[1])/100])
-        node_features.append([0.])
-        node_features.append([0.])
+        empty = list()
+        for j in range(len(self.jobs_data)):
+            job = self.jobs_data[j]
+            for o in range(len(job)):
+                ops = job[o]
+                empty.append(ops[1])
+
+
+        for j in range(len(self.jobs_data)):
+            job = self.jobs_data[j]
+
+            sum_ops = sum([float(job[o][1]) for o in range(len(job))])
+            for o in range(len(job)):
+                ops = job[o]
+                sum_ops_o = [float(job[k][1]) for k in range(0, o+1)]
+                #print([float(job[k][1]) for k in range(0, o+1)])
+                sum_ops_o.append(0)
+                sum_ops_o = sum(sum_ops_o)
+                #print([float(ops[1])/np.max(empty), sum_ops_o/sum_ops, (o+1)/len(job)])
+                node_features.append([float(ops[1]) / np.max(empty), sum_ops_o / sum_ops])
+#                node_features.append([float(ops[1])/np.max(empty), sum_ops_o/sum_ops, (o+1)/len(job)])
+                #print([float(ops[1])/np.max(empty), sum_ops_o/sum_ops, (o+1)/len(job)])
+        node_features.append([0., 1.])
+        node_features.append([0., 0.])
         return node_features
 
 
@@ -220,14 +239,14 @@ class Scheduler:
                 if k == len(job)-1:
                     edge_index[0].append(len(self.jobs_data)*len(self.jobs_data[0]))
                     edge_index[1].append(jk)
-                    edge_index[0].append(len(self.jobs_data)*len(self.jobs_data[0]))
-                    edge_index[1].append(jk)
+                    # edge_index[0].append(len(self.jobs_data)*len(self.jobs_data[0]))
+                    # edge_index[1].append(jk)
                     jk += 1
                 else:
                     edge_index[0].append(jk)
                     edge_index[1].append(jk+1)
-                    edge_index[0].append(jk+1)
-                    edge_index[1].append(jk)
+                    # edge_index[0].append(jk+1)
+                    # edge_index[1].append(jk)
                     jk += 1
         return edge_index
 
@@ -237,10 +256,10 @@ class Scheduler:
         for job in self.jobs_data:
             for k in range(len(job)):
                 if k == 0:
-                    edge_index[0].append(len(self.jobs_data)*len(self.jobs_data[0])+1)
-                    edge_index[1].append(jk)
-                    edge_index[0].append(len(self.jobs_data)*len(self.jobs_data[0])+1)
-                    edge_index[1].append(jk)
+                    # edge_index[0].append(len(self.jobs_data)*len(self.jobs_data[0])+1)
+                    # edge_index[1].append(jk)
+                    edge_index[0].append(jk)
+                    edge_index[1].append(len(self.jobs_data)*len(self.jobs_data[0])+1)
 
                     jk += 1
 
@@ -248,8 +267,8 @@ class Scheduler:
                     #ops = job[k]
                     edge_index[0].append(jk)
                     edge_index[1].append(jk-1)
-                    edge_index[0].append(jk-1)
-                    edge_index[1].append(jk)
+                    # edge_index[0].append(jk-1)
+                    # edge_index[1].append(jk)
                     jk += 1
         #print(edge_index)
         return edge_index

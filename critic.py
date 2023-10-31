@@ -13,17 +13,23 @@ class PtrNet2(nn.Module):
                                        bias=False)  # input_shape : num_of_process, output_shape : n_embedding
             self.GraphEmbedding = GCRN(feature_size = params["num_of_process"],
                                        graph_embedding_size= params["graph_embedding_size"],
-                                       embedding_size =  params["n_embedding"],layers =  params["layers"], num_edge_cat = 3)
+                                       embedding_size =  params["n_hidden"],layers =  params["layers"], num_edge_cat = 3)
+            self.GraphEmbedding1 = GCRN(feature_size=params["n_hidden"],
+                                       graph_embedding_size=params["graph_embedding_size"],
+                                       embedding_size=params["n_hidden"], layers=params["layers"], num_edge_cat=3)
+            self.GraphEmbedding2 = GCRN(feature_size=params["n_hidden"],
+                                       graph_embedding_size=params["graph_embedding_size"],
+                                       embedding_size=params["n_hidden"], layers=params["layers"], num_edge_cat=3)
             if torch.cuda.is_available():
-                self.Vec = nn.Parameter(torch.cuda.FloatTensor(params["n_embedding"]))
+                self.Vec = nn.Parameter(torch.cuda.FloatTensor(params["n_hidden"]))
             else:
-                self.Vec = nn.Parameter(torch.FloatTensor(params["n_embedding"]))
-            self.W_q = nn.Linear(params["n_embedding"], params["n_embedding"], bias=True)
-            self.W_ref = nn.Conv1d(params["n_embedding"], params["n_embedding"], 1, 1)
+                self.Vec = nn.Parameter(torch.FloatTensor(params["n_hidden"]))
+            self.W_q = nn.Linear(params["n_hidden"], params["n_hidden"], bias=True)
+            self.W_ref = nn.Conv1d(params["n_hidden"], params["n_hidden"], 1, 1)
             self.final2FC = nn.Sequential(
-                nn.Linear(params["n_embedding"], params["n_embedding"], bias=False),
+                nn.Linear(params["n_hidden"], params["n_hidden"], bias=False),
                 nn.ReLU(inplace=False),
-                nn.Linear(params["n_embedding"], 1, bias=False))
+                nn.Linear(params["n_hidden"], 1, bias=False))
             self._initialize_weights(params["init_min"], params["init_max"])
             self.n_glimpse = params["n_glimpse"]
             self.n_process = params["n_process"]
@@ -58,28 +64,26 @@ class PtrNet2(nn.Module):
         '''
 
         node_features, heterogeneous_edges = x
-        node_features = torch.tensor(node_features).to(device)
-        embed_enc_inputs = self.Embedding(node_features)
-        embed = embed_enc_inputs.size(2)
-        batch = node_features.shape[0]
-        block_num = node_features.shape[1] - 2
+        node_features = torch.tensor(node_features).to(device).float()
+        #embed_enc_inputs = self.Embedding(node_features)
+        #embed = embed_enc_inputs.size(2)
+        #batch = node_features.shape[0]
+        #block_num = node_features.shape[1] - 2
 
         enc_h = self.GraphEmbedding(heterogeneous_edges, node_features, mini_batch=True)
-        c = enc_h[:, -1].unsqueeze(0).contiguous()
-        h = enc_h[:, -2].unsqueeze(0).contiguous()
-        enc_h = enc_h[:, :-2]
+        enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
 
-        #3print(h.shape,c[-1].shape)
-        #x = x.to(device)
-        #embed_enc_inputs = self.Embedding(x)
-        #enc_h, (h, c) = self.Encoder(embed_enc_inputs, None)
+        h = enc_h[:, -2].unsqueeze(0)
+        enc_h = enc_h[:, :-2]
         ref = enc_h
-        query = c[-1]
+        query = h[-1]
+        #print(h[-1].shape)
 
         for i in range(self.n_process):
             query = self.glimpse(query, ref)
 
         pred_l = self.final2FC(query).squeeze(-1)
+
         return pred_l
 
     def glimpse(self, query, ref, infinity=1e8):
