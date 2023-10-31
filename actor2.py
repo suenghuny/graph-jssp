@@ -173,6 +173,7 @@ class PtrNet1(nn.Module):
             #print(log_p[0][0].tolist().count(-1.0101e+08))
             if y == None:
                 log_p = log_p.squeeze(0)
+                #print(log_p.exp()[0])
                 next_block_index = self.block_selecter(log_p)
                 log_probabilities.append(log_p.gather(1, next_block_index.unsqueeze(1)))
                 self.block_indices.append(next_block_index)

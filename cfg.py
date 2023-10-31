@@ -8,8 +8,8 @@ def get_cfg():
 
     parser.add_argument("--save_step", type=int, default=100000, help="")
     parser.add_argument("--batch_size", type=int, default=12, help="")
-    parser.add_argument("--C", type=float, default=1, help="")
-    parser.add_argument("--T", type=int, default=1, help="")
+    parser.add_argument("--C", type=float, default=10, help="")
+    parser.add_argument("--T", type=int, default=0.02, help="")
     parser.add_argument("--iteration", type=int, default=1, help="")
     parser.add_argument("--epsilon", type=float, default=0.18, help="")
     parser.add_argument("--n_glimpse", type=int, default=2, help="")

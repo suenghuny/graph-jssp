@@ -201,12 +201,13 @@ class Scheduler:
                 #print([float(job[k][1]) for k in range(0, o+1)])
                 sum_ops_o.append(0)
                 sum_ops_o = sum(sum_ops_o)
+                node_features.append([float(ops[1])/np.max(empty), sum_ops_o/sum_ops, (o+1)/len(job)])
                 #print([float(ops[1])/np.max(empty), sum_ops_o/sum_ops, (o+1)/len(job)])
-                node_features.append([float(ops[1]) / np.max(empty), sum_ops_o / sum_ops])
-#                node_features.append([float(ops[1])/np.max(empty), sum_ops_o/sum_ops, (o+1)/len(job)])
+                #node_features.append([float(ops[1]) / np.max(empty), sum_ops_o / sum_ops])
+
                 #print([float(ops[1])/np.max(empty), sum_ops_o/sum_ops, (o+1)/len(job)])
-        node_features.append([0., 1.])
-        node_features.append([0., 0.])
+        node_features.append([0., 1., 1])
+        node_features.append([0., 0., 0])
         return node_features
 
 
