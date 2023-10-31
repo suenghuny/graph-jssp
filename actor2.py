@@ -137,10 +137,10 @@ class PtrNet1(nn.Module):
 
             enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
             #enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
-            print(enc_h[0][0][3])
-            print(enc_h[0][12][3])
-            print(enc_h[0][35][3])
-            print("===========================")
+            # print(enc_h[0][0][3])
+            # print(enc_h[0][12][3])
+            # print(enc_h[0][35][3])
+            # print("===========================")
             embed = enc_h.size(2)
             h = self.h_embedding(enc_h[:, -2].unsqueeze(0)).contiguous()
             enc_h = enc_h[:, :-2]

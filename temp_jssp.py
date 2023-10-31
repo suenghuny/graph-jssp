@@ -3,7 +3,10 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
-
+import networkx as nx
+import matplotlib.pyplot as plt
+import os
+os.environ['KMP_DUPLICATE_LIB_OK']='True'
 from time import time
 from datetime import datetime
 
@@ -152,6 +155,46 @@ def train_model( params, log_path=None):
             edge_precedence = scheduler.get_edge_index_precedence()
             edge_antiprecedence = scheduler.get_edge_index_antiprecedence()
             edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
+
+
+            # # Edge data
+            # edge1 = edge_precedence
+            # edge2 = edge_machine_sharing
+            # print(edge2)
+            # # Create a graph
+            #
+            # G = nx.Graph()
+            #
+            # # Add edges from edge1 and edge2
+            # for e in range(len(edge1[0])):
+            #     G.add_edge(edge1[0][e], edge1[1][e], weight=1)
+            #
+            # for e in range(len(edge2[0])):
+            #     G.add_edge(edge2[0][e], edge2[1][e], weight=1)
+            #
+            # # for edge in edge2:
+            # #     G.add_edge(edge[0], edge[1], weight=1)
+            #
+            # # Draw the graph
+            # pos = nx.spring_layout(G)
+            #
+            # # Draw nodes
+            # nx.draw_networkx_nodes(G, pos, node_size=500, node_color="skyblue")
+            # print("??")
+            # # Draw edges from edge1 in red and from edge2 in blue
+            # nx.draw_networkx_edges(G, pos, edgelist=edge1, edge_color='red', width=2)
+            # nx.draw_networkx_edges(G, pos, edgelist=edge2, edge_color='blue', width=2)
+            #
+            # # Draw node labels
+            # nx.draw_networkx_labels(G, pos)
+            #
+            # # Draw edge weights
+            # labels = nx.get_edge_attributes(G, 'weight')
+            # nx.draw_networkx_edge_labels(G, pos, edge_labels=labels)
+            # plt.show()
+            # plt.savefig("xxx.png")
+            #
+
             heterogeneous_edges = (edge_precedence, edge_antiprecedence, edge_machine_sharing)
             heterogeneous_edges = [heterogeneous_edges for _ in range(params['batch_size'])]
             input_data = (node_feature, heterogeneous_edges)
