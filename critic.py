@@ -65,11 +65,11 @@ class PtrNet2(nn.Module):
 
         node_features, heterogeneous_edges = x
         node_features = torch.tensor(node_features).to(device).float()
-        #embed_enc_inputs = self.Embedding(node_features)
-        #embed = embed_enc_inputs.size(2)
-        #batch = node_features.shape[0]
-        #block_num = node_features.shape[1] - 2
-
+        # embed_enc_inputs = self.Embedding(node_features)
+        # embed = embed_enc_inputs.size(2)
+        # batch = node_features.shape[0]
+        # block_num = node_features.shape[1] - 2
+        #print(self.W_q.weight[0][2])
         enc_h = self.GraphEmbedding(heterogeneous_edges, node_features, mini_batch=True)
         enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
 

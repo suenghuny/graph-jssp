@@ -14,6 +14,10 @@ from actor2 import PtrNet1
 from critic import PtrNet2
 from jssp import Scheduler
 from cfg import get_cfg
+import random
+numbers = list(range(10))
+random.shuffle(numbers)
+
 
 cfg = get_cfg()
 if cfg.vessl == True:
@@ -22,48 +26,69 @@ if cfg.vessl == True:
 # torch.autograd.set_detect_anomaly(True)
 # machine, procesing time
 
-datas = [[
-    [(0, np.random.randint(1, 100)), (1, np.random.randint(1, 100)), (2, np.random.randint(1, 100)),
-     (3, np.random.randint(1, 100)), (4, np.random.randint(1, 100)), (5, np.random.randint(1, 100)),
-     (6, np.random.randint(1, 100)), (7, np.random.randint(1, 100)), (8, np.random.randint(1, 100)),
-     (9, np.random.randint(1, 100))],
-    [(0, np.random.randint(1, 100)), (2, np.random.randint(1, 100)), (4, np.random.randint(1, 100)),
-     (9, np.random.randint(1, 100)), (3, np.random.randint(1, 100)), (1, np.random.randint(1, 100)),
-     (6, np.random.randint(1, 100)), (5, np.random.randint(1, 100)), (7, np.random.randint(1, 100)),
-     (8, np.random.randint(1, 100))],
-    [(1, np.random.randint(1, 100)), (0, np.random.randint(1, 100)), (3, np.random.randint(1, 100)),
-     (2, np.random.randint(1, 100)), (8, np.random.randint(1, 100)), (5, np.random.randint(1, 100)),
-     (7, np.random.randint(1, 100)), (6, np.random.randint(1, 100)), (9, np.random.randint(1, 100)),
-     (4, np.random.randint(1, 100))],
-    [(1, np.random.randint(1, 100)), (2, np.random.randint(1, 100)), (0, np.random.randint(1, 100)),
-     (4, np.random.randint(1, 100)), (6, np.random.randint(1, 100)), (8, np.random.randint(1, 100)),
-     (7, np.random.randint(1, 100)), (3, np.random.randint(1, 100)), (9, np.random.randint(1, 100)),
-     (5, np.random.randint(1, 100))],
-    [(2, np.random.randint(1, 100)), (0, np.random.randint(1, 100)), (1, np.random.randint(1, 100)),
-     (5, np.random.randint(1, 100)), (3, np.random.randint(1, 100)), (4, np.random.randint(1, 100)),
-     (8, np.random.randint(1, 100)), (7, np.random.randint(1, 100)), (9, np.random.randint(1, 100)),
-     (6, np.random.randint(1, 100))],
-    [(2, np.random.randint(1, 100)), (1, np.random.randint(1, 100)), (5, np.random.randint(1, 100)),
-     (3, np.random.randint(1, 100)), (8, np.random.randint(1, 100)), (9, np.random.randint(1, 100)),
-     (0, np.random.randint(1, 100)), (6, np.random.randint(1, 100)), (4, np.random.randint(1, 100)),
-     (7, np.random.randint(1, 100))],
-    [(1, np.random.randint(1, 100)), (0, np.random.randint(1, 100)), (3, np.random.randint(1, 100)),
-     (2, np.random.randint(1, 100)), (6, np.random.randint(1, 100)), (5, np.random.randint(1, 100)),
-     (9, np.random.randint(1, 100)), (8, np.random.randint(1, 100)), (7, np.random.randint(1, 100)),
-     (4, np.random.randint(1, 100))],
-    [(2, np.random.randint(1, 100)), (0, np.random.randint(1, 100)), (1, np.random.randint(1, 100)),
-     (5, np.random.randint(1, 100)), (4, np.random.randint(1, 100)), (6, np.random.randint(1, 100)),
-     (8, np.random.randint(1, 100)), (9, np.random.randint(1, 100)), (7, np.random.randint(1, 100)),
-     (3, np.random.randint(1, 100))],
-    [(0, np.random.randint(1, 100)), (1, np.random.randint(1, 100)), (3, np.random.randint(1, 100)),
-     (5, np.random.randint(1, 100)), (2, np.random.randint(1, 100)), (9, np.random.randint(1, 100)),
-     (6, np.random.randint(1, 100)), (7, np.random.randint(1, 100)), (4, np.random.randint(1, 100)),
-     (8, np.random.randint(1, 100))],
-    [(1, np.random.randint(1, 100)), (0, np.random.randint(1, 100)), (2, np.random.randint(1, 100)),
-     (6, np.random.randint(1, 100)), (8, np.random.randint(1, 100)), (9, np.random.randint(1, 100)),
-     (5, np.random.randint(1, 100)), (3, np.random.randint(1, 100)), (4, np.random.randint(1, 100)),
-     (7, np.random.randint(1, 100))]
-] for _ in range(10)]
+val_data = [
+    [(9, 66), (8, 13), (0, 93), (7, 91), (6, 14), (5, 70), (3, 99), (2, 53), (4, 86), (1, 16)],
+    [(8, 34), (9, 99), (0, 62), (7, 65), (5, 62), (4, 64), (6, 21), (2, 12), (3, 9), (1, 75)],
+    [(9, 12), (8, 26), (7, 64), (6, 92), (4, 67), (5, 28), (3, 66), (2, 83), (1, 38), (0, 58)],
+    [(0, 77), (1, 73), (3, 82), (2, 75), (6, 84), (4, 19), (5, 18), (7, 89), (8, 8), (9, 73)],
+    [(0, 34), (1, 74), (7, 48), (5, 44), (4, 92), (6, 40), (3, 60), (2, 62), (8, 22), (9, 67)],
+    [(9, 8),  (8, 85), (3, 58), (7, 97), (5, 92), (4, 89), (6, 75), (2, 77), (1, 95), (0, 5)],
+    [(8, 52), (9, 43), (6, 5), (7, 78), (5, 12), (3, 62), (4, 21), (2, 80), (1, 60), (0, 31)],
+    [(9, 81), (8, 23), (7, 23), (6, 75), (4, 78), (5, 56), (3, 51), (2, 39), (1, 53), (0, 96)],
+    [(9, 79), (8, 55), (2, 88), (4, 21), (5, 83), (3, 93), (6, 47), (7, 10), (0, 63), (1, 14)],
+    [(0, 43), (1, 63), (2, 83), (3, 29), (4, 52), (5, 98), (6, 54), (7, 39), (8, 33), (9, 23)]
+]
+
+
+
+
+
+
+
+
+
+# datas = [[
+#     [(0, np.random.randint(1, 100)), (1, np.random.randint(1, 100)), (2, np.random.randint(1, 100)),
+#      (3, np.random.randint(1, 100)), (4, np.random.randint(1, 100)), (5, np.random.randint(1, 100)),
+#      (6, np.random.randint(1, 100)), (7, np.random.randint(1, 100)), (8, np.random.randint(1, 100)),
+#      (9, np.random.randint(1, 100))],
+#     [(0, np.random.randint(1, 100)), (2, np.random.randint(1, 100)), (4, np.random.randint(1, 100)),
+#      (9, np.random.randint(1, 100)), (3, np.random.randint(1, 100)), (1, np.random.randint(1, 100)),
+#      (6, np.random.randint(1, 100)), (5, np.random.randint(1, 100)), (7, np.random.randint(1, 100)),
+#      (8, np.random.randint(1, 100))],
+#     [(1, np.random.randint(1, 100)), (0, np.random.randint(1, 100)), (3, np.random.randint(1, 100)),
+#      (2, np.random.randint(1, 100)), (8, np.random.randint(1, 100)), (5, np.random.randint(1, 100)),
+#      (7, np.random.randint(1, 100)), (6, np.random.randint(1, 100)), (9, np.random.randint(1, 100)),
+#      (4, np.random.randint(1, 100))],
+#     [(1, np.random.randint(1, 100)), (2, np.random.randint(1, 100)), (0, np.random.randint(1, 100)),
+#      (4, np.random.randint(1, 100)), (6, np.random.randint(1, 100)), (8, np.random.randint(1, 100)),
+#      (7, np.random.randint(1, 100)), (3, np.random.randint(1, 100)), (9, np.random.randint(1, 100)),
+#      (5, np.random.randint(1, 100))],
+#     [(2, np.random.randint(1, 100)), (0, np.random.randint(1, 100)), (1, np.random.randint(1, 100)),
+#      (5, np.random.randint(1, 100)), (3, np.random.randint(1, 100)), (4, np.random.randint(1, 100)),
+#      (8, np.random.randint(1, 100)), (7, np.random.randint(1, 100)), (9, np.random.randint(1, 100)),
+#      (6, np.random.randint(1, 100))],
+#     [(2, np.random.randint(1, 100)), (1, np.random.randint(1, 100)), (5, np.random.randint(1, 100)),
+#      (3, np.random.randint(1, 100)), (8, np.random.randint(1, 100)), (9, np.random.randint(1, 100)),
+#      (0, np.random.randint(1, 100)), (6, np.random.randint(1, 100)), (4, np.random.randint(1, 100)),
+#      (7, np.random.randint(1, 100))],
+#     [(1, np.random.randint(1, 100)), (0, np.random.randint(1, 100)), (3, np.random.randint(1, 100)),
+#      (2, np.random.randint(1, 100)), (6, np.random.randint(1, 100)), (5, np.random.randint(1, 100)),
+#      (9, np.random.randint(1, 100)), (8, np.random.randint(1, 100)), (7, np.random.randint(1, 100)),
+#      (4, np.random.randint(1, 100))],
+#     [(2, np.random.randint(1, 100)), (0, np.random.randint(1, 100)), (1, np.random.randint(1, 100)),
+#      (5, np.random.randint(1, 100)), (4, np.random.randint(1, 100)), (6, np.random.randint(1, 100)),
+#      (8, np.random.randint(1, 100)), (9, np.random.randint(1, 100)), (7, np.random.randint(1, 100)),
+#      (3, np.random.randint(1, 100))],
+#     [(0, np.random.randint(1, 100)), (1, np.random.randint(1, 100)), (3, np.random.randint(1, 100)),
+#      (5, np.random.randint(1, 100)), (2, np.random.randint(1, 100)), (9, np.random.randint(1, 100)),
+#      (6, np.random.randint(1, 100)), (7, np.random.randint(1, 100)), (4, np.random.randint(1, 100)),
+#      (8, np.random.randint(1, 100))],
+#     [(1, np.random.randint(1, 100)), (0, np.random.randint(1, 100)), (2, np.random.randint(1, 100)),
+#      (6, np.random.randint(1, 100)), (8, np.random.randint(1, 100)), (9, np.random.randint(1, 100)),
+#      (5, np.random.randint(1, 100)), (3, np.random.randint(1, 100)), (4, np.random.randint(1, 100)),
+#      (7, np.random.randint(1, 100))]
+# ] for _ in range(10)]
 
 
 def train_model( params, log_path=None):
@@ -102,6 +127,19 @@ def train_model( params, log_path=None):
         inputs : batch_size X number_of_blocks X number_of_process
         pred_seq : batch_size X number_of_blocks
         """
+        if s % 5 == 1:
+            jobs_data = []
+            num_jobs = 10
+            num_operation = 10
+            for job in range(num_jobs):
+                machine_sequence = list(range(num_jobs))
+                random.shuffle(machine_sequence)
+                empty = list()
+                for ops in range(num_operation):
+                    empty.append((machine_sequence[ops], np.random.randint(1, 100)))
+                jobs_data.append(empty)
+            #print(jobs_data)
+
         # if s % 20 == 1:
         #     jobs_data = [
         #         [(0, np.random.randint(1, 100)), (1, np.random.randint(1, 100)), (2, np.random.randint(1, 100)),
@@ -145,8 +183,36 @@ def train_model( params, log_path=None):
         #          (5, np.random.randint(1, 100)), (3, np.random.randint(1, 100)), (4, np.random.randint(1, 100)),
         #          (7, np.random.randint(1, 100))]
         #     ]  # mach
-        rem = s% 10
-        jobs_data = datas[rem]
+        #rem = s% 10
+        #jobs_data = datas[rem]
+
+        if s % 20 == 1:
+            num_val = 50
+            act_model.init_mask_job_count(num_val)
+            scheduler = Scheduler(val_data)
+            node_feature = scheduler.get_node_feature()
+            node_feature = [node_feature for _ in range(num_val)]
+            edge_precedence = scheduler.get_edge_index_precedence()
+            edge_antiprecedence = scheduler.get_edge_index_antiprecedence()
+            edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
+            heterogeneous_edges = (edge_precedence, edge_antiprecedence, edge_machine_sharing)
+            heterogeneous_edges = [heterogeneous_edges for _ in range(num_val)]
+            input_data = (node_feature, heterogeneous_edges)
+            pred_seq, ll_old, _ = act_model(input_data, device)
+            val_makespan = list()
+            for sequence in pred_seq:
+                scheduler = Scheduler(jobs_data)
+                scheduler.run(sequence.tolist())
+                makespan = scheduler.c_max
+                val_makespan.append(makespan)
+
+            print((np.min(val_makespan)/944-1)*100, (np.mean(val_makespan)/944-1)*100)
+            vessl.log(step=s, payload={'min makespan': (np.min(val_makespan)/944-1)*100})
+            vessl.log(step=s, payload={'mean makespan': (np.mean(val_makespan) / 944 - 1) * 100})
+            act_model.init_mask_job_count(params['batch_size'])
+
+
+
         act_model.block_indices = []
         scheduler = Scheduler(jobs_data)
         if params['gnn'] == True:
@@ -214,31 +280,51 @@ def train_model( params, log_path=None):
         ave_makespan += sum(real_makespan)/(params["batch_size"]*params["log_step"])
         if cfg.vessl == True:
             vessl.log(step=s, payload={'makespan': sum(real_makespan)/params["batch_size"]})
-
-        for k in range(params["iteration"]):  # K-epoch
-            pred_makespan = cri_model(input_data, device).unsqueeze(-1)
-            adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - pred_makespan.detach().to(device)
-            cri_loss = mse_loss(pred_makespan, torch.tensor(real_makespan, dtype = torch.float).to(device).unsqueeze(1).detach())
-            cri_optim.zero_grad()
-            cri_loss.backward()
-            nn.utils.clip_grad_norm_(cri_model.parameters(), max_norm=10.0, norm_type=2)
-            cri_optim.step()
-            if params["is_lr_decay"]:
-                cri_lr_scheduler.step()
-            ave_cri_loss += cri_loss.item()
-            _, ll_new, _ = act_model(input_data, device, pred_seq)  # pi(seq|inputs)
-            ratio = torch.exp(ll_new - ll_old.detach()).unsqueeze(-1)  #
-            surr1 = ratio * adv
-            surr2 = torch.clamp(ratio, 1 - params["epsilon"], 1 + params["epsilon"]) * adv
-            act_loss = -torch.min(surr1, surr2).mean()
-
-            act_optim.zero_grad()
-            act_loss.backward()
-            act_optim.step()
-            nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=2.0, norm_type=2)
-            if params["is_lr_decay"]:
-                act_lr_scheduler.step()
-            ave_act_loss += act_loss.item()
+        # if s % 10 == 0:
+        #     if act_model.T >= 0.05:
+        #         act_model.T *=1
+        pred_makespan = cri_model(input_data, device).unsqueeze(-1)
+        adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - pred_makespan.detach().to(device)
+        cri_loss = mse_loss(pred_makespan, torch.tensor(real_makespan, dtype = torch.float).to(device).unsqueeze(1).detach())
+        cri_optim.zero_grad()
+        cri_loss.backward()
+        nn.utils.clip_grad_norm_(cri_model.parameters(), max_norm=1., norm_type=2)
+        cri_optim.step()
+        if params["is_lr_decay"]:
+            cri_lr_scheduler.step()
+        #print(ll_old.shape, adv.shape)
+        act_loss = -(ll_old*adv).mean()
+        act_optim.zero_grad()
+        act_loss.backward()
+        act_optim.step()
+        nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=1.0, norm_type=2)
+        if params["is_lr_decay"]:
+            act_lr_scheduler.step()
+        ave_cri_loss += cri_loss.item()
+        ave_act_loss += act_loss.item()
+        # for k in range(params["iteration"]):  # K-epoch
+        #     pred_makespan = cri_model(input_data, device).unsqueeze(-1)
+        #     adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - pred_makespan.detach().to(device)
+        #     cri_loss = mse_loss(pred_makespan, torch.tensor(real_makespan, dtype = torch.float).to(device).unsqueeze(1).detach())
+        #     cri_optim.zero_grad()
+        #     cri_loss.backward()
+        #     nn.utils.clip_grad_norm_(cri_model.parameters(), max_norm=1., norm_type=2)
+        #     cri_optim.step()
+        #     if params["is_lr_decay"]:
+        #         cri_lr_scheduler.step()
+        #     ave_cri_loss += cri_loss.item()
+        #     _, ll_new, _ = act_model(input_data, device, pred_seq)  # pi(seq|inputs)
+        #     ratio = torch.exp(ll_new - ll_old.detach()).unsqueeze(-1)  #
+        #     surr1 = ratio * adv
+        #     surr2 = torch.clamp(ratio, 1 - params["epsilon"], 1 + params["epsilon"]) * adv
+        #     act_loss = -torch.min(surr1, surr2).mean()
+        #     act_optim.zero_grad()
+        #     act_loss.backward()
+        #     act_optim.step()
+        #     nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=10.0, norm_type=2)
+        #     if params["is_lr_decay"]:
+        #         act_lr_scheduler.step()
+        #     ave_act_loss += act_loss.item()
 
 
 

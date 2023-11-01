@@ -85,9 +85,9 @@ class GCRN(nn.Module):
 
         self.embedding_layers = NodeEmbedding(graph_embedding_size*num_edge_cat, embedding_size, layers).to(device)
 
-        self.m = [nn.LeakyReLU() for _ in range(num_edge_cat)]
-        self.mv = [nn.Softplus() for _ in range(num_edge_cat)]
-        self.mq = [nn.Softplus() for _ in range(num_edge_cat)]
+        self.m = [nn.ReLU() for _ in range(num_edge_cat)]
+        # self.mv = [nn.Softplus() for _ in range(num_edge_cat)]
+        # self.mq = [nn.Softplus() for _ in range(num_edge_cat)]
 
         self.a = [nn.Parameter(torch.empty(size=(2 * graph_embedding_size, 1))) for i in range(num_edge_cat)]
         [nn.init.xavier_uniform_(self.a[e].data, gain=1.414) for e in range(num_edge_cat)]
@@ -122,14 +122,13 @@ class GCRN(nn.Module):
                 E = A[e]
                 num_nodes = X.shape[0]
                 E = torch.sparse_coo_tensor(E, torch.ones(torch.tensor(E).shape[1]), (num_nodes, num_nodes)).to(device).to_dense()
-
                 Wh = X @ self.Ws[e]
                 Wq = self.mq[e](self.Wq[e](X))
                 Wv = self.mv[e](self.Wv[e](X))
 
 
                 a = self._prepare_attentional_mechanism_input(Wq, Wv, E, e, mini_batch = mini_batch)
-                a = F.softmax(a, dim = 1)
+                a = F.softmax(a*20, dim = 1)
                 H = a*E@Wh
 
                 temp.append(H)
@@ -150,16 +149,17 @@ class GCRN(nn.Module):
                                             (num_nodes, num_nodes)).to(device).to_dense()
                     # X_b = X[b].dou
                     #print(X[b])
-                    Wh = X[b] @ self.Ws[e]
-                    Wq = self.mq[e](X[b] @ self.Wq[e])# self.mq[e](self.Wq[e](X[b]))
-                    Wv = self.mv[e](X[b] @ self.Wv[e])# self.mv[e](self.Wv[e](X[b]))
-                    # print(Wq[0])
-                    # print(Wq[4])
-                    # print("==================")
-                    a = self._prepare_attentional_mechanism_input(Wq, Wv,E, e, mini_batch=mini_batch)
+                    H = self.m[e](E @ X[b] @ self.Ws[e])
+                    # print(Wh.shape)
+                    # Wq = self.mq[e](X[b] @ self.Wq[e])# self.mq[e](self.Wq[e](X[b]))
+                    # Wv = self.mv[e](X[b] @ self.Wv[e])# self.mv[e](self.Wv[e](X[b]))
+                    # # print(Wq[0])
+                    # # print(Wq[4])
+                    # # print("==================")
+                    # a = self._prepare_attentional_mechanism_input(Wq, Wv,E, e, mini_batch=mini_batch)
 
-                    a = F.softmax(a, dim=1)
-                    H = a*E@Wh
+                    # a = F.softmax(a*10, dim=1)
+                    # H = a*E@Wh
                     empty[b, :, e, :].copy_(H)
 
             H = empty.reshape(batch_size, num_nodes, self.num_edge_cat*self.graph_embedding_size)
