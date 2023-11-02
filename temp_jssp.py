@@ -14,7 +14,7 @@ from datetime import datetime
 
 from actor2 import PtrNet1
 from critic import PtrNet2
-from jssp import Scheduler
+from jssp2 import Scheduler
 from cfg import get_cfg
 import random
 numbers = list(range(10))
@@ -193,7 +193,7 @@ def train_model( params, log_path=None):
         if s % 20 == 1:
             num_val = 50
             act_model.init_mask_job_count(num_val)
-            scheduler = Scheduler(val_data)
+            scheduler = Scheduler(ORB10)
             node_feature = scheduler.get_node_feature()
             node_feature = [node_feature for _ in range(num_val)]
             edge_precedence = scheduler.get_edge_index_precedence()
