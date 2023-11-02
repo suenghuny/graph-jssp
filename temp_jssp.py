@@ -1,4 +1,6 @@
 import os
+
+import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -26,7 +28,7 @@ if cfg.vessl == True:
 # torch.autograd.set_detect_anomaly(True)
 # machine, procesing time
 
-val_data = [
+ORB10 = [
     [(9, 66), (8, 13), (0, 93), (7, 91), (6, 14), (5, 70), (3, 99), (2, 53), (4, 86), (1, 16)],
     [(8, 34), (9, 99), (0, 62), (7, 65), (5, 62), (4, 64), (6, 21), (2, 12), (3, 9), (1, 75)],
     [(9, 12), (8, 26), (7, 64), (6, 92), (4, 67), (5, 28), (3, 66), (2, 83), (1, 38), (0, 58)],
@@ -121,6 +123,8 @@ def train_model( params, log_path=None):
     mse_loss = nn.MSELoss()
     t1 = time()
     ave_makespan = 0
+    min_makespans = []
+    mean_makespans = []
     for s in range(epoch + 1, params["step"]):
         """
         변수별 shape 
@@ -207,8 +211,17 @@ def train_model( params, log_path=None):
                 val_makespan.append(makespan)
 
             print((np.min(val_makespan)/944-1)*100, (np.mean(val_makespan)/944-1)*100)
-            vessl.log(step=s, payload={'min makespan': (np.min(val_makespan)/944-1)*100})
-            vessl.log(step=s, payload={'mean makespan': (np.mean(val_makespan) / 944 - 1) * 100})
+            if cfg.vessl == True:
+                vessl.log(step=s, payload={'min makespan': (np.min(val_makespan)/944-1)*100})
+                vessl.log(step=s, payload={'mean makespan': (np.mean(val_makespan) / 944 - 1) * 100})
+            else:
+                min_makespans.append((np.min(val_makespan)/944-1)*100)
+                mean_makespans.append((np.mean(val_makespan) / 944 - 1) * 100)
+                min_m = pd.DataFrame(min_makespans)
+                mean_m = pd.DataFrame(mean_makespans)
+                min_m.to_csv('min_makespan.csv')
+                mean_m.to_csv('mean_makespan.csv')
+
             act_model.init_mask_job_count(params['batch_size'])
 
 
@@ -346,16 +359,16 @@ def train_model( params, log_path=None):
                     (t2 - t1) // 60, (t2 - t1) % 60))
             t1 = time()
 
-        # if s % params["save_step"] == 0:
-        #     torch.save({'epoch': s,
-        #                 'model_state_dict_actor': act_model.state_dict(),
-        #                 'model_state_dict_critic': cri_model.state_dict(),
-        #                 'optimizer_state_dict_actor': act_optim.state_dict(),
-        #                 'optimizer_state_dict_critic': cri_optim.state_dict(),
-        #                 'ave_act_loss': ave_act_loss,
-        #                 'ave_cri_loss': ave_cri_loss,
-        #                 'ave_makespan': ave_makespan},
-        #                params["model_dir"] + '/ppo' + '/%s_step%d_act.pt' % (date, s))
+        if s % params["save_step"] == 1:
+            torch.save({'epoch': s,
+                        'model_state_dict_actor': act_model.state_dict(),
+                        'model_state_dict_critic': cri_model.state_dict(),
+                        'optimizer_state_dict_actor': act_optim.state_dict(),
+                        'optimizer_state_dict_critic': cri_optim.state_dict(),
+                        'ave_act_loss': ave_act_loss,
+                        'ave_cri_loss': ave_cri_loss,
+                        'ave_makespan': ave_makespan},
+                       params["model_dir"] + '/ppo' + '/%s_step%d_act.pt' % (date, s))
         #     print('save model...')
 def one_hot_encode(tensor, n_classes):
     original_shape = tensor.shape
