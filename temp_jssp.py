@@ -14,7 +14,7 @@ from datetime import datetime
 
 from actor2 import PtrNet1
 from critic import PtrNet2
-from jssp2 import Scheduler
+from jssp import Scheduler
 from cfg import get_cfg
 import random
 numbers = list(range(10))
@@ -132,16 +132,19 @@ def train_model( params, log_path=None):
         pred_seq : batch_size X number_of_blocks
         """
         if s % 5 == 1:
-            jobs_data = []
+            jobs_datas = []
             num_jobs = 10
             num_operation = 10
-            for job in range(num_jobs):
-                machine_sequence = list(range(num_jobs))
-                random.shuffle(machine_sequence)
-                empty = list()
-                for ops in range(num_operation):
-                    empty.append((machine_sequence[ops], np.random.randint(1, 100)))
-                jobs_data.append(empty)
+            for _ in range(params['batch_size']):
+                temp = []
+                for job in range(num_jobs):
+                    machine_sequence = list(range(num_jobs))
+                    random.shuffle(machine_sequence)
+                    empty = list()
+                    for ops in range(num_operation):
+                        empty.append((machine_sequence[ops], np.random.randint(1, 100)))
+                    temp.append(empty)
+                jobs_datas.append(temp)
             #print(jobs_data)
 
         # if s % 20 == 1:
@@ -199,18 +202,19 @@ def train_model( params, log_path=None):
             edge_precedence = scheduler.get_edge_index_precedence()
             edge_antiprecedence = scheduler.get_edge_index_antiprecedence()
             edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
-            heterogeneous_edges = (edge_precedence, edge_antiprecedence, edge_machine_sharing)
+            edge_fcn = scheduler.get_fully_connected_edge_index()
+            heterogeneous_edges = (edge_precedence, edge_antiprecedence, edge_machine_sharing, edge_fcn)
             heterogeneous_edges = [heterogeneous_edges for _ in range(num_val)]
             input_data = (node_feature, heterogeneous_edges)
             pred_seq, ll_old, _ = act_model(input_data, device)
             val_makespan = list()
             for sequence in pred_seq:
-                scheduler = Scheduler(jobs_data)
-                scheduler.run(sequence.tolist())
-                makespan = scheduler.c_max
+                scheduler = Scheduler(ORB10)
+                makespan = scheduler.run(sequence.tolist())
+                #makespan = scheduler.
                 val_makespan.append(makespan)
 
-            print((np.min(val_makespan)/944-1)*100, (np.mean(val_makespan)/944-1)*100)
+            print((np.min(val_makespan)/944-1)*100, (np.mean(val_makespan)/944-1)*100, np.min(val_makespan))
             if cfg.vessl == True:
                 vessl.log(step=s, payload={'min makespan': (np.min(val_makespan)/944-1)*100})
                 vessl.log(step=s, payload={'mean makespan': (np.mean(val_makespan) / 944 - 1) * 100})
@@ -227,13 +231,18 @@ def train_model( params, log_path=None):
 
 
         act_model.block_indices = []
-        scheduler = Scheduler(jobs_data)
+
         if params['gnn'] == True:
-            node_feature = scheduler.get_node_feature()
-            node_feature = [node_feature for _ in range(params['batch_size'])]
-            edge_precedence = scheduler.get_edge_index_precedence()
-            edge_antiprecedence = scheduler.get_edge_index_antiprecedence()
-            edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
+            heterogeneous_edges = list()
+            node_features = list()
+            for n in range(params['batch_size']):
+                scheduler = Scheduler(jobs_datas[n])
+                node_feature = scheduler.get_node_feature()
+                node_features.append(node_feature)
+                #node_feature = [node_feature for _ in range(params['batch_size'])]
+                edge_precedence = scheduler.get_edge_index_precedence()
+                edge_antiprecedence = scheduler.get_edge_index_antiprecedence()
+                edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
 
 
             # # Edge data
@@ -273,10 +282,10 @@ def train_model( params, log_path=None):
             # plt.show()
             # plt.savefig("xxx.png")
             #
-
-            heterogeneous_edges = (edge_precedence, edge_antiprecedence, edge_machine_sharing)
-            heterogeneous_edges = [heterogeneous_edges for _ in range(params['batch_size'])]
-            input_data = (node_feature, heterogeneous_edges)
+                edge_fcn = scheduler.get_fully_connected_edge_index()
+                heterogeneous_edge  = (edge_precedence, edge_antiprecedence, edge_machine_sharing, edge_fcn)
+                heterogeneous_edges.append(heterogeneous_edge)
+            input_data = (node_features, heterogeneous_edges)
         else:
             input_data = torch.tensor(jobs_data, dtype=torch.float).reshape(-1, 2).unsqueeze(0)
             input_data[:, :, 1] = input_data[:, :, 1].squeeze(0).squeeze(0) * 1 / input_data[:, :, 1].squeeze(0).squeeze(0).max()
@@ -285,60 +294,72 @@ def train_model( params, log_path=None):
             input_data = new_input_data.repeat(params["batch_size"], 1, 1)
         pred_seq, ll_old, _ = act_model(input_data, device)
         real_makespan = list()
-        for sequence in pred_seq:
-            scheduler = Scheduler(jobs_data)
-            scheduler.run(sequence.tolist())
-            makespan = - scheduler.c_max / 15
+        for n in range(len(node_features)):
+            sequence = pred_seq[n]
+            scheduler = Scheduler(jobs_datas[n])
+            makespan = - scheduler.run(sequence.tolist())/15
             real_makespan.append(makespan)
         ave_makespan += sum(real_makespan)/(params["batch_size"]*params["log_step"])
-        if cfg.vessl == True:
-            vessl.log(step=s, payload={'makespan': sum(real_makespan)/params["batch_size"]})
-        # if s % 10 == 0:
-        #     if act_model.T >= 0.05:
-        #         act_model.T *=1
-        pred_makespan = cri_model(input_data, device).unsqueeze(-1)
-        adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - pred_makespan.detach().to(device)
-        cri_loss = mse_loss(pred_makespan, torch.tensor(real_makespan, dtype = torch.float).to(device).unsqueeze(1).detach())
-        cri_optim.zero_grad()
-        cri_loss.backward()
-        nn.utils.clip_grad_norm_(cri_model.parameters(), max_norm=1., norm_type=2)
-        cri_optim.step()
-        if params["is_lr_decay"]:
-            cri_lr_scheduler.step()
-        #print(ll_old.shape, adv.shape)
-        act_loss = -(ll_old*adv).mean()
-        act_optim.zero_grad()
-        act_loss.backward()
-        act_optim.step()
-        nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=1.0, norm_type=2)
-        if params["is_lr_decay"]:
-            act_lr_scheduler.step()
-        ave_cri_loss += cri_loss.item()
-        ave_act_loss += act_loss.item()
-        # for k in range(params["iteration"]):  # K-epoch
-        #     pred_makespan = cri_model(input_data, device).unsqueeze(-1)
-        #     adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - pred_makespan.detach().to(device)
-        #     cri_loss = mse_loss(pred_makespan, torch.tensor(real_makespan, dtype = torch.float).to(device).unsqueeze(1).detach())
-        #     cri_optim.zero_grad()
-        #     cri_loss.backward()
-        #     nn.utils.clip_grad_norm_(cri_model.parameters(), max_norm=1., norm_type=2)
-        #     cri_optim.step()
-        #     if params["is_lr_decay"]:
-        #         cri_lr_scheduler.step()
-        #     ave_cri_loss += cri_loss.item()
-        #     _, ll_new, _ = act_model(input_data, device, pred_seq)  # pi(seq|inputs)
-        #     ratio = torch.exp(ll_new - ll_old.detach()).unsqueeze(-1)  #
-        #     surr1 = ratio * adv
-        #     surr2 = torch.clamp(ratio, 1 - params["epsilon"], 1 + params["epsilon"]) * adv
-        #     act_loss = -torch.min(surr1, surr2).mean()
-        #     act_optim.zero_grad()
-        #     act_loss.backward()
-        #     act_optim.step()
-        #     nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=10.0, norm_type=2)
-        #     if params["is_lr_decay"]:
-        #         act_lr_scheduler.step()
-        #     ave_act_loss += act_loss.item()
+        """
+        vanila actor critic
+        """
+        if cfg.ppo == False:
+        # # if cfg.vessl == True:
+        # #     vessl.log(step=s, payload={'makespan': sum(real_makespan)/params["batch_size"]})
+        # # # if s % 10 == 0:
+        # # #     if act_model.T >= 0.05:
+        # # #         act_model.T *=1
+            pred_makespan = cri_model(input_data, device).unsqueeze(-1)
+            adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - pred_makespan.detach().to(device)
+            cri_loss = mse_loss(pred_makespan, torch.tensor(real_makespan, dtype = torch.float).to(device).unsqueeze(1).detach())
+            cri_optim.zero_grad()
+            cri_loss.backward()
+            nn.utils.clip_grad_norm_(cri_model.parameters(), max_norm=1., norm_type=2)
+            cri_optim.step()
+            if params["is_lr_decay"]:
+                cri_lr_scheduler.step()
+            # print(ll_old.shape, adv.shape)
 
+            act_loss = -(ll_old*adv).mean()
+            act_optim.zero_grad()
+            act_loss.backward()
+            act_optim.step()
+            nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=1.0, norm_type=2)
+            if params["is_lr_decay"]:
+                act_lr_scheduler.step()
+            ave_act_loss += act_loss.item()
+            ave_cri_loss += cri_loss.item()
+
+        """
+        vanila actor critic
+        
+        """
+
+#
+        if cfg.ppo == True:
+            for k in range(params["iteration"]):  # K-epoch
+                pred_makespan = cri_model(input_data, device).unsqueeze(-1)
+                adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - pred_makespan.detach().to(device)
+                cri_loss = mse_loss(pred_makespan, torch.tensor(real_makespan, dtype = torch.float).to(device).unsqueeze(1).detach())
+                cri_optim.zero_grad()
+                cri_loss.backward()
+                nn.utils.clip_grad_norm_(cri_model.parameters(), max_norm=1., norm_type=2)
+                cri_optim.step()
+                if params["is_lr_decay"]:
+                    cri_lr_scheduler.step()
+                ave_cri_loss += cri_loss.item()
+                _, ll_new, _ = act_model(input_data, device, pred_seq)  # pi(seq|inputs)
+                ratio = torch.exp(ll_new - ll_old.detach()).unsqueeze(-1)  #
+                surr1 = ratio * adv
+                surr2 = torch.clamp(ratio, 1 - params["epsilon"], 1 + params["epsilon"]) * adv
+                act_loss = -torch.min(surr1, surr2).mean()
+                act_optim.zero_grad()
+                act_loss.backward()
+                act_optim.step()
+                nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=10.0, norm_type=2)
+                if params["is_lr_decay"]:
+                    act_lr_scheduler.step()
+                ave_act_loss += act_loss.item()
 
 
         if s % params["log_step"] == 0:

@@ -188,11 +188,8 @@ class Scheduler:
         self.jobs_data = input_data
         self.num_mc = len(input_data)   # number of machines
         self.num_job = len(input_data)  # number of jobs
-
-
         self.pt = [[ops[1] for ops in job] for job in input_data] # processing_time
-        self.ms = [[ops[0] for ops in job] for job in input_data] # job 별 machine sequence
-
+        self.ms = [[ops[0]+1 for ops in job] for job in input_data] # job 별 machine sequence
         self.j_keys = [j for j in range(self.num_job)]
         self.key_count = {key: 0 for key in self.j_keys}
         self.j_count =   {key: 0 for key in self.j_keys}
@@ -205,6 +202,7 @@ class Scheduler:
             gen_m = int(self.ms[i][self.key_count[i]])
             self.j_count[i] = self.j_count[i] + gen_t
             self.m_count[gen_m] = self.m_count[gen_m] + gen_t
+
             if self.m_count[gen_m] < self.j_count[i]:
                 self.m_count[gen_m] = self.j_count[i]
             elif self.m_count[gen_m] > self.j_count[i]:
@@ -253,6 +251,15 @@ class Scheduler:
         node_features.append([0., 0., 0])
         return node_features
 
+    def get_fully_connected_edge_index(self):
+        #jk = 0
+        n = len(self.jobs_data)*len(self.jobs_data)
+        rows = [i // n for i in range(n ** 2)]
+        cols = [i % n for i in range(n ** 2)]
+    #return [rows, cols]
+
+        return [rows, cols]
+
 
     def get_machine_sharing_edge_index(self):
         jk = 0
@@ -269,8 +276,6 @@ class Scheduler:
                     if m != m_prime:
                         edge_index[0].append(m)
                         edge_index[1].append(m_prime)
-
-
         return edge_index
         # print(machine_sharing)
         # print(edge_index)

@@ -111,8 +111,7 @@ class GCRN(nn.Module):
         #print(e.shape, A.shape)
         #print((e*A)[6])
         #print("ddd", self.m[k](e*A)[0], (e*A)[0])
-        return self.m[k](e*A)
-
+        return e*A
     def forward(self, A, X, mini_batch, layer = 0):
 
         if mini_batch == False:
@@ -147,23 +146,23 @@ class GCRN(nn.Module):
                     E = torch.sparse_coo_tensor(A[b][e],
                                             torch.ones(torch.tensor(torch.tensor(A[b][e]).shape[1])),
                                             (num_nodes, num_nodes)).to(device).to_dense()
-                    # X_b = X[b].dou
-                    #print(X[b])
-                    H = self.m[e](E @ X[b] @ self.Ws[e])
-                    # print(Wh.shape)
-                    # Wq = self.mq[e](X[b] @ self.Wq[e])# self.mq[e](self.Wq[e](X[b]))
-                    # Wv = self.mv[e](X[b] @ self.Wv[e])# self.mv[e](self.Wv[e](X[b]))
-                    # # print(Wq[0])
-                    # # print(Wq[4])
-                    # # print("==================")
+                    Wh = X[b] @ self.Ws[e]
+                    # Wq = X[b] @ self.Wq[e]
+                    # Wv = X[b] @ self.Wv[e]
                     # a = self._prepare_attentional_mechanism_input(Wq, Wv,E, e, mini_batch=mini_batch)
-
-                    # a = F.softmax(a*10, dim=1)
+                    # a = F.softmax(a, dim=1)
                     # H = a*E@Wh
+
+
+                    H = E@Wh
+                    n = H.shape[0]
+                    H = H/n
+                    #print(H.shape)
                     empty[b, :, e, :].copy_(H)
 
             H = empty.reshape(batch_size, num_nodes, self.num_edge_cat*self.graph_embedding_size)
             H = H.reshape(batch_size*num_nodes, self.num_edge_cat*self.graph_embedding_size)
             H = self.embedding_layers(H)
             H = H.reshape(batch_size, num_nodes, self.embedding_size)
+
             return H

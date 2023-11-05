@@ -9,31 +9,35 @@ class PtrNet2(nn.Module):
         super().__init__()
         self.gnn = params["gnn"]
         if self.gnn == True:
-            self.Embedding = nn.Linear(params["num_of_process"], params["n_embedding"],
-                                       bias=False)  # input_shape : num_of_process, output_shape : n_embedding
-            self.GraphEmbedding = GCRN(feature_size = params["num_of_process"],
-                                       graph_embedding_size= params["graph_embedding_size"],
-                                       embedding_size =  params["n_hidden"],layers =  params["layers"], num_edge_cat = 3)
-            self.GraphEmbedding1 = GCRN(feature_size=params["n_hidden"],
+            # self.Embedding = nn.Linear(params["num_of_process"], params["n_embedding"],
+            #                            bias=False)  # input_shape : num_of_process, output_shape : n_embedding
+            self.GraphEmbedding = GCRN(feature_size=params["num_of_process"],
                                        graph_embedding_size=params["graph_embedding_size"],
-                                       embedding_size=params["n_hidden"], layers=params["layers"], num_edge_cat=3)
+                                       embedding_size=params["n_hidden"], layers=params["layers"], num_edge_cat=4)
+            #
+            self.GraphEmbedding1 = GCRN(feature_size=params["n_hidden"] + params["num_of_process"],
+                                        graph_embedding_size=params["graph_embedding_size"],
+                                        embedding_size=params["n_hidden"], layers=params["layers"], num_edge_cat=4)
             self.GraphEmbedding2 = GCRN(feature_size=params["n_hidden"],
-                                       graph_embedding_size=params["graph_embedding_size"],
-                                       embedding_size=params["n_hidden"], layers=params["layers"], num_edge_cat=3)
+                                        graph_embedding_size=params["graph_embedding_size"],
+                                        embedding_size=params["n_hidden"], layers=params["layers"], num_edge_cat=4)
+            augmented_hidden_size = params["n_hidden"] + params["n_hidden"] + params["num_of_process"] + params["num_of_process"]
+
             if torch.cuda.is_available():
-                self.Vec = nn.Parameter(torch.cuda.FloatTensor(params["n_hidden"]))
+                self.Vec = nn.Parameter(torch.cuda.FloatTensor(augmented_hidden_size))
             else:
-                self.Vec = nn.Parameter(torch.FloatTensor(params["n_hidden"]))
-            self.W_q = nn.Linear(params["n_hidden"], params["n_hidden"], bias=True)
-            self.W_ref = nn.Conv1d(params["n_hidden"], params["n_hidden"], 1, 1)
+                self.Vec = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
+            self.W_q = nn.Linear(augmented_hidden_size,augmented_hidden_size, bias=True)
+            self.W_ref = nn.Conv1d(augmented_hidden_size, augmented_hidden_size, 1, 1)
             self.final2FC = nn.Sequential(
-                nn.Linear(params["n_hidden"], params["n_hidden"], bias=False),
+                nn.Linear(augmented_hidden_size, params["n_hidden"], bias=False),
                 nn.ReLU(inplace=False),
                 nn.Linear(params["n_hidden"], 1, bias=False))
             self._initialize_weights(params["init_min"], params["init_max"])
             self.n_glimpse = params["n_glimpse"]
             self.n_process = params["n_process"]
-
+            self.h_embedding = nn.Linear(2 * augmented_hidden_size, augmented_hidden_size, bias=True)
+            self.h_act = nn.ReLU()
         else:
             self.Embedding = nn.Linear(params["num_of_process"], params["n_embedding"], bias=False)
             self.Encoder = nn.LSTM(input_size=params["n_embedding"], hidden_size=params["n_hidden"], batch_first=True)
@@ -70,10 +74,15 @@ class PtrNet2(nn.Module):
         # batch = node_features.shape[0]
         # block_num = node_features.shape[1] - 2
         #print(self.W_q.weight[0][2])
-        enc_h = self.GraphEmbedding(heterogeneous_edges, node_features, mini_batch=True)
-        enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
-
-        h = enc_h[:, -2].unsqueeze(0)
+        enc_h_prev = self.GraphEmbedding(heterogeneous_edges, node_features, mini_batch=True)
+        enc_h_prev = torch.concat([enc_h_prev, node_features], dim=2)
+        enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h_prev, mini_batch=True)
+        enc_h = torch.concat([enc_h, enc_h_prev, node_features], dim=2)
+        #enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
+        c = enc_h[:, -2].unsqueeze(0).contiguous()
+        h = enc_h[:, -1].unsqueeze(0).contiguous()
+        h = torch.cat([c, h], dim=2).squeeze(0)
+        h = self.h_act(self.h_embedding(h).unsqueeze(0))
         enc_h = enc_h[:, :-2]
         ref = enc_h
         query = h[-1]

@@ -180,7 +180,15 @@ class Scheduler:
         self.schedule(sequence)
         self.env.process(self.evaluate())
         self.env.run()
+        return self.c_max
+    def get_fully_connected_edge_index(self):
+        #jk = 0
+        n = len(self.jobs_data)*len(self.jobs_data)
+        rows = [i // n for i in range(n ** 2)]
+        cols = [i % n for i in range(n ** 2)]
+    #return [rows, cols]
 
+        return [rows, cols]
     def get_node_feature(self):
         node_features = []
         empty = list()
