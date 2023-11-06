@@ -154,6 +154,7 @@ class PtrNet1(nn.Module):
             enc_h_prev = torch.concat([enc_h_prev, node_features], dim = 2)
             enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h_prev, mini_batch=True)
             enc_h = torch.concat([enc_h, enc_h_prev, node_features], dim=2)
+
             #print(enc_h.shape)
 
 
