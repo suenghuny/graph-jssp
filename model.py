@@ -146,7 +146,10 @@ class GCRN(nn.Module):
                     E = torch.sparse_coo_tensor(A[b][e],
                                             torch.ones(torch.tensor(torch.tensor(A[b][e]).shape[1])),
                                             (num_nodes, num_nodes)).to(device).to_dense()
-                    Wh = X[b] @ self.Ws[e]
+                    if e == 3:
+                        Wh = X[b] @ self.Ws[e]
+                    else:
+                        Wh = self.m[e](X[b] @ self.Ws[e])
                     # Wq = X[b] @ self.Wq[e]
                     # Wv = X[b] @ self.Wv[e]
                     # a = self._prepare_attentional_mechanism_input(Wq, Wv,E, e, mini_batch=mini_batch)
@@ -161,8 +164,8 @@ class GCRN(nn.Module):
                     empty[b, :, e, :].copy_(H)
 
             H = empty.reshape(batch_size, num_nodes, self.num_edge_cat*self.graph_embedding_size)
-            H = H.reshape(batch_size*num_nodes, self.num_edge_cat*self.graph_embedding_size)
-            H = self.embedding_layers(H)
-            H = H.reshape(batch_size, num_nodes, self.embedding_size)
+            # H = H.reshape(batch_size*num_nodes, self.num_edge_cat*self.graph_embedding_size)
+            # H = self.embedding_layers(H)
+            # H = H.reshape(batch_size, num_nodes, self.embedding_size)
 
             return H

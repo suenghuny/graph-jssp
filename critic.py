@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from model import GCRN
+from model import GCRN, NodeEmbedding
 
 
 class PtrNet2(nn.Module):
@@ -9,19 +9,18 @@ class PtrNet2(nn.Module):
         super().__init__()
         self.gnn = params["gnn"]
         if self.gnn == True:
-            # self.Embedding = nn.Linear(params["num_of_process"], params["n_embedding"],
-            #                            bias=False)  # input_shape : num_of_process, output_shape : n_embedding
-            self.GraphEmbedding = GCRN(feature_size=params["num_of_process"],
-                                       graph_embedding_size=params["graph_embedding_size"],
-                                       embedding_size=params["n_hidden"], layers=params["layers"], num_edge_cat=4)
-            #
-            self.GraphEmbedding1 = GCRN(feature_size=params["n_hidden"] + params["num_of_process"],
-                                        graph_embedding_size=params["graph_embedding_size"],
-                                        embedding_size=params["n_hidden"], layers=params["layers"], num_edge_cat=4)
-            self.GraphEmbedding2 = GCRN(feature_size=params["n_hidden"],
-                                        graph_embedding_size=params["graph_embedding_size"],
-                                        embedding_size=params["n_hidden"], layers=params["layers"], num_edge_cat=4)
-            augmented_hidden_size = params["n_hidden"] + params["n_hidden"] + params["num_of_process"] + params["num_of_process"]
+            num_edge_cat = 4
+            self.GraphEmbedding = GCRN(feature_size = params["num_of_process"],
+                                       graph_embedding_size= params["graph_embedding_size"],
+                                       embedding_size =  params["n_hidden"],layers =  params["layers"], num_edge_cat = num_edge_cat)
+            augmented_hidden_size0 = num_edge_cat * params["graph_embedding_size"] + params["num_of_process"]
+            self.NodeEmbedding = NodeEmbedding(augmented_hidden_size0, params["n_hidden"], params['layers'])
+            self.GraphEmbedding1 = GCRN(feature_size = params["n_hidden"],
+                                       graph_embedding_size= params["graph_embedding_size"],
+                                       embedding_size =  params["n_hidden"],layers =  params["layers"], num_edge_cat = num_edge_cat)
+
+            self.NodeEmbedding1 = NodeEmbedding(num_edge_cat * params["graph_embedding_size"] + params["num_of_process"]+params["n_hidden"], params["n_hidden"], params['layers'])
+            augmented_hidden_size = params["n_hidden"]
 
             if torch.cuda.is_available():
                 self.Vec = nn.Parameter(torch.cuda.FloatTensor(augmented_hidden_size))
@@ -74,15 +73,31 @@ class PtrNet2(nn.Module):
         # batch = node_features.shape[0]
         # block_num = node_features.shape[1] - 2
         #print(self.W_q.weight[0][2])
+        batch = node_features.shape[0]
+        block_num = node_features.shape[1] - 2
+        node_num = node_features.shape[1]
         enc_h_prev = self.GraphEmbedding(heterogeneous_edges, node_features, mini_batch=True)
+
         enc_h_prev = torch.concat([enc_h_prev, node_features], dim=2)
+
+        enc_h_prev = enc_h_prev.reshape(batch * node_num, -1)
+        enc_h_prev = self.NodeEmbedding(enc_h_prev)
+        enc_h_prev = enc_h_prev.reshape(batch, node_num, -1)
+
         enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h_prev, mini_batch=True)
+        # print(enc_h.shape, enc_h_prev.shape, node_features.shape)
         enc_h = torch.concat([enc_h, enc_h_prev, node_features], dim=2)
+
+        enc_h = enc_h.reshape(batch * node_num, -1)
+        enc_h = self.NodeEmbedding1(enc_h)
+        enc_h = enc_h.reshape(batch, node_num, -1)
+
         #enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
-        c = enc_h[:, -2].unsqueeze(0).contiguous()
-        h = enc_h[:, -1].unsqueeze(0).contiguous()
-        h = torch.cat([c, h], dim=2).squeeze(0)
-        h = self.h_act(self.h_embedding(h).unsqueeze(0))
+        # c = enc_h[:, -2].unsqueeze(0).contiguous()
+        # h = enc_h[:, -1].unsqueeze(0).contiguous()
+        # h = torch.cat([c, h], dim=2).squeeze(0)
+        # h = self.h_act(self.h_embedding(h).unsqueeze(0))
+        h = enc_h.mean(dim=1).unsqueeze(0)
         enc_h = enc_h[:, :-2]
         ref = enc_h
         query = h[-1]
