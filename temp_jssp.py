@@ -241,6 +241,7 @@ def train_model( params, log_path=None):
     min_makespans = []
     mean_makespans = []
     for s in range(epoch + 1, params["step"]):
+        problem_list = [1,2,3,4,5,7,8,9,10]
         """
         변수별 shape 
         inputs : batch_size X number_of_blocks X number_of_process
@@ -251,17 +252,19 @@ def train_model( params, log_path=None):
             num_jobs = 10
             num_operation = 10
             for _ in range(params['batch_size']):
-                temp = []
-                for job in range(num_jobs):
-                    machine_sequence = list(range(num_jobs))
-                    random.shuffle(machine_sequence)
-                    # if job == 2:
-                    #     print(machine_sequence)
-                    empty = list()
-                    for ops in range(num_operation):
-                        empty.append((machine_sequence[ops], np.random.randint(1, 100)))
-                    temp.append(empty)
+                #temp = []
+                # for j in range(num_jobs):
+                #     temp.append(eval('ORB{}'.format(np.random.choice(problem_list)))[j])
+                temp = eval('ORB{}'.format(np.random.choice(problem_list)))
                 jobs_datas.append(temp)
+                # for job in range(num_jobs):
+                #     machine_sequence = list(range(num_jobs))
+                #     random.shuffle(machine_sequence)
+                #     empty = list()
+                #     for ops in range(num_operation):
+                #         empty.append((machine_sequence[ops], np.random.randint(1, 100)))
+                #     temp.append(empty)
+                # jobs_datas.append(temp)
             #print(jobs_data)
 
         # if s % 20 == 1:
@@ -309,7 +312,7 @@ def train_model( params, log_path=None):
         #     ]  # mach
         #rem = s% 10
         #jobs_data = datas[rem]
-        problem_list = [1,2,3,4,5,7,8,9,10]
+
         if s % 20 == 1:
             for p in problem_list:
                 num_val = 50
@@ -437,8 +440,9 @@ def train_model( params, log_path=None):
             if params["is_lr_decay"]:
                 cri_lr_scheduler.step()
             # print(ll_old.shape, adv.shape)
-
-            act_loss = -(ll_old*adv).mean()
+            #print(ll_old.shape)
+            entropy = -torch.exp(ll_old) * ll_old
+            act_loss = -(ll_old*adv).mean()-0.01*entropy.mean()
             act_optim.zero_grad()
             act_loss.backward()
             act_optim.step()
