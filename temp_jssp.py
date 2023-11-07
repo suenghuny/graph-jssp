@@ -338,8 +338,8 @@ def train_model( params, log_path=None):
 
                 print("ORB{}".format(p),(np.min(val_makespan)/opt_list[p-1]-1)*100, (np.mean(val_makespan)/opt_list[p-1]-1)*100, np.min(val_makespan))
                 if cfg.vessl == True:
-                    vessl.log(step=s, payload={'min makespan_{}'.format('ORB'+{p}): (np.min(val_makespan)/opt_list[p-1]-1)*100})
-                    vessl.log(step=s, payload={'mean makespan_{}'.format('ORB'+{p}): (np.mean(val_makespan)/opt_list[p-1]-1)*100})
+                    vessl.log(step=s, payload={'min makespan_{}'.format('ORB'+str(p)): (np.min(val_makespan)/opt_list[p-1]-1)*100})
+                    vessl.log(step=s, payload={'mean makespan_{}'.format('ORB'+str(p)): (np.mean(val_makespan)/opt_list[p-1]-1)*100})
                 else:
                     min_makespans.append((np.min(val_makespan)/944-1)*100)
                     mean_makespans.append((np.mean(val_makespan) / 944 - 1) * 100)
