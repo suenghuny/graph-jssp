@@ -586,7 +586,8 @@ if __name__ == '__main__':
         "layers":eval(cfg.layers),
         "lr_critic": cfg.lr_critic,
         "n_embedding": cfg.n_embedding,
-        "graph_embedding_size" : cfg.graph_embedding_size
+        "graph_embedding_size" : cfg.graph_embedding_size,
+
     }
 
     train_model(params)

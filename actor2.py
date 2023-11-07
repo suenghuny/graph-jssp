@@ -27,14 +27,14 @@ class PtrNet1(nn.Module):
         device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.gnn = params["gnn"]
         if self.gnn == True:
-            self.Embedding = nn.Linear(params["num_of_process"], 32, bias=False).to(device)  # input_shape : num_of_process, output_shape : n_embedding
+            self.Embedding = nn.Linear(params["num_of_process"], params['n_embedding'], bias=False).to(device)  # input_shape : num_of_process, output_shape : n_embedding
 
 
             num_edge_cat = 4
-            self.GraphEmbedding = GCRN(feature_size = params["num_of_process"],
+            self.GraphEmbedding = GCRN(feature_size = params['n_embedding'],
                                        graph_embedding_size= params["graph_embedding_size"],
                                        embedding_size =  params["n_hidden"],layers =  params["layers"], num_edge_cat = num_edge_cat).to(device)
-            augmented_hidden_size0 = num_edge_cat * params["graph_embedding_size"] + params["num_of_process"]
+            augmented_hidden_size0 = num_edge_cat * params["graph_embedding_size"] + params['n_embedding']+params["num_of_process"]
             self.NodeEmbedding = NodeEmbedding(augmented_hidden_size0, params["n_hidden"], params['layers'])
             self.GraphEmbedding1 = GCRN(feature_size = params["n_hidden"],
                                        graph_embedding_size= params["graph_embedding_size"],
@@ -154,12 +154,14 @@ class PtrNet1(nn.Module):
             batch = node_features.shape[0]
             block_num = node_features.shape[1]-2
             node_num = node_features.shape[1]
-#            node_features.reshape(batch * node_num, -1)
-            env_h_prev_prev_prev = self.Embedding()
+
+            node_reshaped_features = node_features.reshape(batch * node_num, -1)
+            env_h_prev_prev_prev = self.Embedding(node_reshaped_features)
+            env_h_prev_prev_prev = env_h_prev_prev_prev.reshape(batch, node_num, -1)
 
 
-            enc_h_prev_prev = self.GraphEmbedding(heterogeneous_edges, node_features,  mini_batch = True)
-            enc_h_prev_prev = torch.concat([enc_h_prev_prev, node_features], dim = 2)
+            enc_h_prev_prev = self.GraphEmbedding(heterogeneous_edges, env_h_prev_prev_prev,  mini_batch = True)
+            enc_h_prev_prev = torch.concat([enc_h_prev_prev, env_h_prev_prev_prev, node_features], dim = 2)
 
             enc_h_prev_prev = enc_h_prev_prev.reshape(batch*node_num,  -1)
             enc_h_prev_prev = self.NodeEmbedding(enc_h_prev_prev)
