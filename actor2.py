@@ -27,8 +27,7 @@ class PtrNet1(nn.Module):
         device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.gnn = params["gnn"]
         if self.gnn == True:
-            self.Embedding = nn.Linear(params["num_of_process"], params["n_hidden"],
-                                       bias=False).to(device)  # input_shape : num_of_process, output_shape : n_embedding
+            self.Embedding = nn.Linear(params["num_of_process"], 32, bias=False).to(device)  # input_shape : num_of_process, output_shape : n_embedding
 
 
             num_edge_cat = 4
@@ -155,6 +154,10 @@ class PtrNet1(nn.Module):
             batch = node_features.shape[0]
             block_num = node_features.shape[1]-2
             node_num = node_features.shape[1]
+#            node_features.reshape(batch * node_num, -1)
+            env_h_prev_prev_prev = self.Embedding()
+
+
             enc_h_prev_prev = self.GraphEmbedding(heterogeneous_edges, node_features,  mini_batch = True)
             enc_h_prev_prev = torch.concat([enc_h_prev_prev, node_features], dim = 2)
 

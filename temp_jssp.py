@@ -241,7 +241,7 @@ def train_model( params, log_path=None):
     min_makespans = []
     mean_makespans = []
     for s in range(epoch + 1, params["step"]):
-        problem_list = [1,2,3,4,5,7,8,9,10]
+        problem_list = [1,2,3,4,5,6,7,8,9,10]
         """
         변수별 shape 
         inputs : batch_size X number_of_blocks X number_of_process
@@ -256,6 +256,7 @@ def train_model( params, log_path=None):
                 # for j in range(num_jobs):
                 #     temp.append(eval('ORB{}'.format(np.random.choice(problem_list)))[j])
                 temp = eval('ORB{}'.format(np.random.choice(problem_list)))
+                #print(temp)
                 jobs_datas.append(temp)
                 # for job in range(num_jobs):
                 #     machine_sequence = list(range(num_jobs))

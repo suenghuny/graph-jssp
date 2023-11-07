@@ -21,7 +21,7 @@ def get_cfg():
     parser.add_argument("--lr_decay_step_critic", type=int, default=2000, help="")
     parser.add_argument("--layers", type=str, default="[256, 128]", help="")
     parser.add_argument("--n_embedding", type=int, default=32, help="")
-    parser.add_argument("--graph_embedding_size", type=int, default=56, help="")
+    parser.add_argument("--graph_embedding_size", type=int, default=64, help="")
     parser.add_argument("--n_hidden", type=int, default=64, help="")
     parser.add_argument("--ppo", type=bool, default=False, help="")
     return parser.parse_args()
