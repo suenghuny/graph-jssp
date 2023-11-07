@@ -216,12 +216,10 @@ class PtrNet1(nn.Module):
             query = h.squeeze(0)
             #print(query.shape, enc_h.shape)
             for j in range(self.n_glimpse):
-                query = self.glimpse(query, ref, mask2)  # ref(enc_h)는 key이다.
-            #print(query[0])
+                query = self.glimpse(query, ref, mask2)
             logits = self.pointer(query, ref, mask2)
             log_p = torch.log_softmax(logits / self.T, dim=-1)
 
-            #print(log_p[0][0].tolist().count(-1.0101e+08))
 
 
             if y == None:
