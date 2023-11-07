@@ -419,7 +419,7 @@ def train_model( params, log_path=None):
         for n in range(len(node_features)):
             sequence = pred_seq[n]
             scheduler = Scheduler(jobs_datas[n])
-            makespan = - scheduler.run(sequence.tolist())/15
+            makespan = - scheduler.run(sequence.tolist())/params['reward_scaler']
             real_makespan.append(makespan)
         ave_makespan += sum(real_makespan)/(params["batch_size"]*params["log_step"])
         """
@@ -587,7 +587,7 @@ if __name__ == '__main__':
         "lr_critic": cfg.lr_critic,
         "n_embedding": cfg.n_embedding,
         "graph_embedding_size" : cfg.graph_embedding_size,
-
+        "reward_scaler": cfg.reward_scaler,
     }
 
     train_model(params)
