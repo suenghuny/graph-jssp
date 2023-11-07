@@ -64,26 +64,18 @@ class PtrNet1(nn.Module):
 
             self.W_q = nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=True)
             self.W_q2 = nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=True)
-
             self.W_ref = nn.Conv1d(augmented_hidden_size,augmented_hidden_size, 1, 1)
             self.W_ref2 = nn.Conv1d(augmented_hidden_size,augmented_hidden_size, 1, 1)
             self.dec_input = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
             self.h_embedding = nn.Linear(2 * augmented_hidden_size, augmented_hidden_size, bias=True)
             self.Decoder = nn.GRU(input_size=augmented_hidden_size,
                                   hidden_size=augmented_hidden_size, batch_first=True)
-
-
             self._initialize_weights(params["init_min"], params["init_max"])
             self.use_logit_clipping = params["use_logit_clipping"]
             self.C = params["C"]
             self.T = params["T"]
             self.n_glimpse = params["n_glimpse"]
-
-
-            #self.c_embedding = nn.Linear(params["n_hidden"], params["n_hidden"], bias=True)
-
             self.h_act = nn.ReLU()
-            # self.mask = [[[0 for i in range(params['num_machine'])] for j in range(params['num_jobs'])] for _ in range(params['batch_size'])]
             self.block_indices = []
             self.block_selecter = Categorical()  # {'greedy': Greedy(), 'sampling': Categorical()}.get(params["decode_type"], None)
             self.last_block_index = 0
@@ -184,12 +176,6 @@ class PtrNet1(nn.Module):
 
             embed = enc_h.size(2)
 
-            #@print(enc_h.mean(dim = 1).unsqueeze(0).shape)
-            # c = enc_h[:, -2].unsqueeze(0).contiguous()
-            # h = enc_h[:, -1].unsqueeze(0).contiguous()
-            # h = torch.cat([c,h], dim = 2).squeeze(0)
-            # h = self.h_act(self.h_embedding(h).unsqueeze(0))
-            # print("dd",h.shape)
             h = enc_h.mean(dim = 1).unsqueeze(0)
             #print(h.shape)
             #print(c.shape, h.shap
