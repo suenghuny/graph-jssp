@@ -16,12 +16,13 @@ from actor2 import PtrNet1
 from critic import PtrNet2
 from jssp import Scheduler
 from cfg import get_cfg
+cfg = get_cfg()
 import random
 numbers = list(range(10))
 random.shuffle(numbers)
 
 
-cfg = get_cfg()
+
 if cfg.vessl == True:
     import vessl
     vessl.init()

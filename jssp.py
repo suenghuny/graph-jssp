@@ -198,10 +198,9 @@ class Scheduler:
                 ops = job[o]
                 empty.append(ops[1])
 
-
+        jk=0
         for j in range(len(self.jobs_data)):
             job = self.jobs_data[j]
-
             sum_ops = sum([float(job[o][1]) for o in range(len(job))])
             for o in range(len(job)):
                 ops = job[o]
@@ -210,10 +209,8 @@ class Scheduler:
                 sum_ops_o.append(0)
                 sum_ops_o = sum(sum_ops_o)
                 node_features.append([float(ops[1])/np.max(empty), sum_ops_o/sum_ops, (o+1)/len(job)])
-                #print([float(ops[1])/np.max(empty), sum_ops_o/sum_ops, (o+1)/len(job)])
-                #node_features.append([float(ops[1]) / np.max(empty), sum_ops_o / sum_ops])
-
-                #print([float(ops[1])/np.max(empty), sum_ops_o/sum_ops, (o+1)/len(job)])
+                # print([float(ops[1])/np.max(empty), sum_ops_o/sum_ops, (o+1)/len(job)])
+                # jk+=1
         node_features.append([0., 1., 1])
         node_features.append([0., 0., 0])
         return node_features
