@@ -231,6 +231,8 @@ class Scheduler:
                     if m != m_prime:
                         edge_index[0].append(m)
                         edge_index[1].append(m_prime)
+
+
         return edge_index
         # print(machine_sharing)
         # print(edge_index)
@@ -242,16 +244,16 @@ class Scheduler:
         for job in self.jobs_data:
             for k in range(len(job)):
                 if k == len(job)-1:
-                    # edge_index[0].append(len(self.jobs_data)*len(self.jobs_data[0]))
-                    # edge_index[1].append(jk)
+                    edge_index[0].append(len(self.jobs_data)*len(self.jobs_data[0]))
+                    edge_index[1].append(jk)
                     edge_index[0].append(len(self.jobs_data)*len(self.jobs_data[0]))
                     edge_index[1].append(jk)
                     jk += 1
                 else:
                     edge_index[0].append(jk)
                     edge_index[1].append(jk+1)
-                    # edge_index[0].append(jk+1)
-                    # edge_index[1].append(jk)
+                    edge_index[0].append(jk+1)
+                    edge_index[1].append(jk)
                     jk += 1
         return edge_index
 
@@ -261,16 +263,16 @@ class Scheduler:
         for job in self.jobs_data:
             for k in range(len(job)):
                 if k == 0:
-                    # edge_index[0].append(len(self.jobs_data)*len(self.jobs_data[0])+1)
-                    # edge_index[1].append(jk)
+                    edge_index[0].append(len(self.jobs_data)*len(self.jobs_data[0])+1)
+                    edge_index[1].append(jk)
                     edge_index[0].append(jk)
                     edge_index[1].append(len(self.jobs_data)*len(self.jobs_data[0])+1)
                     jk += 1
                 else:
                     edge_index[0].append(jk)
                     edge_index[1].append(jk-1)
-                    # edge_index[0].append(jk-1)
-                    # edge_index[1].append(jk)
+                    edge_index[0].append(jk-1)
+                    edge_index[1].append(jk)
                     jk += 1
         #print(edge_index)
         return edge_index

@@ -24,7 +24,7 @@ def get_cfg():
     parser.add_argument("--graph_embedding_size", type=int, default=64, help="")
     parser.add_argument("--n_hidden", type=int, default=64, help="")
     parser.add_argument("--ppo", type=bool, default=False, help="")
-    parser.add_argument("--reward_scaler", type=float, default=15, help="")
+    parser.add_argument("--reward_scaler", type=float, default=100, help="")
     parser.add_argument("--n_multi_head", type=int, default=3, help="")
     return parser.parse_args()
 

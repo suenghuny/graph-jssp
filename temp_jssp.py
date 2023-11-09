@@ -8,7 +8,8 @@ import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 import os
-os.environ['KMP_DUPLICATE_LIB_OK']='True'
+
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 from time import time
 from datetime import datetime
 
@@ -16,48 +17,46 @@ from actor2 import PtrNet1
 from critic import PtrNet2
 from jssp import Scheduler
 from cfg import get_cfg
+
 cfg = get_cfg()
 import random
+
 numbers = list(range(10))
 random.shuffle(numbers)
 
-
-
 if cfg.vessl == True:
     import vessl
+
     vessl.init()
 # torch.autograd.set_detect_anomaly(True)
 # machine, procesing time
-
 
 
 ORB1 = [
     [(0, 72), (1, 64), (2, 55), (3, 31), (4, 53), (5, 95), (6, 11), (7, 52), (8, 6), (9, 84)],
     [(0, 61), (3, 27), (4, 88), (2, 78), (1, 49), (5, 83), (8, 91), (6, 74), (7, 29), (9, 87)],
     [(0, 86), (3, 32), (1, 35), (2, 37), (5, 18), (4, 48), (6, 91), (7, 52), (9, 60), (8, 30)],
-    [(0, 8),  (1, 82), (4, 27), (3, 99), (6, 74), (5, 9),  (2, 33), (9, 20), (7, 59), (8, 98)],
-    [(1, 50), (0, 94), (5, 43), (3, 62), (4, 55), (7, 48), (2, 5),  (8, 36), (9, 47), (6, 36)],
-    [(0, 53), (6, 30), (2, 7),  (3, 12), (1, 68), (8, 87), (4, 28), (9, 70), (7, 45), (5, 7)],
-    [(2, 29), (3, 96), (0, 99), (1, 14), (4, 34), (7, 14), (5, 7),  (6, 76), (8, 57), (9, 76)],
+    [(0, 8), (1, 82), (4, 27), (3, 99), (6, 74), (5, 9), (2, 33), (9, 20), (7, 59), (8, 98)],
+    [(1, 50), (0, 94), (5, 43), (3, 62), (4, 55), (7, 48), (2, 5), (8, 36), (9, 47), (6, 36)],
+    [(0, 53), (6, 30), (2, 7), (3, 12), (1, 68), (8, 87), (4, 28), (9, 70), (7, 45), (5, 7)],
+    [(2, 29), (3, 96), (0, 99), (1, 14), (4, 34), (7, 14), (5, 7), (6, 76), (8, 57), (9, 76)],
     [(2, 90), (0, 19), (3, 87), (4, 51), (1, 84), (5, 45), (9, 84), (6, 58), (7, 81), (8, 96)],
     [(2, 97), (1, 99), (4, 93), (0, 38), (7, 13), (5, 96), (3, 40), (9, 64), (6, 32), (8, 45)],
-    [(2, 44), (0, 60), (8, 29), (3, 5),  (6, 74), (1, 85), (4, 34), (7, 95), (9, 51), (5, 47)],
+    [(2, 44), (0, 60), (8, 29), (3, 5), (6, 74), (1, 85), (4, 34), (7, 95), (9, 51), (5, 47)],
 ]
 
 ORB2 = [
-    [(0, 72), (1, 54), (2, 33), (3, 86), (4, 75), (5, 16), (6, 96), (7, 7),  (8, 99), (9, 76)],
+    [(0, 72), (1, 54), (2, 33), (3, 86), (4, 75), (5, 16), (6, 96), (7, 7), (8, 99), (9, 76)],
     [(0, 16), (3, 88), (4, 48), (8, 52), (9, 60), (6, 29), (7, 18), (5, 89), (2, 80), (1, 76)],
     [(0, 47), (7, 11), (3, 14), (2, 56), (6, 16), (4, 83), (1, 10), (5, 61), (8, 24), (9, 58)],
     [(0, 49), (1, 31), (3, 17), (8, 50), (5, 63), (2, 35), (4, 65), (7, 23), (6, 50), (9, 29)],
-    [(0, 55), (6, 6),  (1, 28), (3, 96), (5, 86), (2, 99), (9, 14), (7, 70), (8, 64), (4, 24)],
+    [(0, 55), (6, 6), (1, 28), (3, 96), (5, 86), (2, 99), (9, 14), (7, 70), (8, 64), (4, 24)],
     [(4, 46), (0, 23), (6, 70), (8, 19), (2, 54), (3, 22), (9, 85), (7, 87), (5, 79), (1, 93)],
     [(4, 76), (3, 60), (0, 76), (9, 98), (2, 76), (1, 50), (8, 86), (7, 14), (6, 27), (5, 57)],
     [(4, 93), (6, 27), (9, 57), (3, 87), (8, 86), (2, 54), (7, 24), (5, 49), (0, 20), (1, 47)],
-    [(2, 28), (6, 11), (8, 78), (7, 85), (4, 63), (9, 81), (3, 10), (1, 9),  (5, 46), (0, 32)],
+    [(2, 28), (6, 11), (8, 78), (7, 85), (4, 63), (9, 81), (3, 10), (1, 9), (5, 46), (0, 32)],
     [(2, 22), (9, 76), (5, 89), (8, 13), (6, 88), (3, 10), (7, 75), (4, 98), (1, 78), (0, 17)],
 ]
-
-
 
 ORB3 = [
     [(0, 96), (1, 69), (2, 25), (3, 5), (4, 55), (5, 15), (6, 88), (7, 11), (8, 17), (9, 82)],
@@ -72,7 +71,7 @@ ORB3 = [
     [(0, 52), (2, 20), (3, 70), (4, 98), (1, 23), (5, 15), (7, 81), (8, 71), (9, 24), (6, 81)]
 ]
 
-ORB4 =[
+ORB4 = [
     [(0, 8), (1, 10), (2, 35), (3, 44), (4, 15), (5, 92), (6, 70), (7, 89), (8, 50), (9, 12)],
     [(0, 63), (8, 39), (3, 80), (5, 22), (2, 88), (1, 39), (9, 85), (6, 27), (7, 74), (4, 69)],
     [(0, 52), (6, 22), (1, 33), (3, 68), (8, 27), (2, 68), (5, 25), (4, 34), (7, 24), (9, 84)],
@@ -98,7 +97,7 @@ ORB5 = [
     [(0, 5), (1, 19), (2, 20), (3, 12), (4, 94), (5, 60), (6, 99), (7, 31), (8, 96), (9, 63)]
 ]
 
-ORB6 =  [
+ORB6 = [
     [(0, 99), (1, 74), (2, 49), (3, 67), (4, 17), (5, 7), (6, 9), (7, 39), (8, 35), (9, 49)],
     [(0, 49), (3, 67), (4, 82), (2, 92), (1, 62), (5, 84), (8, 45), (6, 30), (7, 42), (9, 71)],
     [(0, 26), (3, 33), (1, 82), (2, 98), (5, 83), (4, 16), (6, 64), (7, 65), (9, 36), (8, 77)],
@@ -156,15 +155,16 @@ ORB10 = [
     [(9, 12), (8, 26), (7, 64), (6, 92), (4, 67), (5, 28), (3, 66), (2, 83), (1, 38), (0, 58)],
     [(0, 77), (1, 73), (3, 82), (2, 75), (6, 84), (4, 19), (5, 18), (7, 89), (8, 8), (9, 73)],
     [(0, 34), (1, 74), (7, 48), (5, 44), (4, 92), (6, 40), (3, 60), (2, 62), (8, 22), (9, 67)],
-    [(9, 8),  (8, 85), (3, 58), (7, 97), (5, 92), (4, 89), (6, 75), (2, 77), (1, 95), (0, 5)],
-    [(8, 52), (9, 43), (6, 5),  (7, 78), (5, 12), (3, 62), (4, 21), (2, 80), (1, 60), (0, 31)],
+    [(9, 8), (8, 85), (3, 58), (7, 97), (5, 92), (4, 89), (6, 75), (2, 77), (1, 95), (0, 5)],
+    [(8, 52), (9, 43), (6, 5), (7, 78), (5, 12), (3, 62), (4, 21), (2, 80), (1, 60), (0, 31)],
     [(9, 81), (8, 23), (7, 23), (6, 75), (4, 78), (5, 56), (3, 51), (2, 39), (1, 53), (0, 96)],
     [(9, 79), (8, 55), (2, 88), (4, 21), (5, 83), (3, 93), (6, 47), (7, 10), (0, 63), (1, 14)],
     [(0, 43), (1, 63), (2, 83), (3, 29), (4, 52), (5, 98), (6, 54), (7, 39), (8, 33), (9, 23)]
 ]
 
+opt_list = [1059, 888, 1005, 1005, 887, 1010, 397, 899, 934, 944]
 
-opt_list = [1059, 888,1005,1005,887,1010,397,899,934,944]
+
 # datas = [[
 #     [(0, np.random.randint(1, 100)), (1, np.random.randint(1, 100)), (2, np.random.randint(1, 100)),
 #      (3, np.random.randint(1, 100)), (4, np.random.randint(1, 100)), (5, np.random.randint(1, 100)),
@@ -209,7 +209,7 @@ opt_list = [1059, 888,1005,1005,887,1010,397,899,934,944]
 # ] for _ in range(10)]
 
 
-def train_model( params, log_path=None):
+def train_model(params, log_path=None):
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     date = datetime.now().strftime('%m%d_%H_%M')
     param_path = params["log_dir"] + '/ppo' + '/%s_%s_param.csv' % (date, "train")
@@ -230,11 +230,11 @@ def train_model( params, log_path=None):
         act_optim = optim.RMSprop(act_model.parameters(), lr=params["lr"])
         cri_optim = optim.RMSprop(cri_model.parameters(), lr=params["lr_critic"])
 
-
-
     if params["is_lr_decay"]:
-        act_lr_scheduler = optim.lr_scheduler.StepLR(act_optim, step_size=params["lr_decay_step"],gamma=params["lr_decay"])
-        cri_lr_scheduler = optim.lr_scheduler.StepLR(cri_optim, step_size=params["lr_decay_step_critic"],gamma=params["lr_decay"])
+        act_lr_scheduler = optim.lr_scheduler.StepLR(act_optim, step_size=params["lr_decay_step"],
+                                                     gamma=params["lr_decay"])
+        cri_lr_scheduler = optim.lr_scheduler.StepLR(cri_optim, step_size=params["lr_decay_step_critic"],
+                                                     gamma=params["lr_decay"])
 
     mse_loss = nn.MSELoss()
     t1 = time()
@@ -242,7 +242,7 @@ def train_model( params, log_path=None):
     min_makespans = []
     mean_makespans = []
     for s in range(epoch + 1, params["step"]):
-        problem_list = [1,2,3,4,5,6,7,8,9,10]
+        problem_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         """
         변수별 shape 
         inputs : batch_size X number_of_blocks X number_of_process
@@ -253,11 +253,11 @@ def train_model( params, log_path=None):
             num_jobs = 10
             num_operation = 10
             for _ in range(params['batch_size']):
-                #temp = []
+                # temp = []
                 # for j in range(num_jobs):
                 #     temp.append(eval('ORB{}'.format(np.random.choice(problem_list)))[j])
                 temp = eval('ORB{}'.format(np.random.choice(problem_list)))
-                #print(temp)
+                # print(temp)
                 jobs_datas.append(temp)
                 # for job in range(num_jobs):
                 #     machine_sequence = list(range(num_jobs))
@@ -267,7 +267,7 @@ def train_model( params, log_path=None):
                 #         empty.append((machine_sequence[ops], np.random.randint(1, 100)))
                 #     temp.append(empty)
                 # jobs_datas.append(temp)
-            #print(jobs_data)
+            # print(jobs_data)
 
         # if s % 20 == 1:
         #     jobs_data = [
@@ -312,8 +312,8 @@ def train_model( params, log_path=None):
         #          (5, np.random.randint(1, 100)), (3, np.random.randint(1, 100)), (4, np.random.randint(1, 100)),
         #          (7, np.random.randint(1, 100))]
         #     ]  # mach
-        #rem = s% 10
-        #jobs_data = datas[rem]
+        # rem = s% 10
+        # jobs_data = datas[rem]
 
         if s % 20 == 1:
             for p in problem_list:
@@ -334,15 +334,18 @@ def train_model( params, log_path=None):
                 for sequence in pred_seq:
                     scheduler = Scheduler(eval('ORB{}'.format(p)))
                     makespan = scheduler.run(sequence.tolist())
-                    #makespan = scheduler.
+                    # makespan = scheduler.
                     val_makespan.append(makespan)
 
-                print("ORB{}".format(p),(np.min(val_makespan)/opt_list[p-1]-1)*100, (np.mean(val_makespan)/opt_list[p-1]-1)*100, np.min(val_makespan))
+                print("ORB{}".format(p), (np.min(val_makespan) / opt_list[p - 1] - 1) * 100,
+                      (np.mean(val_makespan) / opt_list[p - 1] - 1) * 100, np.min(val_makespan))
                 if cfg.vessl == True:
-                    vessl.log(step=s, payload={'min makespan_{}'.format('ORB'+str(p)): (np.min(val_makespan)/opt_list[p-1]-1)*100})
-                    vessl.log(step=s, payload={'mean makespan_{}'.format('ORB'+str(p)): (np.mean(val_makespan)/opt_list[p-1]-1)*100})
+                    vessl.log(step=s, payload={
+                        'min makespan_{}'.format('ORB' + str(p)): (np.min(val_makespan) / opt_list[p - 1] - 1) * 100})
+                    vessl.log(step=s, payload={
+                        'mean makespan_{}'.format('ORB' + str(p)): (np.mean(val_makespan) / opt_list[p - 1] - 1) * 100})
                 else:
-                    min_makespans.append((np.min(val_makespan)/944-1)*100)
+                    min_makespans.append((np.min(val_makespan) / 944 - 1) * 100)
                     mean_makespans.append((np.mean(val_makespan) / 944 - 1) * 100)
                     min_m = pd.DataFrame(min_makespans)
                     mean_m = pd.DataFrame(mean_makespans)
@@ -350,8 +353,6 @@ def train_model( params, log_path=None):
                     mean_m.to_csv('mean_makespan.csv')
 
                 act_model.init_mask_job_count(params['batch_size'])
-
-
 
         act_model.block_indices = []
 
@@ -362,56 +363,56 @@ def train_model( params, log_path=None):
                 scheduler = Scheduler(jobs_datas[n])
                 node_feature = scheduler.get_node_feature()
                 node_features.append(node_feature)
-                #node_feature = [node_feature for _ in range(params['batch_size'])]
+                # node_feature = [node_feature for _ in range(params['batch_size'])]
                 edge_precedence = scheduler.get_edge_index_precedence()
                 edge_antiprecedence = scheduler.get_edge_index_antiprecedence()
                 edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
 
-
-            # # Edge data
-            # edge1 = edge_precedence
-            # edge2 = edge_machine_sharing
-            # print(edge2)
-            # # Create a graph
-            #
-            # G = nx.Graph()
-            #
-            # # Add edges from edge1 and edge2
-            # for e in range(len(edge1[0])):
-            #     G.add_edge(edge1[0][e], edge1[1][e], weight=1)
-            #
-            # for e in range(len(edge2[0])):
-            #     G.add_edge(edge2[0][e], edge2[1][e], weight=1)
-            #
-            # # for edge in edge2:
-            # #     G.add_edge(edge[0], edge[1], weight=1)
-            #
-            # # Draw the graph
-            # pos = nx.spring_layout(G)
-            #
-            # # Draw nodes
-            # nx.draw_networkx_nodes(G, pos, node_size=500, node_color="skyblue")
-            # print("??")
-            # # Draw edges from edge1 in red and from edge2 in blue
-            # nx.draw_networkx_edges(G, pos, edgelist=edge1, edge_color='red', width=2)
-            # nx.draw_networkx_edges(G, pos, edgelist=edge2, edge_color='blue', width=2)
-            #
-            # # Draw node labels
-            # nx.draw_networkx_labels(G, pos)
-            #
-            # # Draw edge weights
-            # labels = nx.get_edge_attributes(G, 'weight')
-            # nx.draw_networkx_edge_labels(G, pos, edge_labels=labels)
-            # plt.show()
-            # plt.savefig("xxx.png")
-            #
+                # # Edge data
+                # edge1 = edge_precedence
+                # edge2 = edge_machine_sharing
+                # print(edge2)
+                # # Create a graph
+                #
+                # G = nx.Graph()
+                #
+                # # Add edges from edge1 and edge2
+                # for e in range(len(edge1[0])):
+                #     G.add_edge(edge1[0][e], edge1[1][e], weight=1)
+                #
+                # for e in range(len(edge2[0])):
+                #     G.add_edge(edge2[0][e], edge2[1][e], weight=1)
+                #
+                # # for edge in edge2:
+                # #     G.add_edge(edge[0], edge[1], weight=1)
+                #
+                # # Draw the graph
+                # pos = nx.spring_layout(G)
+                #
+                # # Draw nodes
+                # nx.draw_networkx_nodes(G, pos, node_size=500, node_color="skyblue")
+                # print("??")
+                # # Draw edges from edge1 in red and from edge2 in blue
+                # nx.draw_networkx_edges(G, pos, edgelist=edge1, edge_color='red', width=2)
+                # nx.draw_networkx_edges(G, pos, edgelist=edge2, edge_color='blue', width=2)
+                #
+                # # Draw node labels
+                # nx.draw_networkx_labels(G, pos)
+                #
+                # # Draw edge weights
+                # labels = nx.get_edge_attributes(G, 'weight')
+                # nx.draw_networkx_edge_labels(G, pos, edge_labels=labels)
+                # plt.show()
+                # plt.savefig("xxx.png")
+                #
                 edge_fcn = scheduler.get_fully_connected_edge_index()
-                heterogeneous_edge  = (edge_precedence, edge_antiprecedence, edge_machine_sharing, edge_fcn)
+                heterogeneous_edge = (edge_precedence, edge_antiprecedence, edge_machine_sharing, edge_fcn)
                 heterogeneous_edges.append(heterogeneous_edge)
             input_data = (node_features, heterogeneous_edges)
         else:
             input_data = torch.tensor(jobs_data, dtype=torch.float).reshape(-1, 2).unsqueeze(0)
-            input_data[:, :, 1] = input_data[:, :, 1].squeeze(0).squeeze(0) * 1 / input_data[:, :, 1].squeeze(0).squeeze(0).max()
+            input_data[:, :, 1] = input_data[:, :, 1].squeeze(0).squeeze(0) * 1 / input_data[:, :, 1].squeeze(
+                0).squeeze(0).max()
             encoded_data = one_hot_encode(input_data[:, :, 0:1], 10)
             new_input_data = torch.cat([encoded_data, input_data[:, :, 1:2]], dim=-1)
             input_data = new_input_data.repeat(params["batch_size"], 1, 1)
@@ -420,21 +421,22 @@ def train_model( params, log_path=None):
         for n in range(len(node_features)):
             sequence = pred_seq[n]
             scheduler = Scheduler(jobs_datas[n])
-            makespan = - scheduler.run(sequence.tolist())/params['reward_scaler']
+            makespan = - scheduler.run(sequence.tolist()) / params['reward_scaler']
             real_makespan.append(makespan)
-        ave_makespan += sum(real_makespan)/(params["batch_size"]*params["log_step"])
+        ave_makespan += sum(real_makespan) / (params["batch_size"] * params["log_step"])
         """
         vanila actor critic
         """
         if cfg.ppo == False:
-        # # if cfg.vessl == True:
-        # #     vessl.log(step=s, payload={'makespan': sum(real_makespan)/params["batch_size"]})
-        # # # if s % 10 == 0:
-        # # #     if act_model.T >= 0.05:
-        # # #         act_model.T *=1
+            # # if cfg.vessl == True:
+            # #     vessl.log(step=s, payload={'makespan': sum(real_makespan)/params["batch_size"]})
+            # # # if s % 10 == 0:
+            # # #     if act_model.T >= 0.05:
+            # # #         act_model.T *=1
             pred_makespan = cri_model(input_data, device).unsqueeze(-1)
             adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - pred_makespan.detach().to(device)
-            cri_loss = mse_loss(pred_makespan, torch.tensor(real_makespan, dtype = torch.float).to(device).unsqueeze(1).detach())
+            cri_loss = mse_loss(pred_makespan,
+                                torch.tensor(real_makespan, dtype=torch.float).to(device).unsqueeze(1).detach())
             cri_optim.zero_grad()
             cri_loss.backward()
             nn.utils.clip_grad_norm_(cri_model.parameters(), max_norm=1., norm_type=2)
@@ -442,9 +444,11 @@ def train_model( params, log_path=None):
             if params["is_lr_decay"]:
                 cri_lr_scheduler.step()
             # print(ll_old.shape, adv.shape)
-            #print(ll_old.shape)
+            # print(ll_old.shape)
             entropy = -torch.exp(ll_old) * ll_old
-            act_loss = -(ll_old*adv).mean()-0.01*entropy.mean()
+            # print("log_prob",ll_old.exp())
+            # print("adv", adv)
+            act_loss = -(ll_old * adv).mean() - 0.001 * entropy.mean()
             act_optim.zero_grad()
             act_loss.backward()
             act_optim.step()
@@ -456,15 +460,16 @@ def train_model( params, log_path=None):
 
         """
         vanila actor critic
-        
+
         """
 
-#
+        #
         if cfg.ppo == True:
             for k in range(params["iteration"]):  # K-epoch
                 pred_makespan = cri_model(input_data, device).unsqueeze(-1)
                 adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - pred_makespan.detach().to(device)
-                cri_loss = mse_loss(pred_makespan, torch.tensor(real_makespan, dtype = torch.float).to(device).unsqueeze(1).detach())
+                cri_loss = mse_loss(pred_makespan,
+                                    torch.tensor(real_makespan, dtype=torch.float).to(device).unsqueeze(1).detach())
                 cri_optim.zero_grad()
                 cri_loss.backward()
                 nn.utils.clip_grad_norm_(cri_model.parameters(), max_norm=1., norm_type=2)
@@ -485,12 +490,12 @@ def train_model( params, log_path=None):
                     act_lr_scheduler.step()
                 ave_act_loss += act_loss.item()
 
-
         if s % params["log_step"] == 0:
             t2 = time()
 
-
-            print('step:%d/%d, actic loss:%1.3f, crictic loss:%1.3f, L:%1.3f, %dmin%dsec' % (s, params["step"], ave_act_loss / ((s + 1) * params["iteration"]),ave_cri_loss / ((s + 1) * params["iteration"]), ave_makespan, (t2 - t1) // 60,(t2 - t1) % 60))
+            print('step:%d/%d, actic loss:%1.3f, crictic loss:%1.3f, L:%1.3f, %dmin%dsec' % (
+            s, params["step"], ave_act_loss / ((s + 1) * params["iteration"]),
+            ave_cri_loss / ((s + 1) * params["iteration"]), ave_makespan, (t2 - t1) // 60, (t2 - t1) % 60))
             ave_makespan = 0
             if log_path is None:
                 log_path = params["log_dir"] + '/ppo' + '/%s_train.csv' % date
@@ -499,9 +504,10 @@ def train_model( params, log_path=None):
             else:
                 with open(log_path, 'a') as f:
                     f.write('%d,%1.4f,%1.4f,%1.4f,%dmin%dsec\n' % (
-                    s, ave_act_loss / ((s + 1) * params["iteration"]), ave_cri_loss / ((s + 1) * params["iteration"]),
-                    ave_makespan / (s + 1),
-                    (t2 - t1) // 60, (t2 - t1) % 60))
+                        s, ave_act_loss / ((s + 1) * params["iteration"]),
+                        ave_cri_loss / ((s + 1) * params["iteration"]),
+                        ave_makespan / (s + 1),
+                        (t2 - t1) // 60, (t2 - t1) % 60))
             t1 = time()
 
         if s % params["save_step"] == 1:
@@ -515,6 +521,8 @@ def train_model( params, log_path=None):
                         'ave_makespan': ave_makespan},
                        params["model_dir"] + '/ppo' + '/%s_step%d_act.pt' % (date, s))
         #     print('save model...')
+
+
 def one_hot_encode(tensor, n_classes):
     original_shape = tensor.shape
     tensor = tensor.long().view(-1)
@@ -522,6 +530,7 @@ def one_hot_encode(tensor, n_classes):
     one_hot.scatter_(1, tensor.view(-1, 1), 1)
     one_hot = one_hot.view(*original_shape[:-1], n_classes)
     return one_hot
+
 
 if __name__ == '__main__':
 
@@ -554,7 +563,7 @@ if __name__ == '__main__':
     # parser.add_argument("--graph_embedding_size", type=int, default=64, help="")
 
     params = {
-        "num_of_process":3,
+        "num_of_process": 3,
         "num_of_blocks": 100,
         "step": cfg.step,
         "log_step": cfg.log_step,
@@ -584,11 +593,12 @@ if __name__ == '__main__':
         "lr_decay_step_critic": cfg.lr_decay_step_critic,
         "load_model": load_model,
         "gnn": True,
-        "layers":eval(cfg.layers),
+        "layers": eval(cfg.layers),
         "lr_critic": cfg.lr_critic,
         "n_embedding": cfg.n_embedding,
-        "graph_embedding_size" : cfg.graph_embedding_size,
+        "graph_embedding_size": cfg.graph_embedding_size,
         "reward_scaler": cfg.reward_scaler,
+        "n_multi_head":cfg.n_multi_head
     }
 
     train_model(params)
