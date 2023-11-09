@@ -448,7 +448,7 @@ def train_model(params, log_path=None):
             entropy = -torch.exp(ll_old) * ll_old
             # print("log_prob",ll_old.exp())
             # print("adv", adv)
-            act_loss = -(ll_old * adv).mean() - 0.001 * entropy.mean()
+            act_loss = -(ll_old * adv).mean() - params["entropy_weight"] * entropy.mean()
             act_optim.zero_grad()
             act_loss.backward()
             act_optim.step()
@@ -598,7 +598,8 @@ if __name__ == '__main__':
         "n_embedding": cfg.n_embedding,
         "graph_embedding_size": cfg.graph_embedding_size,
         "reward_scaler": cfg.reward_scaler,
-        "n_multi_head":cfg.n_multi_head
+        "n_multi_head":cfg.n_multi_head,
+        "entropy_weight": cfg.entropy_weight
     }
 
     train_model(params)
