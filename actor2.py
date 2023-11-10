@@ -11,7 +11,7 @@ class Greedy(nn.Module):
         super().__init__()
 
     def forward(self, log_p):
-        return torch.argmax(log_p, dim=1).long()
+        return torch.argmax(log_p, dim=1).long().squeeze(1)
 
 
 class Categorical(nn.Module):
@@ -90,6 +90,7 @@ class PtrNet1(nn.Module):
             # self.mask = [[[0 for i in range(params['num_machine'])] for j in range(params['num_jobs'])] for _ in range(params['batch_size'])]
             self.block_indices = []
             self.block_selecter = Categorical()  # {'greedy': Greedy(), 'sampling': Categorical()}.get(params["decode_type"], None)
+            self.block_selecter_greedy = Greedy()
             self.last_block_index = 0
             self.params = params
             self.sample_space = [[j for i in range(params['num_machine'])] for j in range(params['num_jobs'])]
@@ -145,7 +146,7 @@ class PtrNet1(nn.Module):
         for param in self.parameters():
             nn.init.uniform_(param.data, init_min, init_max)
 
-    def forward(self, x, device, y=None):
+    def forward(self, x, device, y=None, greedy = False):
 
         if self.gnn == False:
             x = x.to(device)
@@ -202,7 +203,10 @@ class PtrNet1(nn.Module):
 
                 if y == None:
                     log_p = log_p.squeeze(0)
-                    next_block_index = self.block_selecter(log_p)
+                    if greedy == False:
+                        next_block_index = self.block_selecter(log_p)
+                    else:
+                        next_block_index = self.block_selecter_greedy(log_p)
                     log_probabilities.append(log_p.gather(1, next_block_index.unsqueeze(1)))
                     self.block_indices.append(next_block_index)
                     sample_space = self.sample_space.to(device)

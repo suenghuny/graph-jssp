@@ -1,5 +1,5 @@
 import os
-
+from scipy import stats
 import pandas as pd
 import torch
 import torch.nn as nn
@@ -241,6 +241,9 @@ def train_model(params, log_path=None):
     ave_makespan = 0
     min_makespans = []
     mean_makespans = []
+
+    c_max =list()
+    c_max_g = list()
     for s in range(epoch + 1, params["step"]):
         problem_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         """
@@ -330,12 +333,15 @@ def train_model(params, log_path=None):
                 heterogeneous_edges = [heterogeneous_edges for _ in range(num_val)]
                 input_data = (node_feature, heterogeneous_edges)
                 pred_seq, ll_old, _ = act_model(input_data, device)
+
+
+
                 val_makespan = list()
                 for sequence in pred_seq:
                     scheduler = Scheduler(eval('ORB{}'.format(p)))
                     makespan = scheduler.run(sequence.tolist())
-                    # makespan = scheduler.
                     val_makespan.append(makespan)
+
 
                 print("ORB{}".format(p), (np.min(val_makespan) / opt_list[p - 1] - 1) * 100,
                       (np.mean(val_makespan) / opt_list[p - 1] - 1) * 100, np.min(val_makespan))
@@ -367,55 +373,11 @@ def train_model(params, log_path=None):
                 edge_precedence = scheduler.get_edge_index_precedence()
                 edge_antiprecedence = scheduler.get_edge_index_antiprecedence()
                 edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
-
-                # # Edge data
-                # edge1 = edge_precedence
-                # edge2 = edge_machine_sharing
-                # print(edge2)
-                # # Create a graph
-                #
-                # G = nx.Graph()
-                #
-                # # Add edges from edge1 and edge2
-                # for e in range(len(edge1[0])):
-                #     G.add_edge(edge1[0][e], edge1[1][e], weight=1)
-                #
-                # for e in range(len(edge2[0])):
-                #     G.add_edge(edge2[0][e], edge2[1][e], weight=1)
-                #
-                # # for edge in edge2:
-                # #     G.add_edge(edge[0], edge[1], weight=1)
-                #
-                # # Draw the graph
-                # pos = nx.spring_layout(G)
-                #
-                # # Draw nodes
-                # nx.draw_networkx_nodes(G, pos, node_size=500, node_color="skyblue")
-                # print("??")
-                # # Draw edges from edge1 in red and from edge2 in blue
-                # nx.draw_networkx_edges(G, pos, edgelist=edge1, edge_color='red', width=2)
-                # nx.draw_networkx_edges(G, pos, edgelist=edge2, edge_color='blue', width=2)
-                #
-                # # Draw node labels
-                # nx.draw_networkx_labels(G, pos)
-                #
-                # # Draw edge weights
-                # labels = nx.get_edge_attributes(G, 'weight')
-                # nx.draw_networkx_edge_labels(G, pos, edge_labels=labels)
-                # plt.show()
-                # plt.savefig("xxx.png")
-                #
                 edge_fcn = scheduler.get_fully_connected_edge_index()
                 heterogeneous_edge = (edge_precedence, edge_antiprecedence, edge_machine_sharing, edge_fcn)
                 heterogeneous_edges.append(heterogeneous_edge)
             input_data = (node_features, heterogeneous_edges)
-        else:
-            input_data = torch.tensor(jobs_data, dtype=torch.float).reshape(-1, 2).unsqueeze(0)
-            input_data[:, :, 1] = input_data[:, :, 1].squeeze(0).squeeze(0) * 1 / input_data[:, :, 1].squeeze(
-                0).squeeze(0).max()
-            encoded_data = one_hot_encode(input_data[:, :, 0:1], 10)
-            new_input_data = torch.cat([encoded_data, input_data[:, :, 1:2]], dim=-1)
-            input_data = new_input_data.repeat(params["batch_size"], 1, 1)
+
         pred_seq, ll_old, _ = act_model(input_data, device)
         real_makespan = list()
         for n in range(len(node_features)):
@@ -423,40 +385,38 @@ def train_model(params, log_path=None):
             scheduler = Scheduler(jobs_datas[n])
             makespan = - scheduler.run(sequence.tolist()) / params['reward_scaler']
             real_makespan.append(makespan)
+            c_max.append(makespan)
+
+
+
+        act_model.block_indices = []
+        pred_seq_greedy, _, _ = act_model(input_data, device, greedy=True)
+        real_makespan_greedy = list()
+        for sequence_g in pred_seq_greedy:
+            scheduler = Scheduler(eval('ORB{}'.format(p)))
+            makespan = - scheduler.run(sequence_g.tolist()) / params['reward_scaler']
+            real_makespan_greedy.append(makespan)
+            c_max_g.append(makespan)
+
         ave_makespan += sum(real_makespan) / (params["batch_size"] * params["log_step"])
         """
         vanila actor critic
         """
         if cfg.ppo == False:
-            # # if cfg.vessl == True:
-            # #     vessl.log(step=s, payload={'makespan': sum(real_makespan)/params["batch_size"]})
-            # # # if s % 10 == 0:
-            # # #     if act_model.T >= 0.05:
-            # # #         act_model.T *=1
-            pred_makespan = cri_model(input_data, device).unsqueeze(-1)
-            adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - pred_makespan.detach().to(device)
-            cri_loss = mse_loss(pred_makespan,
-                                torch.tensor(real_makespan, dtype=torch.float).to(device).unsqueeze(1).detach())
-            cri_optim.zero_grad()
-            cri_loss.backward()
-            nn.utils.clip_grad_norm_(cri_model.parameters(), max_norm=1., norm_type=2)
-            cri_optim.step()
+            adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - torch.tensor(real_makespan_greedy).detach().unsqueeze(1).to(device)
             if params["is_lr_decay"]:
                 cri_lr_scheduler.step()
-            # print(ll_old.shape, adv.shape)
-            # print(ll_old.shape)
-            entropy = -torch.exp(ll_old) * ll_old
-            # print("log_prob",ll_old.exp())
-            # print("adv", adv)
-            act_loss = -(ll_old * adv).mean() #- params["entropy_weight"] * entropy.mean()
-            act_optim.zero_grad()
+            act_loss = -(ll_old * adv).mean()
             act_loss.backward()
-            act_optim.step()
-            nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=1.0, norm_type=2)
-            if params["is_lr_decay"]:
-                act_lr_scheduler.step()
+            if stats.ttest_rel(c_max, c_max_g)[1]<0.05:
+                act_optim.step()
+                act_optim.zero_grad()
+                c_max = list()
+                c_max_g = list()
+                nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=1.0, norm_type=2)
+                if params["is_lr_decay"]:
+                    act_lr_scheduler.step()
             ave_act_loss += act_loss.item()
-            ave_cri_loss += cri_loss.item()
 
         """
         vanila actor critic
@@ -464,31 +424,6 @@ def train_model(params, log_path=None):
         """
 
         #
-        if cfg.ppo == True:
-            for k in range(params["iteration"]):  # K-epoch
-                pred_makespan = cri_model(input_data, device).unsqueeze(-1)
-                adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - pred_makespan.detach().to(device)
-                cri_loss = mse_loss(pred_makespan,
-                                    torch.tensor(real_makespan, dtype=torch.float).to(device).unsqueeze(1).detach())
-                cri_optim.zero_grad()
-                cri_loss.backward()
-                nn.utils.clip_grad_norm_(cri_model.parameters(), max_norm=1., norm_type=2)
-                cri_optim.step()
-                if params["is_lr_decay"]:
-                    cri_lr_scheduler.step()
-                ave_cri_loss += cri_loss.item()
-                _, ll_new, _ = act_model(input_data, device, pred_seq)  # pi(seq|inputs)
-                ratio = torch.exp(ll_new - ll_old.detach()).unsqueeze(-1)  #
-                surr1 = ratio * adv
-                surr2 = torch.clamp(ratio, 1 - params["epsilon"], 1 + params["epsilon"]) * adv
-                act_loss = -torch.min(surr1, surr2).mean()
-                act_optim.zero_grad()
-                act_loss.backward()
-                act_optim.step()
-                nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=1.0, norm_type=2)
-                if params["is_lr_decay"]:
-                    act_lr_scheduler.step()
-                ave_act_loss += act_loss.item()
 
         if s % params["log_step"] == 0:
             t2 = time()
