@@ -319,7 +319,9 @@ def train_model(params, log_path=None):
         if s % 20 == 1:
             for p in problem_list:
                 num_val = 50
+                val_makespan = list()
                 act_model.init_mask_job_count(num_val)
+                baseline_model.init_mask_job_count(num_val)
                 scheduler = Scheduler(eval('ORB{}'.format(p)))
                 node_feature = scheduler.get_node_feature()
                 node_feature = [node_feature for _ in range(num_val)]
@@ -334,7 +336,7 @@ def train_model(params, log_path=None):
 
 
 
-                val_makespan = list()
+
                 for sequence in pred_seq:
                     scheduler = Scheduler(eval('ORB{}'.format(p)))
                     makespan = scheduler.run(sequence.tolist())
@@ -357,8 +359,11 @@ def train_model(params, log_path=None):
                     mean_m.to_csv('mean_makespan.csv')
 
                 act_model.init_mask_job_count(params['batch_size'])
+                baseline_model.init_mask_job_count(params['batch_size'])
+                #baseline_model.init_mask_job_count(num_val)
 
         act_model.block_indices = []
+        baseline_model.block_indices = []
 
         if params['gnn'] == True:
             heterogeneous_edges = list()
@@ -406,12 +411,13 @@ def train_model(params, log_path=None):
             act_loss = -(ll_old * adv).mean()
             act_loss.backward()
             act_optim.step()
+            nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=1.0, norm_type=2)
             print(stats.ttest_rel(c_max, c_max_g)[1])
             if stats.ttest_rel(c_max, c_max_g)[1]<0.05:
 
                 c_max = list()
                 c_max_g = list()
-                nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=1.0, norm_type=2)
+
                 baseline_model.load_state_dict(act_model.state_dict())
                 if params["is_lr_decay"]:
                     act_lr_scheduler.step()
@@ -447,9 +453,7 @@ def train_model(params, log_path=None):
         if s % params["save_step"] == 1:
             torch.save({'epoch': s,
                         'model_state_dict_actor': act_model.state_dict(),
-                        'model_state_dict_critic': cri_model.state_dict(),
                         'optimizer_state_dict_actor': act_optim.state_dict(),
-                        'optimizer_state_dict_critic': cri_optim.state_dict(),
                         'ave_act_loss': ave_act_loss,
                         'ave_cri_loss': 0,
                         'ave_makespan': ave_makespan},
