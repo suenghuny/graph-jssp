@@ -222,19 +222,17 @@ def train_model(params, log_path=None):
     ave_cri_loss = 0.0
 
     act_model = PtrNet1(params).to(device)
-    cri_model = PtrNet2(params).to(device)
+    baseline_model= PtrNet1(params).to(device)
+    baseline_model.load_state_dict(act_model.state_dict())
     if params["optimizer"] == 'Adam':
         act_optim = optim.Adam(act_model.parameters(), lr=params["lr"])
-        cri_optim = optim.Adam(cri_model.parameters(), lr=params["lr_critic"])
     elif params["optimizer"] == "RMSProp":
         act_optim = optim.RMSprop(act_model.parameters(), lr=params["lr"])
-        cri_optim = optim.RMSprop(cri_model.parameters(), lr=params["lr_critic"])
 
     if params["is_lr_decay"]:
         act_lr_scheduler = optim.lr_scheduler.StepLR(act_optim, step_size=params["lr_decay_step"],
                                                      gamma=params["lr_decay"])
-        cri_lr_scheduler = optim.lr_scheduler.StepLR(cri_optim, step_size=params["lr_decay_step_critic"],
-                                                     gamma=params["lr_decay"])
+
 
     mse_loss = nn.MSELoss()
     t1 = time()
@@ -389,8 +387,8 @@ def train_model(params, log_path=None):
 
 
 
-        act_model.block_indices = []
-        pred_seq_greedy, _, _ = act_model(input_data, device, greedy=True)
+        baseline_model.block_indices = []
+        pred_seq_greedy, _, _ = baseline_model(input_data, device, greedy=True)
         real_makespan_greedy = list()
         for sequence_g in pred_seq_greedy:
             scheduler = Scheduler(eval('ORB{}'.format(p)))
@@ -403,17 +401,18 @@ def train_model(params, log_path=None):
         vanila actor critic
         """
         if cfg.ppo == False:
+            act_optim.zero_grad()
             adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - torch.tensor(real_makespan_greedy).detach().unsqueeze(1).to(device)
-            if params["is_lr_decay"]:
-                cri_lr_scheduler.step()
             act_loss = -(ll_old * adv).mean()
             act_loss.backward()
+            act_optim.step()
+            print(stats.ttest_rel(c_max, c_max_g)[1])
             if stats.ttest_rel(c_max, c_max_g)[1]<0.05:
-                act_optim.step()
-                act_optim.zero_grad()
+
                 c_max = list()
                 c_max_g = list()
                 nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=1.0, norm_type=2)
+                baseline_model.load_state_dict(act_model.state_dict())
                 if params["is_lr_decay"]:
                     act_lr_scheduler.step()
             ave_act_loss += act_loss.item()
