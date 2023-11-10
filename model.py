@@ -87,6 +87,8 @@ class GCRN(nn.Module):
         self.m = [nn.ReLU() for _ in range(num_edge_cat)]
         self.leakyrelu = [nn.LeakyReLU() for _ in range(num_edge_cat)]
         self.Embedding1 = nn.Linear(self.n_multi_head*graph_embedding_size*num_edge_cat, feature_size)
+
+        self.Embedding1_mean = nn.Linear(graph_embedding_size * num_edge_cat, feature_size)
         self.Embedding2 = NodeEmbedding(feature_size, feature_size, layers = layers)
         self.BN1 = nn.BatchNorm1d(feature_size)
         self.BN2 = nn.BatchNorm1d(feature_size)
@@ -97,13 +99,18 @@ class GCRN(nn.Module):
         Wh2 = Wv
         e = Wh1 + Wh2.T
         return e*A
-    def forward(self, A, X, mini_batch, layer = 0):
+    def forward(self, A, X, mini_batch, layer = 0, final = False):
         batch_size = X.shape[0]
         num_nodes = X.shape[1]
 
         placeholder_for_multi_head = []
-        for m in range(self.n_multi_head):
+        if final == False:pass
+        else:
             empty = torch.zeros(batch_size, num_nodes, self.num_edge_cat, self.graph_embedding_size).to(device)
+        for m in range(self.n_multi_head):
+            if final == False:
+                empty = torch.zeros(batch_size, num_nodes, self.num_edge_cat, self.graph_embedding_size).to(device)
+            else:pass
             for b in range(batch_size):
                 for e in range(self.num_edge_cat):
                     E = torch.sparse_coo_tensor(A[b][e],torch.ones(torch.tensor(torch.tensor(A[b][e]).shape[1])),(num_nodes, num_nodes)).to(device).to_dense()
@@ -113,15 +120,30 @@ class GCRN(nn.Module):
                     a = self._prepare_attentional_mechanism_input(Wq, Wv,E, e, mini_batch=mini_batch)
                     a = F.leaky_relu(a)
                     a = F.softmax(a, dim=1)
-                    H = a*E@Wh
-                    empty[b, :, e, :].copy_(H)
-            H = empty.reshape(batch_size, num_nodes, self.num_edge_cat*self.graph_embedding_size)
-            placeholder_for_multi_head.append(H)
-        H = torch.concat(placeholder_for_multi_head, dim = 2)
-        H = H.reshape(batch_size*num_nodes, -1)
-        H = F.relu(self.Embedding1(H))
-        X = X.reshape(batch_size*num_nodes, -1)
-        H = self.BN1(H+X)
+                    H = a@Wh
+                    if final == False:
+                        empty[b, :, e, :].copy_(H)
+                    else:
+                        empty[b, :, e, :] += 1 / self.n_multi_head * H
+            if final == False:
+                H = empty.reshape(batch_size, num_nodes, self.num_edge_cat*self.graph_embedding_size)
+                placeholder_for_multi_head.append(H)
+            else:
+                pass
+
+        if final == False:
+            H = torch.concat(placeholder_for_multi_head, dim = 2)
+            H = H.reshape(batch_size*num_nodes, -1)
+            H = F.relu(self.Embedding1(H))
+            X = X.reshape(batch_size*num_nodes, -1)
+            H = self.BN1(H + X)
+        else:
+            H = empty.reshape(batch_size, num_nodes, self.num_edge_cat * self.graph_embedding_size)
+            H = H.reshape(batch_size * num_nodes, -1)
+            H = self.Embedding1_mean(H)
+            X = X.reshape(batch_size * num_nodes, -1)
+            H = self.BN1(H + X)
+
         Z = self.Embedding2(H)
         Z = self.BN2(H+Z)
         Z = Z.reshape(batch_size, num_nodes, -1)

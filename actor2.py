@@ -187,13 +187,12 @@ class PtrNet1(nn.Module):
                 enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
             if cfg.k_hop == 2:
                 enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
-                enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
+                enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True, final = True)
             if cfg.k_hop == 3:
                 enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
                 enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
-                enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
+                enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True, final = True)
             embed = enc_h.size(2)
-            #print(enc_h.shape)
             h = enc_h.mean(dim = 1).unsqueeze(0)
             enc_h = enc_h[:, :-2]
 
@@ -359,7 +358,7 @@ class PtrNet1(nn.Module):
                 #u1 = self.W_q[m](query).unsqueeze(-1).repeat(1, 1, ref.size(1))      # u1: (batch, 128, block_num)
                 u1 = self.W_q[m](query).unsqueeze(1)
                 u2 = self.W_ref[m](ref.permute(0, 2, 1))                             # u2: (batch, 128, block_num)
-                u = torch.bmm(u1, u2)/dk
+                u = torch.bmm(u1, u2)/dk**0.5
                 v = ref@self.Vec[m]
                 u = u.squeeze(1).masked_fill(mask == 0, -1e8)
                 a = F.softmax(u, dim=1)
