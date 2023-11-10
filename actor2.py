@@ -367,7 +367,7 @@ class PtrNet1(nn.Module):
                 placeholder_for_g.append(g)
             g = torch.concat(placeholder_for_g, dim = 1)
             g = self.multi_head_embedding(g)
-            g = self.BN(g)
+
         return g
 
     def pointer(self, query, ref, mask, inf=1e8):
