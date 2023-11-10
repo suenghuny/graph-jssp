@@ -452,7 +452,7 @@ def train_model(params, log_path=None):
                         'optimizer_state_dict_actor': act_optim.state_dict(),
                         'optimizer_state_dict_critic': cri_optim.state_dict(),
                         'ave_act_loss': ave_act_loss,
-                        'ave_cri_loss': ave_cri_loss,
+                        'ave_cri_loss': 0,
                         'ave_makespan': ave_makespan},
                        params["model_dir"] + '/ppo' + '/%s_step%d_act.pt' % (date, s))
         #     print('save model...')
