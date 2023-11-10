@@ -130,7 +130,7 @@ class GCRN(nn.Module):
                 placeholder_for_multi_head.append(H)
             else:
                 pass
-
+###
         if final == False:
             H = torch.concat(placeholder_for_multi_head, dim = 2)
             H = H.reshape(batch_size*num_nodes, -1)
