@@ -363,10 +363,14 @@ class PtrNet1(nn.Module):
                 v = ref@self.Vec[m]
                 u = u.squeeze(1).masked_fill(mask == 0, -1e8)
                 a = F.softmax(u, dim=1)
-                g = torch.bmm(a.squeeze().unsqueeze(1), v).squeeze(1)
-                placeholder_for_g.append(g)
-            g = torch.concat(placeholder_for_g, dim = 1)
-            g = self.multi_head_embedding(g)
+
+                if m == 0:
+                    g = torch.bmm(a.squeeze().unsqueeze(1), v).squeeze(1)
+                else:
+                    g += torch.bmm(a.squeeze().unsqueeze(1), v).squeeze(1)
+                #placeholder_for_g.append(g)
+            #g = torch.concat(placeholder_for_g, dim = 1)
+            #g = self.multi_head_embedding(g)
 
         return g
 
