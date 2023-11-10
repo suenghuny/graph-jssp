@@ -302,13 +302,13 @@ class PtrNet1(nn.Module):
                     log_probabilities.append(log_p.gather(1, next_block_index.unsqueeze(1)))
                     sample_space = self.sample_space.to(device)
                     next_block = sample_space[next_block_index].to(device)
-
                     for b_prime in range(len(next_block.tolist())):
                         job = next_block[b_prime]
                         self.job_count[b_prime][job] += 1
                 h_pi_t_minus_one = torch.gather(input=enc_h, dim=1, index=next_block_index.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, embed)).squeeze(1).unsqueeze(0)  # 다음 sequence의 input은 encoder의 output 중에서 현재 sequence에 해당하는 embedding이 된다.
                 if i == 0:
                     h_pi_one = torch.gather(input=enc_h, dim=1, index=next_block_index.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, embed)).squeeze(1).unsqueeze(0)  # 다음 sequence의 input은 encoder의 output 중에서 현재 sequence에 해당하는 embedding이 된다.
+                #print(h_pi_one)
                 pi_list.append(next_block)
             pi = torch.stack(pi_list, dim=1)
             if y == None:

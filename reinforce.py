@@ -257,20 +257,21 @@ def train_model(params, log_path=None):
             num_jobs = 10
             num_operation = 10
             for _ in range(params['batch_size']):
-                # temp = []
+
                 # for j in range(num_jobs):
                 #     temp.append(eval('ORB{}'.format(np.random.choice(problem_list)))[j])
-                temp = eval('ORB{}'.format(np.random.choice(problem_list)))
+                #temp = eval('ORB{}'.format(np.random.choice(problem_list)))
                 # print(temp)
+                #jobs_datas.append(temp)
+                temp = []
+                for job in range(num_jobs):
+                    machine_sequence = list(range(num_jobs))
+                    random.shuffle(machine_sequence)
+                    empty = list()
+                    for ops in range(num_operation):
+                        empty.append((machine_sequence[ops], np.random.randint(1, 100)))
+                    temp.append(empty)
                 jobs_datas.append(temp)
-                # for job in range(num_jobs):
-                #     machine_sequence = list(range(num_jobs))
-                #     random.shuffle(machine_sequence)
-                #     empty = list()
-                #     for ops in range(num_operation):
-                #         empty.append((machine_sequence[ops], np.random.randint(1, 100)))
-                #     temp.append(empty)
-                # jobs_datas.append(temp)
             # print(jobs_data)
 
         # if s % 20 == 1:
