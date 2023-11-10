@@ -417,7 +417,7 @@ def train_model(params, log_path=None):
             act_loss.backward()
             act_optim.step()
             nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=1.0, norm_type=2)
-            if s % 40 == 0:
+            if s % cfg.interval== 0:
                 if stats.ttest_rel(c_max, c_max_g)[1]<0.05:
                     c_max = list()
                     c_max_g = list()

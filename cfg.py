@@ -29,6 +29,7 @@ def get_cfg():
     parser.add_argument("--n_multi_head", type=int, default=2, help="")
     parser.add_argument("--k_hop", type=int, default=3, help="")
     parser.add_argument("--dot_product", type=bool, default=True, help="")
+    parser.add_argument("--interval", type=int, default=300, help="")
     return parser.parse_args()
 
 
