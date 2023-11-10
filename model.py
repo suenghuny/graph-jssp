@@ -140,7 +140,7 @@ class GCRN(nn.Module):
         else:
             H = empty.reshape(batch_size, num_nodes, self.num_edge_cat * self.graph_embedding_size)
             H = H.reshape(batch_size * num_nodes, -1)
-            H = self.Embedding1_mean(H)
+            H = F.relu(self.Embedding1_mean(H))
             X = X.reshape(batch_size * num_nodes, -1)
             H = self.BN1(H + X)
 

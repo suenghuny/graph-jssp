@@ -279,11 +279,8 @@ class PtrNet1(nn.Module):
                             mask2[b, k, job_count[b, k]] = 1
                         except IndexError as IE:
                             pass
+                #
                 mask2 = mask2.view(self.count, -1).to(device)
-
-
-
-                #print(h.shape, h_pi_t_minus_one.shape, h_pi_one.shape)
                 h_c = self.decoder(h, h_pi_t_minus_one, h_pi_one)
                 query = h_c.squeeze(0)
                 query = self.glimpse(query, ref, mask2)
@@ -309,10 +306,6 @@ class PtrNet1(nn.Module):
                     for b_prime in range(len(next_block.tolist())):
                         job = next_block[b_prime]
                         self.job_count[b_prime][job] += 1
-
-                # if i == 10:
-                #     print(log_p.gather(1, next_block_index.unsqueeze(1))[15])
-
                 h_pi_t_minus_one = torch.gather(input=enc_h, dim=1, index=next_block_index.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, embed)).squeeze(1).unsqueeze(0)  # 다음 sequence의 input은 encoder의 output 중에서 현재 sequence에 해당하는 embedding이 된다.
                 if i == 0:
                     h_pi_one = torch.gather(input=enc_h, dim=1, index=next_block_index.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, embed)).squeeze(1).unsqueeze(0)  # 다음 sequence의 input은 encoder의 output 중에서 현재 sequence에 해당하는 embedding이 된다.
