@@ -2,6 +2,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from copy import deepcopy
+
+import cfg
+
+cfg = cfg.get_cfg()
 from model import GCRN, NodeEmbedding
 from model_fastgtn import FastGTNs
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -178,9 +182,16 @@ class PtrNet1(nn.Module):
             node_reshaped_features = node_features.reshape(batch * node_num, -1)
             node_embedding = self.Embedding(node_reshaped_features)
             node_embedding = node_embedding.reshape(batch, node_num, -1)
-            enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
-            enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
-            enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
+
+            if cfg.k_hop == 1:
+                enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
+            if cfg.k_hop == 2:
+                enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
+                enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
+            if cfg.k_hop == 3:
+                enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
+                enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
+                enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
             embed = enc_h.size(2)
             #print(enc_h.shape)
             h = enc_h.mean(dim = 1).unsqueeze(0)
