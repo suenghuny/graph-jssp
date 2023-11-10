@@ -335,7 +335,6 @@ class PtrNet1(nn.Module):
             u = self.C * torch.tanh(u)
         # V: (batch, 1, 128) * u1+u2: (batch, 128, block_num) => u: (batch, 1, block_num) => (batch, block_num)
         u = u.masked_fill(mask == 0, -1e8)
-        #print(u.shape)
         return u
 
     def get_log_likelihood(self, _log_p, pi):

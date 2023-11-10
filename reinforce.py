@@ -242,6 +242,8 @@ def train_model(params, log_path=None):
 
     c_max =list()
     c_max_g = list()
+    baseline_update = 30
+    b = 0
     for s in range(epoch + 1, params["step"]):
         problem_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         """
@@ -249,6 +251,7 @@ def train_model(params, log_path=None):
         inputs : batch_size X number_of_blocks X number_of_process
         pred_seq : batch_size X number_of_blocks
         """
+        b +=1
         if s % 5 == 1:
             jobs_datas = []
             num_jobs = 10
@@ -412,15 +415,16 @@ def train_model(params, log_path=None):
             act_loss.backward()
             act_optim.step()
             nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=1.0, norm_type=2)
-            print(stats.ttest_rel(c_max, c_max_g)[1])
-            if stats.ttest_rel(c_max, c_max_g)[1]<0.05:
-
-                c_max = list()
-                c_max_g = list()
-
-                baseline_model.load_state_dict(act_model.state_dict())
-                if params["is_lr_decay"]:
-                    act_lr_scheduler.step()
+            if s % 40 == 0:
+                if stats.ttest_rel(c_max, c_max_g)[1]<0.05:
+                    c_max = list()
+                    c_max_g = list()
+                    baseline_model.load_state_dict(act_model.state_dict())
+                    if params["is_lr_decay"]:
+                        act_lr_scheduler.step()
+                else:
+                    c_max = list()
+                    c_max_g = list()
             ave_act_loss += act_loss.item()
 
         """
