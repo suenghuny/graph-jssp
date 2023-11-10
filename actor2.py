@@ -363,7 +363,7 @@ class PtrNet1(nn.Module):
                 v = ref@self.Vec[m]
                 u = u.squeeze(1).masked_fill(mask == 0, -1e8)
                 a = F.softmax(u, dim=1)
-
+                #dddd
                 if m == 0:
                     g = torch.bmm(a.squeeze().unsqueeze(1), v).squeeze(1)
                 else:
