@@ -333,7 +333,10 @@ def train_model(params, log_path=None):
                 edge_antiprecedence = scheduler.get_edge_index_antiprecedence()
                 edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
                 edge_fcn = scheduler.get_fully_connected_edge_index()
-                heterogeneous_edges = (edge_precedence, edge_antiprecedence, edge_machine_sharing, edge_fcn)
+                if cfg.fully_connected == True:
+                    heterogeneous_edges = (edge_precedence, edge_antiprecedence, edge_machine_sharing, edge_fcn)
+                else:
+                    heterogeneous_edges = (edge_precedence, edge_antiprecedence, edge_machine_sharing)
                 heterogeneous_edges = [heterogeneous_edges for _ in range(num_val)]
                 input_data = (node_feature, heterogeneous_edges)
                 pred_seq, ll_old, _ = act_model(input_data, device)
@@ -381,7 +384,10 @@ def train_model(params, log_path=None):
                 edge_antiprecedence = scheduler.get_edge_index_antiprecedence()
                 edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
                 edge_fcn = scheduler.get_fully_connected_edge_index()
-                heterogeneous_edge = (edge_precedence, edge_antiprecedence, edge_machine_sharing, edge_fcn)
+                if cfg.fully_connected == True:
+                    heterogeneous_edge = (edge_precedence, edge_antiprecedence, edge_machine_sharing, edge_fcn)
+                else:
+                    heterogeneous_edge = (edge_precedence, edge_antiprecedence, edge_machine_sharing)
                 heterogeneous_edges.append(heterogeneous_edge)
             input_data = (node_features, heterogeneous_edges)
 
@@ -416,14 +422,19 @@ def train_model(params, log_path=None):
             act_loss = -(ll_old * adv).mean()
             act_loss.backward()
             act_optim.step()
-            nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=1.0, norm_type=2)
+            nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=10.0, norm_type=2)
+            if act_lr_scheduler.get_last_lr()[0] >= 1e-4:
+                if params["is_lr_decay"]:
+                    # print(act_lr_scheduler.get_last_lr())
+                    act_lr_scheduler.step()
+
+            #print(act_lr_scheduler.get_last_lr())
             if s % cfg.interval== 0:
                 if stats.ttest_rel(c_max, c_max_g)[1]<0.05:
                     c_max = list()
                     c_max_g = list()
                     baseline_model.load_state_dict(act_model.state_dict())
-                    if params["is_lr_decay"]:
-                        act_lr_scheduler.step()
+
                 else:
                     c_max = list()
                     c_max_g = list()

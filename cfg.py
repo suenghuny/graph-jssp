@@ -14,10 +14,10 @@ def get_cfg():
     parser.add_argument("--epsilon", type=float, default=0.2, help="")
     parser.add_argument("--n_glimpse", type=int, default=4, help="")
     parser.add_argument("--n_process", type=int, default=4, help="")
-    parser.add_argument("--lr", type=float, default=1.e-4, help="")
+    parser.add_argument("--lr", type=float, default=1.e-3, help="")
     parser.add_argument("--lr_critic", type=float, default=2.e-4, help="")
     parser.add_argument("--lr_decay", type=float, default=0.98, help="")
-    parser.add_argument("--lr_decay_step", type=int, default=3000, help="")
+    parser.add_argument("--lr_decay_step", type=int, default=20, help="")
     parser.add_argument("--lr_decay_step_critic", type=int, default=2000, help="")
     parser.add_argument("--layers", type=str, default="[256, 128]", help="")
     parser.add_argument("--n_embedding", type=int, default=32, help="")
@@ -30,6 +30,8 @@ def get_cfg():
     parser.add_argument("--k_hop", type=int, default=3, help="")
     parser.add_argument("--dot_product", type=bool, default=True, help="")
     parser.add_argument("--interval", type=int, default=300, help="")
+    parser.add_argument("--fully_connected", type=bool, default=False, help="")
+
     return parser.parse_args()
 
 

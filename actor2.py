@@ -33,7 +33,10 @@ class PtrNet1(nn.Module):
         self.n_multi_head = params["n_multi_head"]
         if self.gnn == True:
             self.Embedding = nn.Linear(params["num_of_process"],  params["n_hidden"], bias=False).to(device)  # input_shape : num_of_process, output_shape : n_embedding
-            num_edge_cat = 4
+            if cfg.fully_connected == True:
+                num_edge_cat = 4
+            else:
+                num_edge_cat = 3
             self.GraphEmbedding = GCRN(feature_size =  params["n_hidden"],
                                        graph_embedding_size= params["graph_embedding_size"],
                                        embedding_size =  params["n_hidden"],layers =  params["layers"], num_edge_cat = num_edge_cat).to(device)
