@@ -396,6 +396,7 @@ def train_model(params, log_path=None):
 
 
         baseline_model.block_indices = []
+        baseline_model.eval()
         pred_seq_greedy, _, _ = baseline_model(input_data, device, greedy=True)
         real_makespan_greedy = list()
         for sequence_g in pred_seq_greedy:
@@ -541,7 +542,8 @@ if __name__ == '__main__':
         "graph_embedding_size": cfg.graph_embedding_size,
         "reward_scaler": cfg.reward_scaler,
         "n_multi_head":cfg.n_multi_head,
-        "entropy_weight": cfg.entropy_weight
+        "entropy_weight": cfg.entropy_weight,
+        "dot_product":cfg.dot_product
     }
 
     train_model(params)

@@ -49,28 +49,44 @@ class PtrNet1(nn.Module):
             # self.Ws = nn.ParameterList(self.Ws)
             # [glorot(W) for W in self.Ws]
             if torch.cuda.is_available():
-                self.Vec = [nn.Parameter(torch.cuda.FloatTensor(augmented_hidden_size)) for _ in range(self.n_multi_head)]
-                self.Vec = nn.ParameterList(self.Vec)
-                self.Vec2 = nn.Parameter(torch.cuda.FloatTensor(augmented_hidden_size))
+                if params["dot_product"] == False:
+                    self.Vec = [nn.Parameter(torch.cuda.FloatTensor(augmented_hidden_size)) for _ in range(self.n_multi_head)]
+                    self.Vec = nn.ParameterList(self.Vec)
+                    self.Vec2 = nn.Parameter(torch.cuda.FloatTensor(augmented_hidden_size))
+                else:
+                    self.Vec = [nn.Parameter(torch.cuda.FloatTensor(augmented_hidden_size, augmented_hidden_size)) for _ in range(self.n_multi_head)]
+                    self.Vec = nn.ParameterList(self.Vec)
+                    self.Vec2 = nn.Parameter(torch.cuda.FloatTensor(augmented_hidden_size))
             else:
-                self.Vec = [nn.Parameter(torch.FloatTensor(augmented_hidden_size)) for _ in range(self.n_multi_head)]
-                self.Vec = nn.ParameterList(self.Vec)
-                self.Vec2 = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
+                if params["dot_product"] == False:
+                    self.Vec = [nn.Parameter(torch.FloatTensor(augmented_hidden_size)) for _ in range(self.n_multi_head)]
+                    self.Vec = nn.ParameterList(self.Vec)
+                    self.Vec2 = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
+                else:
+                    self.Vec = [nn.Parameter(torch.FloatTensor(augmented_hidden_size, augmented_hidden_size)) for _ in range(self.n_multi_head)]
+                    self.Vec = nn.ParameterList(self.Vec)
+                    self.Vec2 = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
 
-
-            self.W_q = [nn.Linear(3*augmented_hidden_size, augmented_hidden_size, bias=True).to(device)  for _ in range(self.n_multi_head)]
-            self.W_q_weights = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_q])
-            self.W_q_biases = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_q])
-            self.W_ref =[nn.Conv1d(augmented_hidden_size,augmented_hidden_size, 1, 1).to(device) for _ in range(self.n_multi_head)]
-            self.W_ref_weights = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_ref])
-            self.W_ref_biases = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_ref])
-
-
-
-            self.W_q2 = nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=True)
-
-            self.W_ref2 = nn.Conv1d(augmented_hidden_size,augmented_hidden_size, 1, 1)
-            self.dec_input = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
+            if params["dot_product"] == False:
+                self.W_q = [nn.Linear(3*augmented_hidden_size, augmented_hidden_size, bias=True).to(device)  for _ in range(self.n_multi_head)]
+                self.W_q_weights = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_q])
+                self.W_q_biases = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_q])
+                self.W_ref =[nn.Conv1d(augmented_hidden_size,augmented_hidden_size, 1, 1).to(device) for _ in range(self.n_multi_head)]
+                self.W_ref_weights = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_ref])
+                self.W_ref_biases = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_ref])
+                self.W_q2 = nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=True)
+                self.W_ref2 = nn.Conv1d(augmented_hidden_size,augmented_hidden_size, 1, 1)
+                self.dec_input = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
+            else:
+                self.W_q = [nn.Linear(3*augmented_hidden_size, augmented_hidden_size, bias=True).to(device)  for _ in range(self.n_multi_head)]
+                self.W_q_weights = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_q])
+                self.W_q_biases = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_q])
+                self.W_ref =[nn.Conv1d(augmented_hidden_size,augmented_hidden_size, 1, 1).to(device) for _ in range(self.n_multi_head)]
+                self.W_ref_weights = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_ref])
+                self.W_ref_biases = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_ref])
+                self.W_q2 = nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=True)
+                self.W_ref2 = nn.Conv1d(augmented_hidden_size,augmented_hidden_size, 1, 1)
+                self.dec_input = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
 
             self.v_1 = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
             self.v_f = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
@@ -112,7 +128,6 @@ class PtrNet1(nn.Module):
                 self.Vec2 = nn.Parameter(torch.FloatTensor(params["n_hidden"]))
             self.W_q = nn.Linear(3*params["n_hidden"], params["n_hidden"], bias=True)
             self.W_ref = nn.Conv1d(params["n_hidden"], params["n_hidden"], 1, 1)
-
             self.W_q2 = nn.Linear(params["n_hidden"], params["n_hidden"], bias=True)
             self.W_ref2 = nn.Conv1d(params["n_hidden"], params["n_hidden"], 1, 1)
             self.dec_input = nn.Parameter(torch.FloatTensor(params["n_embedding"]))
@@ -309,32 +324,60 @@ class PtrNet1(nn.Module):
         query는 decoder의 출력
         ref는   encoder의 출력
         """
-        placeholder_for_g = list()
-        for m in range(self.n_multi_head):
-            u1 = self.W_q[m](query).unsqueeze(-1).repeat(1, 1, ref.size(1))      # u1: (batch, 128, block_num)
-            u2 = self.W_ref[m](ref.permute(0, 2, 1))                             # u2: (batch, 128, block_num)
-            V = self.Vec[m].unsqueeze(0).unsqueeze(0).repeat(ref.size(0), 1, 1)  #
-            u = torch.bmm(V, torch.tanh(u1 + u2)).squeeze(1)
-            u = u.masked_fill(mask == 0, -1e8)
-            a = F.softmax(u, dim=1)
-            g = torch.bmm(a.squeeze().unsqueeze(1), ref).squeeze(1)
-            placeholder_for_g.append(g)
-        g = torch.concat(placeholder_for_g, dim = 1)
-        g = self.multi_head_embedding(g)
-        g = self.BN(g)
+        if self.params["dot_product"] == False:
+            placeholder_for_g = list()
+            for m in range(self.n_multi_head):
+                u1 = self.W_q[m](query).unsqueeze(-1).repeat(1, 1, ref.size(1))      # u1: (batch, 128, block_num)
+                u2 = self.W_ref[m](ref.permute(0, 2, 1))                             # u2: (batch, 128, block_num)
+                V = self.Vec[m].unsqueeze(0).unsqueeze(0).repeat(ref.size(0), 1, 1)  #
+
+                u = torch.bmm(V, torch.tanh(u1 + u2)).squeeze(1)
+                #print(u.shape)
+                u = u.masked_fill(mask == 0, -1e8)
+                a = F.softmax(u, dim=1)
+                g = torch.bmm(a.squeeze().unsqueeze(1), ref).squeeze(1)
+                placeholder_for_g.append(g)
+            g = torch.concat(placeholder_for_g, dim = 1)
+            g = self.multi_head_embedding(g)
+            g = self.BN(g)
+        else:
+            placeholder_for_g = list()
+
+            dk = self.params["n_hidden"]/self.n_multi_head
+            for m in range(self.n_multi_head):
+                #u1 = self.W_q[m](query).unsqueeze(-1).repeat(1, 1, ref.size(1))      # u1: (batch, 128, block_num)
+                u1 = self.W_q[m](query).unsqueeze(1)
+                u2 = self.W_ref[m](ref.permute(0, 2, 1))                             # u2: (batch, 128, block_num)
+                u = torch.bmm(u1, u2)/dk
+                v = ref@self.Vec[m]
+                u = u.squeeze(1).masked_fill(mask == 0, -1e8)
+                a = F.softmax(u, dim=1)
+                g = torch.bmm(a.squeeze().unsqueeze(1), v).squeeze(1)
+                placeholder_for_g.append(g)
+            g = torch.concat(placeholder_for_g, dim = 1)
+            g = self.multi_head_embedding(g)
+            g = self.BN(g)
         return g
 
     def pointer(self, query, ref, mask, inf=1e8):
 
-
-        u1 = self.W_q2(query).unsqueeze(-1).repeat(1, 1, ref.size(1))  # u1: (batch, 128, block_num)
-        u2 = self.W_ref2(ref.permute(0, 2, 1))                         # u2: (batch, 128, block_num)
-        V = self.Vec2.unsqueeze(0).unsqueeze(0).repeat(ref.size(0), 1, 1)
-        u = torch.bmm(V, torch.tanh(u1 + u2)).squeeze(1)
-        if self.use_logit_clipping:
-            u = self.C * torch.tanh(u)
-        # V: (batch, 1, 128) * u1+u2: (batch, 128, block_num) => u: (batch, 1, block_num) => (batch, block_num)
-        u = u.masked_fill(mask == 0, -1e8)
+        if self.params["dot_product"] == False:
+            u1 = self.W_q2(query).unsqueeze(-1).repeat(1, 1, ref.size(1))  # u1: (batch, 128, block_num)
+            u2 = self.W_ref2(ref.permute(0, 2, 1))                         # u2: (batch, 128, block_num)
+            V = self.Vec2.unsqueeze(0).unsqueeze(0).repeat(ref.size(0), 1, 1)
+            u = torch.bmm(V, torch.tanh(u1 + u2)).squeeze(1)
+            if self.use_logit_clipping:
+                u = self.C * torch.tanh(u)
+            # V: (batch, 1, 128) * u1+u2: (batch, 128, block_num) => u: (batch, 1, block_num) => (batch, block_num)
+            u = u.masked_fill(mask == 0, -1e8)
+        else:
+            dk = self.params["n_hidden"]
+            u1 = self.W_q2(query).unsqueeze(1)
+            u2 = self.W_ref2(ref.permute(0, 2, 1))  # u2: (batch, 128, block_num)
+            u = torch.bmm(u1, u2) / dk
+            if self.use_logit_clipping:
+                u = self.C * torch.tanh(u)
+            u = u.squeeze(1).masked_fill(mask == 0, -1e8)
         return u
 
     def get_log_likelihood(self, _log_p, pi):
