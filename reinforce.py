@@ -174,6 +174,7 @@ for i in ['01','02','03','04','05','06','07','08','09','10']:
             job.append(element)
         orb_data.append(job)
     orb_list.append(orb_data)
+    print(orb_data)
         #print(column)
 #pd.DataFrame()
 # datas = [[
@@ -255,7 +256,6 @@ def train_model(params, log_path=None):
     c_max_g = list()
     baseline_update = 30
     b = 0
-
     for s in range(epoch + 1, params["step"]):
         problem_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         """
@@ -269,6 +269,12 @@ def train_model(params, log_path=None):
             num_jobs = 10
             num_operation = 10
             for _ in range(params['batch_size']):
+
+                # for j in range(num_jobs):
+                #     temp.append(eval('ORB{}'.format(np.random.choice(problem_list)))[j])
+                #temp = eval('ORB{}'.format(np.random.choice(problem_list)))
+                # print(temp)
+                #jobs_datas.append(temp)
                 temp = []
                 for job in range(num_jobs):
                     machine_sequence = list(range(num_jobs))
@@ -334,21 +340,18 @@ def train_model(params, log_path=None):
                 baseline_model.init_mask_job_count(num_val)
                 scheduler = Scheduler(orb_list[p-1])
                 node_feature = scheduler.get_node_feature()
-                node_features = [node_feature for _ in range(num_val)]
+                node_feature = [node_feature for _ in range(num_val)]
                 edge_precedence = scheduler.get_edge_index_precedence()
                 edge_antiprecedence = scheduler.get_edge_index_antiprecedence()
                 edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
                 edge_fcn = scheduler.get_fully_connected_edge_index()
                 if cfg.fully_connected == True:
-                    heterogeneous_edge = (edge_precedence, edge_antiprecedence, edge_machine_sharing, edge_fcn)
+                    heterogeneous_edges = (edge_precedence, edge_antiprecedence, edge_machine_sharing, edge_fcn)
                 else:
-                    heterogeneous_edge = (edge_precedence, edge_antiprecedence, edge_machine_sharing)
-                heterogeneous_edges = [heterogeneous_edge for _ in range(num_val)]
-                input_data = (node_features, heterogeneous_edges)
+                    heterogeneous_edges = (edge_precedence, edge_antiprecedence, edge_machine_sharing)
+                heterogeneous_edges = [heterogeneous_edges for _ in range(num_val)]
+                input_data = (node_feature, heterogeneous_edges)
                 pred_seq, ll_old, _ = act_model(input_data, device)
-
-                num_val = 1
-                act_model.init_mask_job_count(num_val)
 
 
 
@@ -389,9 +392,6 @@ def train_model(params, log_path=None):
                 node_feature = scheduler.get_node_feature()
                 node_features.append(node_feature)
                 # node_feature = [node_feature for _ in range(params['batch_size'])]
-                # edge_precedence = scheduler.get_edge_index_precedence()
-                # edge_antiprecedence = scheduler.get_edge_index_antiprecedence()
-                # edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
                 edge_precedence = scheduler.get_edge_index_precedence()
                 edge_antiprecedence = scheduler.get_edge_index_antiprecedence()
                 edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
@@ -408,7 +408,7 @@ def train_model(params, log_path=None):
         for n in range(len(node_features)):
             sequence = pred_seq[n]
             scheduler = Scheduler(jobs_datas[n])
-            makespan = - scheduler.run(sequence.tolist()) / params['reward_scaler']
+            makespan = scheduler.run(sequence.tolist()) / params['reward_scaler']
             real_makespan.append(makespan)
             c_max.append(makespan)
 
@@ -420,7 +420,7 @@ def train_model(params, log_path=None):
         real_makespan_greedy = list()
         for sequence_g in pred_seq_greedy:
             scheduler = Scheduler(jobs_datas[n])
-            makespan = - scheduler.run(sequence_g.tolist()) / params['reward_scaler']
+            makespan = scheduler.run(sequence_g.tolist()) / params['reward_scaler']
             real_makespan_greedy.append(makespan)
             c_max_g.append(makespan)
 
@@ -431,14 +431,16 @@ def train_model(params, log_path=None):
         if cfg.ppo == False:
             act_optim.zero_grad()
             adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - torch.tensor(real_makespan_greedy).detach().unsqueeze(1).to(device)
-            act_loss = -(ll_old * adv).mean()
+            act_loss = (ll_old * adv).mean()
             act_loss.backward()
             act_optim.step()
-            nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=1.0, norm_type=2)
+            nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=10.0, norm_type=2)
             if act_lr_scheduler.get_last_lr()[0] >= 1e-4:
                 if params["is_lr_decay"]:
                     # print(act_lr_scheduler.get_last_lr())
                     act_lr_scheduler.step()
+
+            #print(act_lr_scheduler.get_last_lr())
             if s % cfg.interval== 0:
                 if stats.ttest_rel(c_max, c_max_g)[1]<0.05:
                     c_max = list()
