@@ -4,7 +4,8 @@ import numpy as np
 import simpy
 import random
 import time
-
+from cfg import get_cfg
+cfg = get_cfg()
 start = time.time()
 random.seed(525312344)
 
@@ -228,15 +229,16 @@ class Scheduler:
         for machines in machine_sharing:
             for m in machines:
                 for m_prime in machines:
-
-                    edge_index[0].append(m)
-                    edge_index[1].append(m_prime)
+                    if cfg.gnn_type == 'gcrl':
+                        edge_index[0].append(jk)
+                        edge_index[1].append(jk)
+                    else:
+                        if m != m_prime:
+                            edge_index[0].append(m)
+                            edge_index[1].append(m_prime)
 
 
         return edge_index
-        # print(machine_sharing)
-        # print(edge_index)
-
 
     def get_edge_index_precedence(self):
         jk = 0
@@ -252,8 +254,9 @@ class Scheduler:
                 else:
                     edge_index[0].append(jk)
                     edge_index[1].append(jk+1)
-                    edge_index[0].append(jk)
-                    edge_index[1].append(jk)
+                    if cfg.gnn_type == 'gcrl':
+                        edge_index[0].append(jk)
+                        edge_index[1].append(jk)
                     #edge_index[0].append(jk+1)
                     #edge_index[1].append(jk)
                     jk += 1
@@ -273,8 +276,9 @@ class Scheduler:
                 else:
                     edge_index[0].append(jk)
                     edge_index[1].append(jk-1)
-                    edge_index[0].append(jk)
-                    edge_index[1].append(jk)
+                    if cfg.gnn_type == 'gcrl':
+                        edge_index[0].append(jk)
+                        edge_index[1].append(jk)
                   #  edge_index[0].append(jk-1)
                    # edge_index[1].append(jk)
                     jk += 1

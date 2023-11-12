@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from copy import deepcopy
 import numpy as np
+from utils import _norm
 import cfg
 
 cfg = cfg.get_cfg()
@@ -58,6 +59,7 @@ class PtrNet1(nn.Module):
                                             embedding_size=params["n_hidden"], layers=params["layers"],
                                             num_edge_cat=num_edge_cat).to(device)
             else:
+                num_edge_cat += 1
                 self.GraphEmbedding = FastGTNs(num_edge_type=num_edge_cat,feature_size = params["n_hidden"],num_nodes = 102,num_FastGTN_layers = cfg.k_hop,hidden_size = params["n_hidden"],
                                     num_channels = self.n_multi_head,
                                     num_layers = cfg.k_hop,
@@ -190,8 +192,17 @@ class PtrNet1(nn.Module):
                     enc_h = self.GraphEmbedding3(heterogeneous_edges, enc_h, mini_batch=True)
                     enc_h = self.GraphEmbedding4(heterogeneous_edges, enc_h, mini_batch=True, final = True)
             else:
-                enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding, mini_batch=True)
+                #print("ddd",node_embedding.shape)
+                batch = node_embedding.shape[0]
+                enc_h = list()
 
+                for b in range(batch):
+                    A = self.get_heterogeneous_adjacency_matrix(heterogeneous_edges[b][0], heterogeneous_edges[b][1], heterogeneous_edges[b][2],
+                                                                n_node_features=102)
+                    enc = self.GraphEmbedding(A, node_embedding[b])
+                    enc_h.append(enc)
+                enc_h =torch.stack(enc_h, dim = 0)
+            #print(enc_h.shape)
             embed = enc_h.size(2)
             h = enc_h.mean(dim = 1).unsqueeze(0)
             enc_h = enc_h[:, :-2]
@@ -382,6 +393,41 @@ class PtrNet1(nn.Module):
     def decoder(self, h_bar, h_t_minus_one, h_one):
         #print(h_bar.shape, h_t_minus_one.shape, h_one.shape)
         return torch.concat([h_bar, h_t_minus_one, h_one], dim =2)
+
+    def get_heterogeneous_adjacency_matrix(self, edge_index_1, edge_index_2, edge_index_3, n_node_features):
+        A = []
+        edge_index_1_transpose = deepcopy(edge_index_1)
+        edge_index_1_transpose[1] = edge_index_1[0]
+        edge_index_1_transpose[0] = edge_index_1[1]
+
+        edge_index_2_transpose = deepcopy(edge_index_2)
+        edge_index_2_transpose[1] = edge_index_2[0]
+        edge_index_2_transpose[0] = edge_index_2[1]
+
+
+        edge_index_3_transpose = deepcopy(edge_index_3)
+        edge_index_3_transpose[1] = edge_index_3[0]
+        edge_index_3_transpose[0] = edge_index_3[1]
+
+
+        edges = [edge_index_1,
+                 edge_index_2,
+                 edge_index_3]
+
+        for i, edge in enumerate(edges):
+            edge = torch.tensor(edge, dtype=torch.long, device=device)
+            value = torch.ones(edge.shape[1], dtype=torch.float, device=device)
+            deg_inv_sqrt, deg_row, deg_col = _norm(edge.detach(),n_node_features,
+                                                   value.detach())  # row의 의미는 차원이 1이상인 node들의 index를 의미함
+
+            value = deg_inv_sqrt[
+                        deg_row] * value  # degree_matrix의 inverse 중에서 row에 해당되는(즉, node의 차원이 1이상인) node들만 골라서 value_tmp를 곱한다
+            A.append((edge, value))
+
+        edge = torch.stack((torch.arange(0, n_node_features), torch.arange(0, n_node_features))).type(torch.LongTensor).to(device)
+        value = torch.ones(n_node_features).type(torch.FloatTensor).to(device)
+        A.append((edge, value))
+        return A
 
     # def context_embedding(self, h_bar, pi_t_minus_one, h_one):
     #     h_context = self.get_h_context(self, h_bar, h_t_minus_one, h_one)

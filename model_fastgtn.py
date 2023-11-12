@@ -185,7 +185,7 @@ class FastGTN(nn.Module):
             #start = time.time()
             shape0, shape1, shape2, shape3 = H.shape
             # batch_size, num_channels, num_nodes, feature_size
-            H_ = F.relu(self.gtn_beta * (X_) + (1 - self.gtn_beta) * H)#+(1-self.teleport_probability)*X_
+            H_ = self.teleport_probability * F.relu(self.gtn_beta * (X_) + (1 - self.gtn_beta) * H)+(1-self.teleport_probability)*X_
             H_ = torch.einsum("bijk -> bjik", H_)
             H_ = H_.reshape(shape0, shape2, -1)
             H_ = F.relu(self.linear1(H_))
@@ -239,6 +239,10 @@ class FastGTLayer(nn.Module):
                         total_edge_value = edge_value * filter[i][j]
                     else:
                         total_edge_index = torch.cat((total_edge_index, edge_index), dim=1)
+                        #print(torch.tensor(total_edge_value).shape)
+                        #print(edge_value.shape)
+                        #print(edge_value*filter[i][j])
+                        #      (edge_value * filter[i][j]).shape)
                         total_edge_value = torch.cat((total_edge_value, edge_value * filter[i][j]))
                 mat_a = torch.sparse_coo_tensor(total_edge_index.detach(), total_edge_value, (num_nodes, num_nodes)).to(total_edge_value.device)
                 mat_a = mat_a.coalesce()
@@ -257,10 +261,7 @@ class FastGTLayer(nn.Module):
                 for i in range(self.num_edge_type):
                     # print(num_nodes)
                     # print(A[b][i][0])
-                    #print(torch.sparse_coo_tensor(A[b][i][0], A[b][i][1], (num_nodes, num_nodes)))
-                    #print(torch.tensor(A[b][i][0]).shape, torch.tensor(A[b][i][1]).shape, num_nodes)
-                    total_edge_value = torch.ones_like(torch.tensor(A[b][i][0]))
-                    mat_a[b][i].copy_(torch.sparse_coo_tensor(A[b][i], total_edge_value, (num_nodes, num_nodes)).to(device).to_dense())
+                    mat_a[b][i].copy_(torch.sparse_coo_tensor(A[b][i][0], A[b][i][1], (num_nodes, num_nodes)).to(device).to_dense())
             mat_a = torch.stack(mat_a, dim=0)
             Hs = torch.einsum('bcij, bcjk-> bcik', torch.einsum('bijk, ci  -> bcjk', mat_a, filter), H_)
             # del mat_a
