@@ -7,7 +7,7 @@ def get_cfg():
     parser.add_argument("--log_step", type=int, default=10, help="")
 
     parser.add_argument("--save_step", type=int, default=40, help="")
-    parser.add_argument("--batch_size", type=int, default=12, help="")
+    parser.add_argument("--batch_size", type=int, default=32, help="")
     parser.add_argument("--C", type=float, default=10, help="")
     parser.add_argument("--T", type=float, default=1.0, help="")
     parser.add_argument("--iteration", type=int, default=2, help="")
@@ -17,7 +17,7 @@ def get_cfg():
     parser.add_argument("--lr", type=float, default=1.e-3, help="")
     parser.add_argument("--lr_critic", type=float, default=2.e-4, help="")
     parser.add_argument("--lr_decay", type=float, default=0.995, help="")
-    parser.add_argument("--lr_decay_step", type=int, default=40, help="")
+    parser.add_argument("--lr_decay_step", type=int, default=100, help="")
     parser.add_argument("--lr_decay_step_critic", type=int, default=2000, help="")
     parser.add_argument("--layers", type=str, default="[256, 128]", help="")
     parser.add_argument("--n_embedding", type=int, default=32, help="")
