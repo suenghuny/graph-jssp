@@ -22,7 +22,10 @@ device = torch.device('cuda:0' if torch.cuda.is_available() else "cpu")
 
 
 class FastGTNs(nn.Module):
-    def __init__(self, num_edge_type, feature_size, num_nodes, num_FastGTN_layers,
+    def __init__(self, num_edge_type,
+                 feature_size,
+                 num_nodes,
+                 num_FastGTN_layers,
                  hidden_size,
                  num_channels,
                  num_layers,
@@ -182,7 +185,7 @@ class FastGTN(nn.Module):
             #start = time.time()
             shape0, shape1, shape2, shape3 = H.shape
             # batch_size, num_channels, num_nodes, feature_size
-            H_ = self.teleport_probability * F.relu(self.gtn_beta * (X_) + (1 - self.gtn_beta) * H)+(1-self.teleport_probability)*X_
+            H_ = F.relu(self.gtn_beta * (X_) + (1 - self.gtn_beta) * H)#+(1-self.teleport_probability)*X_
             H_ = torch.einsum("bijk -> bjik", H_)
             H_ = H_.reshape(shape0, shape2, -1)
             H_ = F.relu(self.linear1(H_))
@@ -254,7 +257,10 @@ class FastGTLayer(nn.Module):
                 for i in range(self.num_edge_type):
                     # print(num_nodes)
                     # print(A[b][i][0])
-                    mat_a[b][i].copy_(torch.sparse_coo_tensor(A[b][i][0], A[b][i][1], (num_nodes, num_nodes)).to(device).to_dense())
+                    #print(torch.sparse_coo_tensor(A[b][i][0], A[b][i][1], (num_nodes, num_nodes)))
+                    #print(torch.tensor(A[b][i][0]).shape, torch.tensor(A[b][i][1]).shape, num_nodes)
+                    total_edge_value = torch.ones_like(torch.tensor(A[b][i][0]))
+                    mat_a[b][i].copy_(torch.sparse_coo_tensor(A[b][i], total_edge_value, (num_nodes, num_nodes)).to(device).to_dense())
             mat_a = torch.stack(mat_a, dim=0)
             Hs = torch.einsum('bcij, bcjk-> bcik', torch.einsum('bijk, ci  -> bcjk', mat_a, filter), H_)
             # del mat_a

@@ -37,25 +37,32 @@ class PtrNet1(nn.Module):
                 num_edge_cat = 4
             else:
                 num_edge_cat = 3
-            self.GraphEmbedding = GCRN(feature_size =  params["n_hidden"],
-                                       graph_embedding_size= params["graph_embedding_size"],
-                                       embedding_size =  params["n_hidden"],layers =  params["layers"], num_edge_cat = num_edge_cat).to(device)
-            self.GraphEmbedding1 = GCRN(feature_size =  params["n_hidden"],
-                                       graph_embedding_size= params["graph_embedding_size"],
-                                       embedding_size =  params["n_hidden"],layers =  params["layers"], num_edge_cat = num_edge_cat).to(device)
-            self.GraphEmbedding2 = GCRN(feature_size= params["n_hidden"],
-                                        graph_embedding_size=params["graph_embedding_size"],
-                                        embedding_size=params["n_hidden"], layers=params["layers"],
-                                        num_edge_cat=num_edge_cat).to(device)
+            if cfg.gnn_type =='gcrl':
+                self.GraphEmbedding = GCRN(feature_size =  params["n_hidden"],
+                                           graph_embedding_size= params["graph_embedding_size"],
+                                           embedding_size =  params["n_hidden"],layers =  params["layers"], num_edge_cat = num_edge_cat).to(device)
+                self.GraphEmbedding1 = GCRN(feature_size =  params["n_hidden"],
+                                           graph_embedding_size= params["graph_embedding_size"],
+                                           embedding_size =  params["n_hidden"],layers =  params["layers"], num_edge_cat = num_edge_cat).to(device)
+                self.GraphEmbedding2 = GCRN(feature_size= params["n_hidden"],
+                                            graph_embedding_size=params["graph_embedding_size"],
+                                            embedding_size=params["n_hidden"], layers=params["layers"],
+                                            num_edge_cat=num_edge_cat).to(device)
 
-            self.GraphEmbedding3 = GCRN(feature_size= params["n_hidden"],
-                                        graph_embedding_size=params["graph_embedding_size"],
-                                        embedding_size=params["n_hidden"], layers=params["layers"],
-                                        num_edge_cat=num_edge_cat).to(device)
-            self.GraphEmbedding4 = GCRN(feature_size= params["n_hidden"],
-                                        graph_embedding_size=params["graph_embedding_size"],
-                                        embedding_size=params["n_hidden"], layers=params["layers"],
-                                        num_edge_cat=num_edge_cat).to(device)
+                self.GraphEmbedding3 = GCRN(feature_size= params["n_hidden"],
+                                            graph_embedding_size=params["graph_embedding_size"],
+                                            embedding_size=params["n_hidden"], layers=params["layers"],
+                                            num_edge_cat=num_edge_cat).to(device)
+                self.GraphEmbedding4 = GCRN(feature_size= params["n_hidden"],
+                                            graph_embedding_size=params["graph_embedding_size"],
+                                            embedding_size=params["n_hidden"], layers=params["layers"],
+                                            num_edge_cat=num_edge_cat).to(device)
+            else:
+                self.GraphEmbedding = FastGTNs(num_edge_type=num_edge_cat,feature_size = params["n_hidden"],num_nodes = 102,num_FastGTN_layers = cfg.k_hop,hidden_size = params["n_hidden"],
+                                    num_channels = self.n_multi_head,
+                                    num_layers = cfg.k_hop,
+                                    gtn_beta=0.05,
+                                    teleport_probability = 'non-use')
 
 
 
@@ -161,27 +168,30 @@ class PtrNet1(nn.Module):
             node_reshaped_features = node_features.reshape(batch * node_num, -1)
             node_embedding = self.Embedding(node_reshaped_features)
             node_embedding = node_embedding.reshape(batch, node_num, -1)
+            if cfg.gnn_type == 'gcrl':
+                if cfg.k_hop == 1:
+                    enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
+                if cfg.k_hop == 2:
+                    enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
+                    enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True, final = True)
+                if cfg.k_hop == 3:
+                    enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
+                    enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
+                    enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True, final = True)
+                if cfg.k_hop == 4:
+                    enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
+                    enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
+                    enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
+                    enc_h = self.GraphEmbedding3(heterogeneous_edges, enc_h, mini_batch=True, final = True)
+                if cfg.k_hop == 5:
+                    enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
+                    enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
+                    enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
+                    enc_h = self.GraphEmbedding3(heterogeneous_edges, enc_h, mini_batch=True)
+                    enc_h = self.GraphEmbedding4(heterogeneous_edges, enc_h, mini_batch=True, final = True)
+            else:
+                enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding, mini_batch=True)
 
-            if cfg.k_hop == 1:
-                enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
-            if cfg.k_hop == 2:
-                enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
-                enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True, final = True)
-            if cfg.k_hop == 3:
-                enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
-                enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
-                enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True, final = True)
-            if cfg.k_hop == 4:
-                enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
-                enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
-                enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
-                enc_h = self.GraphEmbedding3(heterogeneous_edges, enc_h, mini_batch=True, final = True)
-            if cfg.k_hop == 5:
-                enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
-                enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
-                enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
-                enc_h = self.GraphEmbedding3(heterogeneous_edges, enc_h, mini_batch=True)
-                enc_h = self.GraphEmbedding4(heterogeneous_edges, enc_h, mini_batch=True, final = True)
             embed = enc_h.size(2)
             h = enc_h.mean(dim = 1).unsqueeze(0)
             enc_h = enc_h[:, :-2]
