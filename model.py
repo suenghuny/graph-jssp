@@ -40,12 +40,12 @@ class NodeEmbedding(nn.Module):
         for i in range(len(layers)):
             layer = layers[i]
             if i <= len(layers)-2:
-                self.linears['linear{}'.format(i)]= nn.Linear(last_layer, layer)
+                self.linears['linear{}'.format(i)]= nn.Linear(last_layer, layer, bias = False)
                 self.linears['batchnorm{}'.format(i)] = nn.BatchNorm1d(layer)
                 self.linears['activation{}'.format(i)] = nn.ELU()
                 last_layer = layer
             else:
-                self.linears['linear{}'.format(i)] = nn.Linear(last_layer, n_representation_obs)
+                self.linears['linear{}'.format(i)] = nn.Linear(last_layer, n_representation_obs, bias = False)
         self.node_embedding = nn.Sequential(self.linears)
         self.node_embedding.apply(weight_init_xavier_uniform)
 
@@ -86,9 +86,9 @@ class GCRN(nn.Module):
 
         self.m = [nn.ReLU() for _ in range(num_edge_cat)]
         self.leakyrelu = [nn.LeakyReLU() for _ in range(num_edge_cat)]
-        self.Embedding1 = nn.Linear(self.n_multi_head*graph_embedding_size*num_edge_cat, feature_size)
+        self.Embedding1 = nn.Linear(self.n_multi_head*graph_embedding_size*num_edge_cat, feature_size, bias = False)
 
-        self.Embedding1_mean = nn.Linear(graph_embedding_size * num_edge_cat, feature_size)
+        self.Embedding1_mean = nn.Linear(graph_embedding_size * num_edge_cat, feature_size, bias = False)
         self.Embedding2 = NodeEmbedding(feature_size, feature_size, layers = layers)
         self.BN1 = nn.BatchNorm1d(feature_size)
         self.BN2 = nn.BatchNorm1d(feature_size)

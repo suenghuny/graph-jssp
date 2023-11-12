@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from copy import deepcopy
-
+import numpy as np
 import cfg
 
 cfg = cfg.get_cfg()
@@ -48,6 +48,17 @@ class PtrNet1(nn.Module):
                                         embedding_size=params["n_hidden"], layers=params["layers"],
                                         num_edge_cat=num_edge_cat).to(device)
 
+            self.GraphEmbedding3 = GCRN(feature_size= params["n_hidden"],
+                                        graph_embedding_size=params["graph_embedding_size"],
+                                        embedding_size=params["n_hidden"], layers=params["layers"],
+                                        num_edge_cat=num_edge_cat).to(device)
+            self.GraphEmbedding4 = GCRN(feature_size= params["n_hidden"],
+                                        graph_embedding_size=params["graph_embedding_size"],
+                                        embedding_size=params["n_hidden"], layers=params["layers"],
+                                        num_edge_cat=num_edge_cat).to(device)
+
+
+
             #self.Vec = nn.Parameter(torch.cuda.FloatTensor(augmented_hidden_size))
 
 
@@ -55,53 +66,48 @@ class PtrNet1(nn.Module):
             #
             # self.Ws = nn.ParameterList(self.Ws)
             # [glorot(W) for W in self.Ws]
-            if torch.cuda.is_available():
-                if params["dot_product"] == False:
-                    self.Vec = [nn.Parameter(torch.cuda.FloatTensor(augmented_hidden_size)) for _ in range(self.n_multi_head)]
-                    self.Vec = nn.ParameterList(self.Vec)
-                    self.Vec2 = nn.Parameter(torch.cuda.FloatTensor(augmented_hidden_size))
-                else:
-                    self.Vec = [nn.Parameter(torch.cuda.FloatTensor(augmented_hidden_size, augmented_hidden_size)) for _ in range(self.n_multi_head)]
-                    self.Vec = nn.ParameterList(self.Vec)
-                    self.Vec2 = nn.Parameter(torch.cuda.FloatTensor(augmented_hidden_size))
-            else:
-                if params["dot_product"] == False:
-                    self.Vec = [nn.Parameter(torch.FloatTensor(augmented_hidden_size)) for _ in range(self.n_multi_head)]
-                    self.Vec = nn.ParameterList(self.Vec)
-                    self.Vec2 = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
-                else:
-                    self.Vec = [nn.Parameter(torch.FloatTensor(augmented_hidden_size, augmented_hidden_size)) for _ in range(self.n_multi_head)]
-                    self.Vec = nn.ParameterList(self.Vec)
-                    self.Vec2 = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
 
-            if params["dot_product"] == False:
-                self.W_q = [nn.Linear(3*augmented_hidden_size, augmented_hidden_size, bias=True).to(device)  for _ in range(self.n_multi_head)]
-                self.W_q_weights = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_q])
-                self.W_q_biases = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_q])
-                self.W_ref =[nn.Conv1d(augmented_hidden_size,augmented_hidden_size, 1, 1).to(device) for _ in range(self.n_multi_head)]
-                self.W_ref_weights = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_ref])
-                self.W_ref_biases = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_ref])
-                self.W_q2 = nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=True)
-                self.W_ref2 = nn.Conv1d(augmented_hidden_size,augmented_hidden_size, 1, 1)
-                self.dec_input = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
-            else:
-                self.W_q = [nn.Linear(3*augmented_hidden_size, augmented_hidden_size, bias=True).to(device)  for _ in range(self.n_multi_head)]
-                self.W_q_weights = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_q])
-                self.W_q_biases = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_q])
-                self.W_ref =[nn.Conv1d(augmented_hidden_size,augmented_hidden_size, 1, 1).to(device) for _ in range(self.n_multi_head)]
-                self.W_ref_weights = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_ref])
-                self.W_ref_biases = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_ref])
-                self.W_q2 = nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=True)
-                self.W_ref2 = nn.Conv1d(augmented_hidden_size,augmented_hidden_size, 1, 1)
-                self.dec_input = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
+            self.Vec = [nn.Parameter(torch.cuda.FloatTensor(augmented_hidden_size, augmented_hidden_size)) for _ in range(self.n_multi_head)]
+            self.Vec = nn.ParameterList(self.Vec)
+            self.W_q = [nn.Linear(3*augmented_hidden_size, augmented_hidden_size, bias=False).to(device)  for _ in range(self.n_multi_head)]
+            self.W_q_weights = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_q])
+            self.W_q_biases = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_q])
+            self.W_ref =[nn.Linear(augmented_hidden_size,augmented_hidden_size, bias=False).to(device) for _ in range(self.n_multi_head)]
+            self.W_ref_weights = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_ref])
+            self.W_ref_biases = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_ref])
+
+            self.Vec3 = [nn.Parameter(torch.cuda.FloatTensor(augmented_hidden_size, augmented_hidden_size)) for _ in range(self.n_multi_head)]
+            self.Vec3 = nn.ParameterList(self.Vec3)
+            self.W_q3 = [nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False).to(device)  for _ in range(self.n_multi_head)]
+            self.W_q_weights3 = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_q3])
+            self.W_q_biases3 = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_q3])
+            self.W_ref3 =[nn.Linear(augmented_hidden_size,augmented_hidden_size, bias=False).to(device) for _ in range(self.n_multi_head)]
+            self.W_ref_weights3 = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_ref3])
+            self.W_ref_biases3 = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_ref3])
+
+            self.Vec4 = [nn.Parameter(torch.cuda.FloatTensor(augmented_hidden_size, augmented_hidden_size)) for _ in range(self.n_multi_head)]
+            self.Vec4 = nn.ParameterList(self.Vec4)
+            self.W_q4 = [nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False).to(device)  for _ in range(self.n_multi_head)]
+            self.W_q_weights4 = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_q4])
+            self.W_q_biases4 = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_q4])
+            self.W_ref4 =[nn.Linear(augmented_hidden_size,augmented_hidden_size, bias=False).to(device) for _ in range(self.n_multi_head)]
+            self.W_ref_weights4 = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_ref4])
+            self.W_ref_biases4 = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_ref4])
+
+
+
+            self.Vec2 = nn.Parameter(torch.cuda.FloatTensor(augmented_hidden_size))
+            self.W_q2 = nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False)
+            self.W_ref2 = nn.Linear(augmented_hidden_size,augmented_hidden_size, bias=False)
+            self.dec_input = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
 
             self.v_1 = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
             self.v_f = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
-            self.h_embedding = nn.Linear(2 * augmented_hidden_size, augmented_hidden_size, bias=True)
+            self.h_embedding = nn.Linear(2 * augmented_hidden_size, augmented_hidden_size, bias=False)
             self.BN = nn.BatchNorm1d(augmented_hidden_size)
-            self.multi_head_embedding =  nn.Linear(self.n_multi_head * augmented_hidden_size, augmented_hidden_size, bias=True)
-            self.Decoder = nn.GRU(input_size=augmented_hidden_size,
-                                  hidden_size=augmented_hidden_size, batch_first=True)
+            self.multi_head_embedding =  nn.Linear(self.n_multi_head * augmented_hidden_size, augmented_hidden_size, bias=False)
+
+
 
 
             self._initialize_weights(params["init_min"], params["init_max"])
@@ -119,48 +125,18 @@ class PtrNet1(nn.Module):
             self.sample_space = [[j for i in range(params['num_machine'])] for j in range(params['num_jobs'])]
             self.sample_space = torch.tensor(self.sample_space).view(-1)
             self.mask_debug = [[[0 for i in range(params['num_machine'])] for j in range(params['num_jobs'])] for _ in range(params['batch_size'])]
+            self.mask_debug0 = [[[1 for i in range(params['num_machine'])] for j in range(params['num_jobs'])] for _ in range(params['batch_size'])]
             self.job_count = [[0 for j in range(params['num_jobs'])] for _ in range(params['batch_size'])]
             self.dummy_job_count = deepcopy(self.job_count)
-        else:
-            self.Embedding = nn.Linear(params["num_of_process"], params["n_hidden"], bias=False)  # input_shape : num_of_process, output_shape : n_embedding
-            self.Encoder = nn.LSTM(input_size=params["n_embedding"], hidden_size=params["n_hidden"], batch_first=True)
-            self.Decoder = nn.LSTM(input_size=params["n_embedding"], hidden_size=params["n_hidden"], batch_first=True)
 
-
-            if torch.cuda.is_available():
-                self.Vec = nn.Parameter(torch.cuda.FloatTensor(params["n_hidden"]))
-                self.Vec2 = nn.Parameter(torch.cuda.FloatTensor(params["n_hidden"]))
-            else:
-                self.Vec = nn.Parameter(torch.FloatTensor(params["n_hidden"]))
-                self.Vec2 = nn.Parameter(torch.FloatTensor(params["n_hidden"]))
-            self.W_q = nn.Linear(3*params["n_hidden"], params["n_hidden"], bias=True)
-            self.W_ref = nn.Conv1d(params["n_hidden"], params["n_hidden"], 1, 1)
-            self.W_q2 = nn.Linear(params["n_hidden"], params["n_hidden"], bias=True)
-            self.W_ref2 = nn.Conv1d(params["n_hidden"], params["n_hidden"], 1, 1)
-            self.dec_input = nn.Parameter(torch.FloatTensor(params["n_embedding"]))
-            self._initialize_weights(params["init_min"], params["init_max"])
-            self.use_logit_clipping = params["use_logit_clipping"]
-            self.C = params["C"]
-            self.T = params["T"]
-            self.n_glimpse = params["n_glimpse"]
-
-            #self.mask = [[[0 for i in range(params['num_machine'])] for j in range(params['num_jobs'])] for _ in range(params['batch_size'])]
-            self.block_indices = []
-            self.block_selecter =  Categorical() #{'greedy': Greedy(), 'sampling': Categorical()}.get(params["decode_type"], None)
-            self.last_block_index = 0
-            self.params = params
-            self.sample_space = [[j for i in range(params['num_machine'])] for j in range(params['num_jobs'])]
-            self.sample_space = torch.tensor(self.sample_space).view(-1)
-
-            self.mask_debug = [[[0 for i in range(params['num_machine'])] for j in range(params['num_jobs'])] for _ in range(params['batch_size'])]
-            self.job_count = [[0 for j in range(params['num_jobs'])] for _ in range(params['batch_size'])]
-            self.dummy_job_count = deepcopy(self.job_count)
 
 
         #print(self.job_count)
     def init_mask_job_count(self, count):
         self.count=count
         self.mask_debug = [[[0 for i in range(self.params['num_machine'])] for j in range(self.params['num_jobs'])] for _ in range(count)]
+        self.mask_debug0 = [[[1 for i in range(self.params['num_machine'])] for j in range(self.params['num_jobs'])] for _ in
+                            range(count)]
         self.job_count = [[0 for j in range(self.params['num_jobs'])] for _ in range(count)]
 
 
@@ -195,6 +171,17 @@ class PtrNet1(nn.Module):
                 enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
                 enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
                 enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True, final = True)
+            if cfg.k_hop == 4:
+                enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
+                enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
+                enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
+                enc_h = self.GraphEmbedding3(heterogeneous_edges, enc_h, mini_batch=True, final = True)
+            if cfg.k_hop == 5:
+                enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
+                enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
+                enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
+                enc_h = self.GraphEmbedding3(heterogeneous_edges, enc_h, mini_batch=True)
+                enc_h = self.GraphEmbedding4(heterogeneous_edges, enc_h, mini_batch=True, final = True)
             embed = enc_h.size(2)
             h = enc_h.mean(dim = 1).unsqueeze(0)
             enc_h = enc_h[:, :-2]
@@ -205,167 +192,150 @@ class PtrNet1(nn.Module):
         dec_input = self.dec_input.unsqueeze(0).repeat(batch, 1).unsqueeze(1).to(device)
         log_probabilities = list()
 
-        transformer = True
-        if transformer == False:
-            for i in range(block_num):
-                job_count = torch.tensor(self.job_count)
-                mask2 = torch.tensor(deepcopy(self.mask_debug), dtype = torch.float)
-                for b in range(job_count.shape[0]):
-                    for k in range(job_count.shape[1]):
-                        try:
-                            mask2[b, k, job_count[b, k]] =1
-                        except IndexError as IE:
-                            pass
-                mask2= mask2.view(self.count, -1).to(device)
-                _, h = self.Decoder(dec_input, h)
-                #print(self.W_q.weight[0][10], self.W_q2.weight[0][15])
 
-                query = h.squeeze(0)
-                #print(query.shape, enc_h.shape)
-                for j in range(self.n_glimpse):
-                    query = self.glimpse(query, ref, mask2)
-                logits = self.pointer(query, ref, mask2)
-                log_p = torch.log_softmax(logits / self.T, dim=-1)
+        h_pi_t_minus_one = self.v_1.unsqueeze(0).repeat(batch, 1).unsqueeze(0).to(device)
+        h_pi_one = self.v_f.unsqueeze(0).repeat(batch, 1).unsqueeze(0).to(device)
 
+        for i in range(block_num):
+            job_count = torch.tensor(self.job_count)
+            mask2 = torch.tensor(deepcopy(self.mask_debug), dtype=torch.float)
+            for b in range(job_count.shape[0]):
+                for k in range(job_count.shape[1]):
+                    try:
+                        mask2[b, k, job_count[b, k]] = 1
+                    except IndexError as IE:
+                        pass
 
-
-                if y == None:
-                    log_p = log_p.squeeze(0)
-                    if greedy == False:
-                        next_block_index = self.block_selecter(log_p)
-                    else:
-                        next_block_index = self.block_selecter_greedy(log_p)
-                    log_probabilities.append(log_p.gather(1, next_block_index.unsqueeze(1)))
-                    self.block_indices.append(next_block_index)
-                    sample_space = self.sample_space.to(device)
-                    next_block = sample_space[next_block_index].to(device)
-                    for b_prime in range(len(next_block.tolist())):
-                        job = next_block[b_prime]
-                        self.job_count[b_prime][job] += 1
-                else:
-                    log_p = log_p.squeeze(0)
-                    next_block_index = self.block_indices[i].long()
-                    log_probabilities.append(log_p.gather(1, next_block_index.unsqueeze(1)))
-                    #next_block = y[:, i].long()
-                    sample_space = self.sample_space.to(device)
-                    next_block = sample_space[next_block_index].to(device)
-                    for b_prime in range(len(next_block.tolist())):
-                        job = next_block[b_prime]
-                        self.job_count[b_prime][job] += 1
-
-                # if i == 10:
-                #     print(log_p.gather(1, next_block_index.unsqueeze(1))[15])
-
-
-                dec_input = torch.gather(input=enc_h, dim=1, index=next_block_index.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, embed)) # 다음 sequence의 input은 encoder의 output 중에서 현재 sequence에 해당하는 embedding이 된다.
-                pi_list.append(next_block)
-            pi = torch.stack(pi_list, dim=1)
+            mask2 = mask2.view(self.count, -1).to(device)
+            mask0 = torch.tensor(self.mask_debug0, dtype=torch.float).view(self.count, -1).to(device)
+            h_c = self.decoder(h, h_pi_t_minus_one, h_pi_one)
+            query = h_c.squeeze(0)
+            query = self.glimpse(query, ref, mask0, mask2)
+            logits = self.pointer(query, ref, mask2)
+            log_p = torch.log_softmax(logits / self.T, dim=-1)
             if y == None:
-                log_probabilities = torch.stack(log_probabilities, dim = 1)
-                ll = log_probabilities.sum(dim=1)
+                log_p = log_p.squeeze(0)
+                next_block_index = self.block_selecter(log_p)
+                log_probabilities.append(log_p.gather(1, next_block_index.unsqueeze(1)))
+                self.block_indices.append(next_block_index)
+                sample_space = self.sample_space.to(device)
+                next_block = sample_space[next_block_index].to(device)
+                for b_prime in range(len(next_block.tolist())):
+                    job = next_block[b_prime]
+                    self.job_count[b_prime][job] += 1
+
+                    mask_array = np.array(self.mask_debug0[b_prime][job])
+
+                    # 첫 번째 1의 인덱스 찾기
+                    idx = np.where(mask_array == 1)[0]
+
+                    # 1이 존재하면 해당 위치를 0으로 변경
+                    if idx.size > 0:
+                        self.mask_debug0[b_prime][job][idx[0]] = 0
+
+
+                    # for x in range(len(self.mask_debug0[b_prime][job])):
+                    #     job_mask = self.mask_debug0[b_prime][job][x]
+                    #     if job_mask == 1:
+                    #         self.mask_debug0[b_prime][job][x] = 0
+                    #         break
+                        #print(self.mask_debug0[b_prime][job])
+                    #print(self.mask_debug0[b_prime][job])
             else:
-                log_probabilities = torch.stack(log_probabilities, dim = 1)
-                ll = log_probabilities.sum(dim=1)
-            #print(self.block_indices[10])
-            self.job_count = deepcopy(self.dummy_job_count)
-            return pi, ll, _
+                log_p = log_p.squeeze(0)
+                next_block_index = self.block_indices[i].long()
+                log_probabilities.append(log_p.gather(1, next_block_index.unsqueeze(1)))
+                sample_space = self.sample_space.to(device)
+                next_block = sample_space[next_block_index].to(device)
+                for b_prime in range(len(next_block.tolist())):
+                    job = next_block[b_prime]
+                    self.job_count[b_prime][job] += 1
+            h_pi_t_minus_one = torch.gather(input=enc_h, dim=1, index=next_block_index.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, embed)).squeeze(1).unsqueeze(0)  # 다음 sequence의 input은 encoder의 output 중에서 현재 sequence에 해당하는 embedding이 된다.
+            if i == 0:
+                h_pi_one = torch.gather(input=enc_h, dim=1, index=next_block_index.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, embed)).squeeze(1).unsqueeze(0)  # 다음 sequence의 input은 encoder의 output 중에서 현재 sequence에 해당하는 embedding이 된다.
+            #print(h_pi_one)
+            pi_list.append(next_block)
+        pi = torch.stack(pi_list, dim=1)
+        if y == None:
+            log_probabilities = torch.stack(log_probabilities, dim=1)
+            ll = log_probabilities.sum(dim=1)
         else:
-            h_pi_t_minus_one = self.v_1.unsqueeze(0).repeat(batch, 1).unsqueeze(0).to(device)
-            h_pi_one = self.v_f.unsqueeze(0).repeat(batch, 1).unsqueeze(0).to(device)
+            log_probabilities = torch.stack(log_probabilities, dim=1)
+            ll = log_probabilities.sum(dim=1)
+        # print(self.block_indices[10])
+        self.job_count = deepcopy(self.dummy_job_count)
+        _ = 1
+        return pi, ll, _
 
-            for i in range(block_num):
-                job_count = torch.tensor(self.job_count)
-                mask2 = torch.tensor(deepcopy(self.mask_debug), dtype=torch.float)
-                for b in range(job_count.shape[0]):
-                    for k in range(job_count.shape[1]):
-                        try:
-                            mask2[b, k, job_count[b, k]] = 1
-                        except IndexError as IE:
-                            pass
-                #
-                mask2 = mask2.view(self.count, -1).to(device)
-                h_c = self.decoder(h, h_pi_t_minus_one, h_pi_one)
-                query = h_c.squeeze(0)
-                query = self.glimpse(query, ref, mask2)
-                logits = self.pointer(query, ref, mask2)
-                log_p = torch.log_softmax(logits / self.T, dim=-1)
-                if y == None:
-                    log_p = log_p.squeeze(0)
-                    next_block_index = self.block_selecter(log_p)
-                    log_probabilities.append(log_p.gather(1, next_block_index.unsqueeze(1)))
-                    self.block_indices.append(next_block_index)
-                    sample_space = self.sample_space.to(device)
-                    next_block = sample_space[next_block_index].to(device)
-                    for b_prime in range(len(next_block.tolist())):
-                        job = next_block[b_prime]
-                        self.job_count[b_prime][job] += 1
-                else:
-                    log_p = log_p.squeeze(0)
-                    next_block_index = self.block_indices[i].long()
-                    log_probabilities.append(log_p.gather(1, next_block_index.unsqueeze(1)))
-                    sample_space = self.sample_space.to(device)
-                    next_block = sample_space[next_block_index].to(device)
-                    for b_prime in range(len(next_block.tolist())):
-                        job = next_block[b_prime]
-                        self.job_count[b_prime][job] += 1
-                h_pi_t_minus_one = torch.gather(input=enc_h, dim=1, index=next_block_index.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, embed)).squeeze(1).unsqueeze(0)  # 다음 sequence의 input은 encoder의 output 중에서 현재 sequence에 해당하는 embedding이 된다.
-                if i == 0:
-                    h_pi_one = torch.gather(input=enc_h, dim=1, index=next_block_index.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, embed)).squeeze(1).unsqueeze(0)  # 다음 sequence의 input은 encoder의 output 중에서 현재 sequence에 해당하는 embedding이 된다.
-                #print(h_pi_one)
-                pi_list.append(next_block)
-            pi = torch.stack(pi_list, dim=1)
-            if y == None:
-                log_probabilities = torch.stack(log_probabilities, dim=1)
-                ll = log_probabilities.sum(dim=1)
-            else:
-                log_probabilities = torch.stack(log_probabilities, dim=1)
-                ll = log_probabilities.sum(dim=1)
-            # print(self.block_indices[10])
-            self.job_count = deepcopy(self.dummy_job_count)
-            _ = 1
-            return pi, ll, _
-
-    def glimpse(self, query, ref, mask, inf=1e8):
+    def glimpse(self, query, ref, mask0, mask2, inf=1e8):
         """
         query는 decoder의 출력
         ref는   encoder의 출력
         """
-        if self.params["dot_product"] == False:
-            placeholder_for_g = list()
-            for m in range(self.n_multi_head):
-                u1 = self.W_q[m](query).unsqueeze(-1).repeat(1, 1, ref.size(1))      # u1: (batch, 128, block_num)
-                u2 = self.W_ref[m](ref.permute(0, 2, 1))                             # u2: (batch, 128, block_num)
-                V = self.Vec[m].unsqueeze(0).unsqueeze(0).repeat(ref.size(0), 1, 1)  #
+        placeholder_for_g = list()
 
-                u = torch.bmm(V, torch.tanh(u1 + u2)).squeeze(1)
-                #print(u.shape)
-                u = u.masked_fill(mask == 0, -1e8)
-                a = F.softmax(u, dim=1)
-                g = torch.bmm(a.squeeze().unsqueeze(1), ref).squeeze(1)
-                placeholder_for_g.append(g)
-            g = torch.concat(placeholder_for_g, dim = 1)
-            g = self.multi_head_embedding(g)
-            g = self.BN(g)
-        else:
-            placeholder_for_g = list()
+        dk = self.params["n_hidden"]/self.n_multi_head
+        for m in range(self.n_multi_head):
+            u1 = self.W_q[m](query).unsqueeze(1)
+            u2 = self.W_ref[m](ref.reshape(ref.shape[0]*ref.shape[1],-1))                             # u2: (batch, 128, block_num)
+            u2 = u2.reshape(ref.shape[0], ref.shape[1],-1)
+            u2 = u2.permute(0, 2, 1)
+            u = torch.bmm(u1, u2)/dk**0.5
+            v = ref@self.Vec[m]
+            u = u.squeeze(1).masked_fill(mask0 == 0, -1e8)
+            a = F.softmax(u, dim=1)
+            if m == 0:
+                g = torch.bmm(a.squeeze().unsqueeze(1), v).squeeze(1)
+            else:
+                g += torch.bmm(a.squeeze().unsqueeze(1), v).squeeze(1)
+        query = g
+        for m in range(self.n_multi_head):
+            u1 = self.W_q3[m](query).unsqueeze(1)
+            u2 = self.W_ref3[m](ref.reshape(ref.shape[0] * ref.shape[1], -1))  # u2: (batch, 128, block_num)
+            u2 = u2.reshape(ref.shape[0], ref.shape[1], -1)
+            u2 = u2.permute(0, 2, 1)
+            u = torch.bmm(u1, u2) / dk ** 0.5
+            v = ref @ self.Vec3[m]
+            u = u.squeeze(1).masked_fill(mask0 == 0, -1e8)
+            a = F.softmax(u, dim=1)
+            if m == 0:
+                g = torch.bmm(a.squeeze().unsqueeze(1), v).squeeze(1)
+            else:
+                g += torch.bmm(a.squeeze().unsqueeze(1), v).squeeze(1)
 
-            dk = self.params["n_hidden"]/self.n_multi_head
-            for m in range(self.n_multi_head):
-                #u1 = self.W_q[m](query).unsqueeze(-1).repeat(1, 1, ref.size(1))      # u1: (batch, 128, block_num)
-                u1 = self.W_q[m](query).unsqueeze(1)
-                u2 = self.W_ref[m](ref.permute(0, 2, 1))                             # u2: (batch, 128, block_num)
-                u = torch.bmm(u1, u2)/dk**0.5
-                v = ref@self.Vec[m]
-                u = u.squeeze(1).masked_fill(mask == 0, -1e8)
-                a = F.softmax(u, dim=1)
-                #dddd
-                if m == 0:
-                    g = torch.bmm(a.squeeze().unsqueeze(1), v).squeeze(1)
-                else:
-                    g += torch.bmm(a.squeeze().unsqueeze(1), v).squeeze(1)
-                #placeholder_for_g.append(g)
-            #g = torch.concat(placeholder_for_g, dim = 1)
-            #g = self.multi_head_embedding(g)
+        query = g
+        for m in range(self.n_multi_head):
+            u1 = self.W_q4[m](query).unsqueeze(1)
+            u2 = self.W_ref4[m](ref.reshape(ref.shape[0] * ref.shape[1], -1))  # u2: (batch, 128, block_num)
+            u2 = u2.reshape(ref.shape[0], ref.shape[1], -1)
+            u2 = u2.permute(0, 2, 1)
+            u = torch.bmm(u1, u2) / dk ** 0.5
+            v = ref @ self.Vec4[m]
+            u = u.squeeze(1).masked_fill(mask2 == 0, -1e8)
+            a = F.softmax(u, dim=1)
+            if m == 0:
+                g = torch.bmm(a.squeeze().unsqueeze(1), v).squeeze(1)
+            else:
+                g += torch.bmm(a.squeeze().unsqueeze(1), v).squeeze(1)
+
+        # query = g
+        # for m in range(self.n_multi_head):
+        #     u1 = self.W_q4[m](query).unsqueeze(1)
+        #     u2 = self.W_ref4[m](ref.reshape(ref.shape[0] * ref.shape[1], -1))  # u2: (batch, 128, block_num)
+        #     u2 = u2.reshape(ref.shape[0], ref.shape[1], -1)
+        #     u2 = u2.permute(0, 2, 1)
+        #     u = torch.bmm(u1, u2) / dk ** 0.5
+        #     v = ref @ self.Vec4[m]
+        #     u = u.squeeze(1).masked_fill(mask == 0, -1e8)
+        #     a = F.softmax(u, dim=1)
+        #     # dddd
+        #     if m == 0:
+        #         g = torch.bmm(a.squeeze().unsqueeze(1), v).squeeze(1)
+        #     else:
+        #         g += torch.bmm(a.squeeze().unsqueeze(1), v).squeeze(1)
+            #placeholder_for_g.append(g)
+        #g = torch.concat(placeholder_for_g, dim = 1)
+        #g = self.multi_head_embedding(g)
 
         return g
 
@@ -383,10 +353,15 @@ class PtrNet1(nn.Module):
         else:
             dk = self.params["n_hidden"]
             u1 = self.W_q2(query).unsqueeze(1)
-            u2 = self.W_ref2(ref.permute(0, 2, 1))  # u2: (batch, 128, block_num)
+
+            u2 = self.W_ref2(ref.reshape(ref.shape[0] * ref.shape[1], -1))  # u2: (batch, 128, block_num)
+            u2 = u2.reshape(ref.shape[0], ref.shape[1], -1)
+            u2 = u2.permute(0, 2, 1)
+
             u = torch.bmm(u1, u2) / dk
             if self.use_logit_clipping:
                 u = self.C * torch.tanh(u)
+            #print(u.shape, mask.shape)
             u = u.squeeze(1).masked_fill(mask == 0, -1e8)
         return u
 
