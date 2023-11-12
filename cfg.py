@@ -22,7 +22,7 @@ def get_cfg():
     parser.add_argument("--layers", type=str, default="[256, 128]", help="")
     parser.add_argument("--n_embedding", type=int, default=32, help="")
     parser.add_argument("--graph_embedding_size", type=int, default=64, help="")
-    parser.add_argument("--n_hidden", type=int, default=24, help="")
+    parser.add_argument("--n_hidden", type=int, default=84, help="")
     parser.add_argument("--ppo", type=bool, default=False, help="")
     parser.add_argument("--entropy_weight", type=float, default=0.00001, help="")
     parser.add_argument("--reward_scaler", type=float, default=15, help="")

@@ -16,13 +16,15 @@ class Greedy(nn.Module):
         super().__init__()
 
     def forward(self, log_p):
-        return torch.argmax(log_p, dim=1).long().squeeze(1)
+        #print("greedy", log_p.shape)
+        return torch.argmax(log_p, dim=1).long()
 
 
 class Categorical(nn.Module):
     def __init__(self):
         super().__init__()
     def forward(self, log_p):
+        #print("cat", log_p.shape)
         return torch.multinomial(log_p.exp(), 1).long().squeeze(1)
 
 
@@ -153,72 +155,77 @@ class PtrNet1(nn.Module):
         for param in self.parameters():
             nn.init.uniform_(param.data, init_min, init_max)
 
-    def forward(self, x, device, y=None, greedy = False):
+    def encoder(self, node_features, heterogeneous_edges):
 
-        if self.gnn == False:
-            x = x.to(device)
-            batch, block_num, _ = x.size()
-            embed_enc_inputs = self.Embedding(x)
-            embed = embed_enc_inputs.size(2)
-            enc_h, h = self.Encoder(embed_enc_inputs, None)
+        batch = node_features.shape[0]
+        block_num = node_features.shape[1]-2
+        node_num = node_features.shape[1]
+        node_reshaped_features = node_features.reshape(batch * node_num, -1)
+
+        node_embedding = self.Embedding(node_reshaped_features)
+        node_embedding = node_embedding.reshape(batch, node_num, -1)
+        if cfg.gnn_type == 'gcrl':
+            if cfg.k_hop == 1:
+                enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
+            if cfg.k_hop == 2:
+                enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
+                enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True, final = True)
+            if cfg.k_hop == 3:
+                enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
+                enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
+                enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True, final = True)
+            if cfg.k_hop == 4:
+                enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
+                enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
+                enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
+                enc_h = self.GraphEmbedding3(heterogeneous_edges, enc_h, mini_batch=True, final = True)
+            if cfg.k_hop == 5:
+                enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
+                enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
+                enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
+                enc_h = self.GraphEmbedding3(heterogeneous_edges, enc_h, mini_batch=True)
+                enc_h = self.GraphEmbedding4(heterogeneous_edges, enc_h, mini_batch=True, final = True)
         else:
-            node_features, heterogeneous_edges = x
-            node_features = torch.tensor(node_features).to(device).float()
-            batch = node_features.shape[0]
-            block_num = node_features.shape[1]-2
-            node_num = node_features.shape[1]
-            node_reshaped_features = node_features.reshape(batch * node_num, -1)
-            node_embedding = self.Embedding(node_reshaped_features)
-            node_embedding = node_embedding.reshape(batch, node_num, -1)
-            if cfg.gnn_type == 'gcrl':
-                if cfg.k_hop == 1:
-                    enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
-                if cfg.k_hop == 2:
-                    enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
-                    enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True, final = True)
-                if cfg.k_hop == 3:
-                    enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
-                    enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
-                    enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True, final = True)
-                if cfg.k_hop == 4:
-                    enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
-                    enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
-                    enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
-                    enc_h = self.GraphEmbedding3(heterogeneous_edges, enc_h, mini_batch=True, final = True)
-                if cfg.k_hop == 5:
-                    enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
-                    enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
-                    enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
-                    enc_h = self.GraphEmbedding3(heterogeneous_edges, enc_h, mini_batch=True)
-                    enc_h = self.GraphEmbedding4(heterogeneous_edges, enc_h, mini_batch=True, final = True)
-            else:
-                #print("ddd",node_embedding.shape)
-                batch = node_embedding.shape[0]
-                enc_h = list()
 
-                for b in range(batch):
-                    A = self.get_heterogeneous_adjacency_matrix(heterogeneous_edges[b][0], heterogeneous_edges[b][1], heterogeneous_edges[b][2],
-                                                                n_node_features=102)
-                    enc = self.GraphEmbedding(A, node_embedding[b])
-                    enc_h.append(enc)
-                enc_h =torch.stack(enc_h, dim = 0)
-            #print(enc_h.shape)
-            embed = enc_h.size(2)
-            h = enc_h.mean(dim = 1).unsqueeze(0)
-            enc_h = enc_h[:, :-2]
+            batch = node_embedding.shape[0]
+            enc_h = list()
+            for b in range(batch):
+                A = self.get_heterogeneous_adjacency_matrix(heterogeneous_edges[b][0], heterogeneous_edges[b][1], heterogeneous_edges[b][2],n_node_features=102)
+                enc = self.GraphEmbedding(A, node_embedding[b])
+                enc_h.append(enc)
+            enc_h =torch.stack(enc_h, dim = 0)
+        embed = enc_h.size(2)
+        h = enc_h.mean(dim = 1).unsqueeze(0)
+        enc_h = enc_h[:, :-2]
+        return enc_h, h, embed, batch, block_num
 
 
-        ref = enc_h
+    def forward(self, x, device, y=None, greedy = False):
+        node_features, heterogeneous_edges = x
+        node_features = torch.tensor(node_features).to(device).float()
+        batch = node_features.shape[0]
+        block_num = node_features.shape[1] - 2
+
         pi_list, log_ps = [], []
-        dec_input = self.dec_input.unsqueeze(0).repeat(batch, 1).unsqueeze(1).to(device)
         log_probabilities = list()
 
 
         h_pi_t_minus_one = self.v_1.unsqueeze(0).repeat(batch, 1).unsqueeze(0).to(device)
         h_pi_one = self.v_f.unsqueeze(0).repeat(batch, 1).unsqueeze(0).to(device)
-
+        n_job = 10
         for i in range(block_num):
+            copied_node_features = node_features.clone()
             job_count = torch.tensor(self.job_count)
+            for b in range(batch):
+                for j in range(n_job):
+                    ops_id_init = j*n_job
+                    ops_id = j*n_job+job_count[b][j]
+                    ops_id_fin = j * n_job+ n_job
+                    copied_node_features[b, ops_id_init:ops_id, -3:] = torch.tensor([1, 0, 0], dtype=torch.float)
+                    copied_node_features[b, ops_id,    -3:] = torch.tensor([0, 1, 0], dtype = torch.float)
+                    copied_node_features[b, ops_id+1:ops_id_fin, -3:] = torch.tensor([0, 0, 1], dtype=torch.float)
+            enc_h, h, embed, batch, block_num = self.encoder(copied_node_features, heterogeneous_edges)
+            ref = enc_h
             mask2 = torch.tensor(deepcopy(self.mask_debug), dtype=torch.float)
             for b in range(job_count.shape[0]):
                 for k in range(job_count.shape[1]):
@@ -236,7 +243,10 @@ class PtrNet1(nn.Module):
             log_p = torch.log_softmax(logits / self.T, dim=-1)
             if y == None:
                 log_p = log_p.squeeze(0)
-                next_block_index = self.block_selecter(log_p)
+                if greedy == False:
+                    next_block_index = self.block_selecter(log_p)
+                else:
+                    next_block_index = self.block_selecter_greedy(log_p)
                 log_probabilities.append(log_p.gather(1, next_block_index.unsqueeze(1)))
                 self.block_indices.append(next_block_index)
                 sample_space = self.sample_space.to(device)
@@ -324,20 +334,20 @@ class PtrNet1(nn.Module):
             else:
                 g += torch.bmm(a.squeeze().unsqueeze(1), v).squeeze(1)
 
-        query = g
-        for m in range(self.n_multi_head):
-            u1 = self.W_q4[m](query).unsqueeze(1)
-            u2 = self.W_ref4[m](ref.reshape(ref.shape[0] * ref.shape[1], -1))  # u2: (batch, 128, block_num)
-            u2 = u2.reshape(ref.shape[0], ref.shape[1], -1)
-            u2 = u2.permute(0, 2, 1)
-            u = torch.bmm(u1, u2) / dk ** 0.5
-            v = ref @ self.Vec4[m]
-            u = u.squeeze(1).masked_fill(mask2 == 0, -1e8)
-            a = F.softmax(u, dim=1)
-            if m == 0:
-                g = torch.bmm(a.squeeze().unsqueeze(1), v).squeeze(1)
-            else:
-                g += torch.bmm(a.squeeze().unsqueeze(1), v).squeeze(1)
+        # query = g
+        # for m in range(self.n_multi_head):
+        #     u1 = self.W_q4[m](query).unsqueeze(1)
+        #     u2 = self.W_ref4[m](ref.reshape(ref.shape[0] * ref.shape[1], -1))  # u2: (batch, 128, block_num)
+        #     u2 = u2.reshape(ref.shape[0], ref.shape[1], -1)
+        #     u2 = u2.permute(0, 2, 1)
+        #     u = torch.bmm(u1, u2) / dk ** 0.5
+        #     v = ref @ self.Vec4[m]
+        #     u = u.squeeze(1).masked_fill(mask2 == 0, -1e8)
+        #     a = F.softmax(u, dim=1)
+        #     if m == 0:
+        #         g = torch.bmm(a.squeeze().unsqueeze(1), v).squeeze(1)
+        #     else:
+        #         g += torch.bmm(a.squeeze().unsqueeze(1), v).squeeze(1)
 
         # query = g
         # for m in range(self.n_multi_head):
@@ -393,6 +403,35 @@ class PtrNet1(nn.Module):
     def decoder(self, h_bar, h_t_minus_one, h_one):
         #print(h_bar.shape, h_t_minus_one.shape, h_one.shape)
         return torch.concat([h_bar, h_t_minus_one, h_one], dim =2)
+
+    def remove_done_operation(self, batched_hetero_edge_index, nodes_to_remove):
+        batched_hetero_edge_index = [
+            [[[1, 2, 3], [2, 3, 1]], [[3, 2, 1], [2, 3, 1]], [[4, 2, 1, 3], [2, 3, 1, 1]]],
+            [[[2, 1, 3], [3, 3, 4]], [[3, 1, 1], [2, 3, 1]], [[5, 2, 1, 3], [1, 3, 4, 1]]]
+        ]
+
+        # 각 배치에서 제거할 노드 지정
+        nodes_to_remove = [1, 2]  # 배치 1에서 노드 1, 배치 2에서 노드 2 제거
+
+        # 결과를 저장할 리스트 초기화
+        filtered_batched_hetero_edge_index = []
+
+        # 각 배치를 순회하며 엣지 제거
+        for batch_index, (hetero_edges, node_to_remove) in enumerate(zip(batched_hetero_edge_index, nodes_to_remove)):
+            filtered_hetero_edges = []
+            # 배치 내의 각 엣지 유형을 순회
+            for edges in hetero_edges:
+                # 각 엣지 유형 내의 엣지들을 순회
+                filtered_edges = [[], []]
+                for u, v in zip(*edges):
+                    # 지정된 노드에 연결된 엣지가 아니라면 결과에 추가
+                    if u != node_to_remove and v != node_to_remove:
+                        filtered_edges[0].append(u)
+                        filtered_edges[1].append(v)
+                filtered_hetero_edges.append(filtered_edges)
+
+            # 결과 리스트에 추가
+            filtered_batched_hetero_edge_index.append(filtered_hetero_edges)
 
     def get_heterogeneous_adjacency_matrix(self, edge_index_1, edge_index_2, edge_index_3, n_node_features):
         A = []
