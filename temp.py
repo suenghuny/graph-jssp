@@ -285,7 +285,7 @@ def train_model(params, log_path=None):
                     temp.append(empty)
                 jobs_datas.append(temp)
             # print(jobs_data)
-
+#
         # if s % 20 == 1:
         #     jobs_data = [
         #         [(0, np.random.randint(1, 100)), (1, np.random.randint(1, 100)), (2, np.random.randint(1, 100)),
