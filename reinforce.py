@@ -174,7 +174,6 @@ for i in ['01','02','03','04','05','06','07','08','09','10']:
             job.append(element)
         orb_data.append(job)
     orb_list.append(orb_data)
-    print(orb_data)
         #print(column)
 #pd.DataFrame()
 # datas = [[
@@ -256,8 +255,10 @@ def train_model(params, log_path=None):
     c_max_g = list()
     baseline_update = 30
     b = 0
+    ops_number = 3
     for s in range(epoch + 1, params["step"]):
         problem_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        problem_list = [ops_number]
         """
         변수별 shape 
         inputs : batch_size X number_of_blocks X number_of_process
@@ -272,13 +273,13 @@ def train_model(params, log_path=None):
 
                 # for j in range(num_jobs):
                 #     temp.append(eval('ORB{}'.format(np.random.choice(problem_list)))[j])
-                #temp = eval('ORB{}'.format(np.random.choice(problem_list)))
-                # print(temp)
-                #jobs_datas.append(temp)
+                # temp = orb_list[np.random.choice(problem_list)-1]
+                # jobs_datas.append(temp)
+
                 temp = []
                 for job in range(num_jobs):
-                    machine_sequence = list(range(num_jobs))
-                    random.shuffle(machine_sequence)
+                    machine_sequence = [ops[0] for ops in orb_list[ops_number-1][job]]
+                    #print(machine_sequence)
                     empty = list()
                     for ops in range(num_operation):
                         empty.append((machine_sequence[ops], np.random.randint(1, 100)))
@@ -420,7 +421,7 @@ def train_model(params, log_path=None):
         real_makespan_greedy = list()
         for sequence_g in pred_seq_greedy:
             scheduler = Scheduler(jobs_datas[n])
-            makespan = scheduler.run(sequence_g.tolist()) / params['reward_scaler']
+            makespan  = scheduler.run(sequence_g.tolist()) / params['reward_scaler']
             real_makespan_greedy.append(makespan)
             c_max_g.append(makespan)
 
@@ -530,7 +531,7 @@ if __name__ == '__main__':
     # parser.add_argument("--graph_embedding_size", type=int, default=64, help="")
 
     params = {
-        "num_of_process": 6,
+        "num_of_process": 3,
         "num_of_blocks": 100,
         "step": cfg.step,
         "log_step": cfg.log_step,

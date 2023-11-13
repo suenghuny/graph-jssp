@@ -78,21 +78,21 @@ class PtrNet1(nn.Module):
             # self.Ws = nn.ParameterList(self.Ws)
             # [glorot(W) for W in self.Ws]
 
-            self.Vec = [nn.Parameter(torch.cuda.FloatTensor(augmented_hidden_size, augmented_hidden_size)) for _ in range(self.n_multi_head)]
+            self.Vec = [nn.Parameter(torch.cuda.FloatTensor(augmented_hidden_size+3, augmented_hidden_size)) for _ in range(self.n_multi_head)]
             self.Vec = nn.ParameterList(self.Vec)
             self.W_q = [nn.Linear(3*augmented_hidden_size, augmented_hidden_size, bias=False).to(device)  for _ in range(self.n_multi_head)]
             self.W_q_weights = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_q])
             self.W_q_biases = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_q])
-            self.W_ref =[nn.Linear(augmented_hidden_size,augmented_hidden_size, bias=False).to(device) for _ in range(self.n_multi_head)]
+            self.W_ref =[nn.Linear(augmented_hidden_size+3,augmented_hidden_size, bias=False).to(device) for _ in range(self.n_multi_head)]
             self.W_ref_weights = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_ref])
             self.W_ref_biases = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_ref])
 
-            self.Vec3 = [nn.Parameter(torch.cuda.FloatTensor(augmented_hidden_size, augmented_hidden_size)) for _ in range(self.n_multi_head)]
+            self.Vec3 = [nn.Parameter(torch.cuda.FloatTensor(augmented_hidden_size+3, augmented_hidden_size)) for _ in range(self.n_multi_head)]
             self.Vec3 = nn.ParameterList(self.Vec3)
             self.W_q3 = [nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False).to(device)  for _ in range(self.n_multi_head)]
             self.W_q_weights3 = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_q3])
             self.W_q_biases3 = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_q3])
-            self.W_ref3 =[nn.Linear(augmented_hidden_size,augmented_hidden_size, bias=False).to(device) for _ in range(self.n_multi_head)]
+            self.W_ref3 =[nn.Linear(augmented_hidden_size+3,augmented_hidden_size, bias=False).to(device) for _ in range(self.n_multi_head)]
             self.W_ref_weights3 = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_ref3])
             self.W_ref_biases3 = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_ref3])
 
@@ -109,7 +109,7 @@ class PtrNet1(nn.Module):
 
             self.Vec2 = nn.Parameter(torch.cuda.FloatTensor(augmented_hidden_size))
             self.W_q2 = nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False)
-            self.W_ref2 = nn.Linear(augmented_hidden_size,augmented_hidden_size, bias=False)
+            self.W_ref2 = nn.Linear(augmented_hidden_size+3,augmented_hidden_size, bias=False)
             self.dec_input = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
 
             self.v_1 = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
@@ -209,23 +209,29 @@ class PtrNet1(nn.Module):
         pi_list, log_ps = [], []
         log_probabilities = list()
 
-
+        enc_h, h, embed, batch, block_num = self.encoder(node_features, heterogeneous_edges)
         h_pi_t_minus_one = self.v_1.unsqueeze(0).repeat(batch, 1).unsqueeze(0).to(device)
         h_pi_one = self.v_f.unsqueeze(0).repeat(batch, 1).unsqueeze(0).to(device)
         n_job = 10
+
+        #print(enc_h.shape)
+
         for i in range(block_num):
-            copied_node_features = node_features.clone()
+            empty_tensor = torch.zeros([batch, block_num, 3]).to(device)
             job_count = torch.tensor(self.job_count)
             for b in range(batch):
                 for j in range(n_job):
                     ops_id_init = j*n_job
                     ops_id = j*n_job+job_count[b][j]
                     ops_id_fin = j * n_job+ n_job
-                    copied_node_features[b, ops_id_init:ops_id, -3:] = torch.tensor([1, 0, 0], dtype=torch.float)
-                    copied_node_features[b, ops_id,    -3:] = torch.tensor([0, 1, 0], dtype = torch.float)
-                    copied_node_features[b, ops_id+1:ops_id_fin, -3:] = torch.tensor([0, 0, 1], dtype=torch.float)
-            enc_h, h, embed, batch, block_num = self.encoder(copied_node_features, heterogeneous_edges)
-            ref = enc_h
+                    empty_tensor[b, ops_id_init:ops_id, :] = torch.tensor([1, 0, 0], dtype=torch.float)
+                    try:
+                        empty_tensor[b, ops_id,    :] = torch.tensor([0, 1, 0], dtype = torch.float)
+                        empty_tensor[b, ops_id+1:ops_id_fin, :] = torch.tensor([0, 0, 1], dtype=torch.float)
+                    except IndexError:
+                        pass
+
+            ref = torch.concat([enc_h, empty_tensor],dim = 2)
             mask2 = torch.tensor(deepcopy(self.mask_debug), dtype=torch.float)
             for b in range(job_count.shape[0]):
                 for k in range(job_count.shape[1]):
@@ -327,14 +333,13 @@ class PtrNet1(nn.Module):
             u2 = u2.permute(0, 2, 1)
             u = torch.bmm(u1, u2) / dk ** 0.5
             v = ref @ self.Vec3[m]
-            u = u.squeeze(1).masked_fill(mask0 == 0, -1e8)
+            u = u.squeeze(1).masked_fill(mask2 == 0, -1e8)
             a = F.softmax(u, dim=1)
             if m == 0:
                 g = torch.bmm(a.squeeze().unsqueeze(1), v).squeeze(1)
             else:
                 g += torch.bmm(a.squeeze().unsqueeze(1), v).squeeze(1)
 
-        # query = g
         # for m in range(self.n_multi_head):
         #     u1 = self.W_q4[m](query).unsqueeze(1)
         #     u2 = self.W_ref4[m](ref.reshape(ref.shape[0] * ref.shape[1], -1))  # u2: (batch, 128, block_num)

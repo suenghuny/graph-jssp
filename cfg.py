@@ -7,7 +7,7 @@ def get_cfg():
     parser.add_argument("--log_step", type=int, default=10, help="")
 
     parser.add_argument("--save_step", type=int, default=40, help="")
-    parser.add_argument("--batch_size", type=int, default=32, help="")
+    parser.add_argument("--batch_size", type=int, default=12, help="")
     parser.add_argument("--C", type=float, default=10, help="")
     parser.add_argument("--T", type=float, default=1.0, help="")
     parser.add_argument("--iteration", type=int, default=2, help="")
@@ -31,7 +31,7 @@ def get_cfg():
     parser.add_argument("--dot_product", type=bool, default=True, help="")
     parser.add_argument("--interval", type=int, default=300, help="")
     parser.add_argument("--fully_connected", type=bool, default=False, help="")
-    parser.add_argument("--gnn_type", type=str, default='FastGTN', help="")
+    parser.add_argument("--gnn_type", type=str, default='gcrl', help="")
     return parser.parse_args()
 
 
