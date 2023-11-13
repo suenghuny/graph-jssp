@@ -273,18 +273,18 @@ def train_model(params, log_path=None):
 
                 # for j in range(num_jobs):
                 #     temp.append(eval('ORB{}'.format(np.random.choice(problem_list)))[j])
-                # temp = orb_list[np.random.choice(problem_list)-1]
-                # jobs_datas.append(temp)
-
-                temp = []
-                for job in range(num_jobs):
-                    machine_sequence = [ops[0] for ops in orb_list[ops_number-1][job]]
-                    #print(machine_sequence)
-                    empty = list()
-                    for ops in range(num_operation):
-                        empty.append((machine_sequence[ops], np.random.randint(1, 100)))
-                    temp.append(empty)
+                temp = orb_list[ops_number]
                 jobs_datas.append(temp)
+
+                # temp = []
+                # for job in range(num_jobs):
+                #     machine_sequence = [ops[0] for ops in orb_list[ops_number-1][job]]
+                #     #print(machine_sequence)
+                #     empty = list()
+                #     for ops in range(num_operation):
+                #         empty.append((machine_sequence[ops], np.random.randint(1, 100)))
+                #     temp.append(empty)
+                # jobs_datas.append(temp)
             # print(jobs_data)
 
         # if s % 20 == 1:

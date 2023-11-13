@@ -200,20 +200,35 @@ class Scheduler:
                 empty.append(ops[1])
 
         jk=0
+        empty2 = list()
         for j in range(len(self.jobs_data)):
             job = self.jobs_data[j]
             sum_ops = sum([float(job[o][1]) for o in range(len(job))])
+            empty2.append(sum_ops)
+
+
+        for j in range(len(self.jobs_data)):
+            job = self.jobs_data[j]
+            sum_ops = sum([float(job[o][1]) for o in range(len(job))])
+
             for o in range(len(job)):
                 ops = job[o]
                 sum_ops_o = [float(job[k][1]) for k in range(0, o+1)]
                 #print([float(job[k][1]) for k in range(0, o+1)])
                 sum_ops_o.append(0)
                 sum_ops_o = sum(sum_ops_o)
-                node_features.append([float(ops[1])/np.max(empty), sum_ops_o/sum_ops, (o+1)/len(job), 1, 0 , 0])
+                node_features.append([float(ops[1]) / sum_ops,
+                                      float(ops[1]) / np.max(empty),
+                                      sum_ops_o/sum_ops,
+                                      sum_ops / np.max(empty2),
+                                      (o+1)/len(job),
+
+                                      ])
+                #print(sum_ops/np.max(empty2))
                 # print([float(ops[1])/np.max(empty), sum_ops_o/sum_ops, (o+1)/len(job)])
                 # jk+=1
-        node_features.append([0., 1., 1,  1, 0 , 0])
-        node_features.append([0., 0., 0,  1, 0 , 0])
+        node_features.append([0., 1., 1, 0, 0])
+        node_features.append([0., 0., 0, 0, 0])
         return node_features
 
 
@@ -257,8 +272,8 @@ class Scheduler:
                     if cfg.gnn_type == 'gcrl':
                         edge_index[0].append(jk)
                         edge_index[1].append(jk)
-                    #edge_index[0].append(jk+1)
-                    #edge_index[1].append(jk)
+                    # edge_index[0].append(jk+1)
+                    # edge_index[1].append(jk)
                     jk += 1
         return edge_index
 
@@ -279,8 +294,8 @@ class Scheduler:
                     if cfg.gnn_type == 'gcrl':
                         edge_index[0].append(jk)
                         edge_index[1].append(jk)
-                  #  edge_index[0].append(jk-1)
-                   # edge_index[1].append(jk)
+                    # edge_index[0].append(jk-1)
+                    # edge_index[1].append(jk)
                     jk += 1
         #print(edge_index)
         return edge_index

@@ -97,7 +97,7 @@ class GCRN(nn.Module):
     def _prepare_attentional_mechanism_input(self, Wq, Wv,A,k, mini_batch):
         Wh1 = Wq
         Wh2 = Wv
-        e = Wh1 + Wh2.T
+        e = Wh1 @ Wh2.T
         return e*A
     def forward(self, A, X, mini_batch, layer = 0, final = False):
         batch_size = X.shape[0]
@@ -133,18 +133,23 @@ class GCRN(nn.Module):
 ###
         if final == False:
             H = torch.concat(placeholder_for_multi_head, dim = 2)
+
             H = H.reshape(batch_size*num_nodes, -1)
             H = F.relu(self.Embedding1(H))
+            #print(H.shape)
             X = X.reshape(batch_size*num_nodes, -1)
-            H = self.BN1(H + X)
+            H = self.BN1((1 - cfg.alpha)*H + cfg.alpha*X)
+            #H = F.dropout(H, p = cfg.dropout)
         else:
             H = empty.reshape(batch_size, num_nodes, self.num_edge_cat * self.graph_embedding_size)
             H = H.reshape(batch_size * num_nodes, -1)
             H = F.relu(self.Embedding1_mean(H))
             X = X.reshape(batch_size * num_nodes, -1)
-            H = self.BN1(H + X)
+            H = self.BN1((1 - cfg.alpha)*H + cfg.alpha*X)
+            #H = F.dropout(H, p = cfg.dropout)
 
         Z = self.Embedding2(H)
-        Z = self.BN2(H+Z)
+        Z = self.BN2(H + Z)
+        #Z = F.dropout(Z)
         Z = Z.reshape(batch_size, num_nodes, -1)
         return Z

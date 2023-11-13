@@ -183,18 +183,63 @@ class Machine:
             self.availability.succeed()
 
 
-class Scheduler:
+class AdaptiveScheduler:
     def __init__(self, input_data):
         self.jobs_data = input_data
-        self.num_mc = len(input_data)   # number of machines
-        self.num_job = len(input_data)  # number of jobs
-        self.pt = [[ops[1] for ops in job] for job in input_data] # processing_time
-        self.ms = [[ops[0]+1 for ops in job] for job in input_data] # job 별 machine sequence
+        self.input_data = input_data
+        self.num_mc = len(self.input_data)   # number of machines
+        self.num_job = len(self.input_data)  # number of jobs
+        self.pt = [[ops[1] for ops in job] for job in self.input_data] # processing_time
+        self.ms = [[ops[0]+1 for ops in job] for job in self.input_data] # job 별 machine sequence
         self.j_keys = [j for j in range(self.num_job)]
         self.key_count = {key: 0 for key in self.j_keys}
         self.j_count =   {key: 0 for key in self.j_keys}
         self.m_keys =  [j + 1 for j in range(self.num_mc)]
         self.m_count = {key: 0 for key in self.m_keys}
+
+    def adaptive_run(self, est_holder, fin_holder, i= None):
+
+        estI_list=list()
+        gentI_list=list()
+        for I in range(self.num_job):
+            try:
+                gen_tI = int(self.pt[I][self.key_count[I]])
+                gen_mI = int(self.ms[I][self.key_count[I]])
+                estI = max(self.j_count[I], self.m_count[gen_mI])
+                estI_list.append(estI)
+                gentI_list.append(estI+gen_tI)
+            except IndexError:
+                pass
+
+        for I in range(self.num_job):
+            try:
+                gen_tI = int(self.pt[I][self.key_count[I]])
+                gen_mI = int(self.ms[I][self.key_count[I]])
+                estI = max(self.j_count[I], self.m_count[gen_mI])
+
+                index_of_one = (est_holder[I] == 1)
+                if len(estI_list)>0 and np.max(estI_list)!=0:
+                    est_holder[I][index_of_one] = estI/np.max(estI_list)
+                    fin_holder[I][index_of_one] = (estI+gen_tI)/np.max(gentI_list)
+                else:pass
+                estI_list.append(estI)
+                gentI_list.append(estI+gen_tI)
+            except IndexError:
+                pass
+
+        if i != None:
+            gen_t = int(self.pt[i][self.key_count[i]])
+            gen_m = int(self.ms[i][self.key_count[i]])
+            self.j_count[i] = self.j_count[i] + gen_t
+            self.m_count[gen_m] = self.m_count[gen_m] + gen_t
+            if self.m_count[gen_m] < self.j_count[i]:
+                self.m_count[gen_m] = self.j_count[i]
+            elif self.m_count[gen_m] > self.j_count[i]:
+                self.j_count[i] = self.m_count[gen_m]
+            self.key_count[i] = self.key_count[i] + 1
+
+
+        return est_holder, est_holder
 
     def run(self, sequence):
         for i in sequence:
@@ -202,7 +247,6 @@ class Scheduler:
             gen_m = int(self.ms[i][self.key_count[i]])
             self.j_count[i] = self.j_count[i] + gen_t
             self.m_count[gen_m] = self.m_count[gen_m] + gen_t
-
             if self.m_count[gen_m] < self.j_count[i]:
                 self.m_count[gen_m] = self.j_count[i]
             elif self.m_count[gen_m] > self.j_count[i]:
@@ -212,15 +256,15 @@ class Scheduler:
         return makespan
 
     def reset(self):
-        result = []
-        for idx, row in ms_tmp.iterrows():
-            empty = list()
-            for col in ms_tmp.columns:
-                o = row[col] - 1
-                t = pt_tmp.at[idx, col]
-                empty.append((o, t))
-            result.append(empty)
-        return result
+        self.num_mc = len(self.input_data)   # number of machines
+        self.num_job = len(self.input_data)  # number of jobs
+        self.pt = [[ops[1] for ops in job] for job in self.input_data] # processing_time
+        self.ms = [[ops[0]+1 for ops in job] for job in self.input_data] # job 별 machine sequence
+        self.j_keys = [j for j in range(self.num_job)]
+        self.key_count = {key: 0 for key in self.j_keys}
+        self.j_count =   {key: 0 for key in self.j_keys}
+        self.m_keys =  [j + 1 for j in range(self.num_mc)]
+        self.m_count = {key: 0 for key in self.m_keys}
 
     def get_node_feature(self):
         node_features = []

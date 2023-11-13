@@ -16,6 +16,7 @@ from datetime import datetime
 from actor2 import PtrNet1
 from critic import PtrNet2
 from jssp import Scheduler
+from jssp2 import AdaptiveScheduler
 from cfg import get_cfg
 
 cfg = get_cfg()
@@ -264,17 +265,11 @@ def train_model(params, log_path=None):
         pred_seq : batch_size X number_of_blocks
         """
         b +=1
-        if s % 1 == 0:
+        if s % cfg.gen_step == 1:
             jobs_datas = []
-            num_jobs = 10
-            num_operation = 10
             for _ in range(params['batch_size']):
-
-                # for j in range(num_jobs):
-                #     temp.append(eval('ORB{}'.format(np.random.choice(problem_list)))[j])
-                #temp = eval('ORB{}'.format(np.random.choice(problem_list)))
-                # print(temp)
-                #jobs_datas.append(temp)
+                num_jobs = 10
+                num_operation = 10
                 temp = []
                 for job in range(num_jobs):
                     machine_sequence = list(range(num_jobs))
@@ -284,63 +279,32 @@ def train_model(params, log_path=None):
                         empty.append((machine_sequence[ops], np.random.randint(1, 100)))
                     temp.append(empty)
                 jobs_datas.append(temp)
-            # print(jobs_data)
-#
-        # if s % 20 == 1:
-        #     jobs_data = [
-        #         [(0, np.random.randint(1, 100)), (1, np.random.randint(1, 100)), (2, np.random.randint(1, 100)),
-        #          (3, np.random.randint(1, 100)), (4, np.random.randint(1, 100)), (5, np.random.randint(1, 100)),
-        #          (6, np.random.randint(1, 100)), (7, np.random.randint(1, 100)), (8, np.random.randint(1, 100)),
-        #          (9, np.random.randint(1, 100))],
-        #         [(0, np.random.randint(1, 100)), (2, np.random.randint(1, 100)), (4, np.random.randint(1, 100)),
-        #          (9, np.random.randint(1, 100)), (3, np.random.randint(1, 100)), (1, np.random.randint(1, 100)),
-        #          (6, np.random.randint(1, 100)), (5, np.random.randint(1, 100)), (7, np.random.randint(1, 100)),
-        #          (8, np.random.randint(1, 100))],
-        #         [(1, np.random.randint(1, 100)), (0, np.random.randint(1, 100)), (3, np.random.randint(1, 100)),
-        #          (2, np.random.randint(1, 100)), (8, np.random.randint(1, 100)), (5, np.random.randint(1, 100)),
-        #          (7, np.random.randint(1, 100)), (6, np.random.randint(1, 100)), (9, np.random.randint(1, 100)),
-        #          (4, np.random.randint(1, 100))],
-        #         [(1, np.random.randint(1, 100)), (2, np.random.randint(1, 100)), (0, np.random.randint(1, 100)),
-        #          (4, np.random.randint(1, 100)), (6, np.random.randint(1, 100)), (8, np.random.randint(1, 100)),
-        #          (7, np.random.randint(1, 100)), (3, np.random.randint(1, 100)), (9, np.random.randint(1, 100)),
-        #          (5, np.random.randint(1, 100))],
-        #         [(2, np.random.randint(1, 100)), (0, np.random.randint(1, 100)), (1, np.random.randint(1, 100)),
-        #          (5, np.random.randint(1, 100)), (3, np.random.randint(1, 100)), (4, np.random.randint(1, 100)),
-        #          (8, np.random.randint(1, 100)), (7, np.random.randint(1, 100)), (9, np.random.randint(1, 100)),
-        #          (6, np.random.randint(1, 100))],
-        #         [(2, np.random.randint(1, 100)), (1, np.random.randint(1, 100)), (5, np.random.randint(1, 100)),
-        #          (3, np.random.randint(1, 100)), (8, np.random.randint(1, 100)), (9, np.random.randint(1, 100)),
-        #          (0, np.random.randint(1, 100)), (6, np.random.randint(1, 100)), (4, np.random.randint(1, 100)),
-        #          (7, np.random.randint(1, 100))],
-        #         [(1, np.random.randint(1, 100)), (0, np.random.randint(1, 100)), (3, np.random.randint(1, 100)),
-        #          (2, np.random.randint(1, 100)), (6, np.random.randint(1, 100)), (5, np.random.randint(1, 100)),
-        #          (9, np.random.randint(1, 100)), (8, np.random.randint(1, 100)), (7, np.random.randint(1, 100)),
-        #          (4, np.random.randint(1, 100))],
-        #         [(2, np.random.randint(1, 100)), (0, np.random.randint(1, 100)), (1, np.random.randint(1, 100)),
-        #          (5, np.random.randint(1, 100)), (4, np.random.randint(1, 100)), (6, np.random.randint(1, 100)),
-        #          (8, np.random.randint(1, 100)), (9, np.random.randint(1, 100)), (7, np.random.randint(1, 100)),
-        #          (3, np.random.randint(1, 100))],
-        #         [(0, np.random.randint(1, 100)), (1, np.random.randint(1, 100)), (3, np.random.randint(1, 100)),
-        #          (5, np.random.randint(1, 100)), (2, np.random.randint(1, 100)), (9, np.random.randint(1, 100)),
-        #          (6, np.random.randint(1, 100)), (7, np.random.randint(1, 100)), (4, np.random.randint(1, 100)),
-        #          (8, np.random.randint(1, 100))],
-        #         [(1, np.random.randint(1, 100)), (0, np.random.randint(1, 100)), (2, np.random.randint(1, 100)),
-        #          (6, np.random.randint(1, 100)), (8, np.random.randint(1, 100)), (9, np.random.randint(1, 100)),
-        #          (5, np.random.randint(1, 100)), (3, np.random.randint(1, 100)), (4, np.random.randint(1, 100)),
-        #          (7, np.random.randint(1, 100))]
-        #     ]  # mach
-        # rem = s% 10
-        # jobs_data = datas[rem]
+
+            scheduler_list = list()
+            for n in range(len(jobs_datas)):
+                scheduler_list.append(AdaptiveScheduler(jobs_datas[n]))
+            #print(scheduler_list)
+        else:
+            for scheduler in scheduler_list:
+                scheduler.reset()
+
+
 
         if s % 20 == 1:
             for p in problem_list:
+
+
+
                 num_val = 50
+                scheduler_list_val = [AdaptiveScheduler(orb_list[p - 1]) for _ in range(num_val)]
                 val_makespan = list()
                 act_model.init_mask_job_count(num_val)
                 baseline_model.init_mask_job_count(num_val)
+                act_model.eval()
                 scheduler = Scheduler(orb_list[p-1])
                 node_feature = scheduler.get_node_feature()
                 node_feature = [node_feature for _ in range(num_val)]
+
                 edge_precedence = scheduler.get_edge_index_precedence()
                 edge_antiprecedence = scheduler.get_edge_index_antiprecedence()
                 edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
@@ -351,7 +315,7 @@ def train_model(params, log_path=None):
                     heterogeneous_edges = (edge_precedence, edge_antiprecedence, edge_machine_sharing)
                 heterogeneous_edges = [heterogeneous_edges for _ in range(num_val)]
                 input_data = (node_feature, heterogeneous_edges)
-                pred_seq, ll_old, _ = act_model(input_data, device)
+                pred_seq, ll_old, _ = act_model(input_data, device, scheduler_list = scheduler_list_val)
 
 
 
@@ -402,36 +366,37 @@ def train_model(params, log_path=None):
                     heterogeneous_edge = (edge_precedence, edge_antiprecedence, edge_machine_sharing)
                 heterogeneous_edges.append(heterogeneous_edge)
             input_data = (node_features, heterogeneous_edges)
-
-        pred_seq, ll_old, _ = act_model(input_data, device)
+        act_model.train()
+        pred_seq, ll_old, _ = act_model(input_data, device, scheduler_list = scheduler_list)
         real_makespan = list()
         for n in range(len(node_features)):
             sequence = pred_seq[n]
             scheduler = Scheduler(jobs_datas[n])
-            makespan = scheduler.run(sequence.tolist()) / params['reward_scaler']
+            makespan = -scheduler.run(sequence.tolist()) / params['reward_scaler']
             real_makespan.append(makespan)
             c_max.append(makespan)
-
-
-
-        baseline_model.block_indices = []
-        baseline_model.eval()
-        pred_seq_greedy, _, _ = baseline_model(input_data, device, greedy=True)
-        real_makespan_greedy = list()
-        for sequence_g in pred_seq_greedy:
-            scheduler = Scheduler(jobs_datas[n])
-            makespan = scheduler.run(sequence_g.tolist()) / params['reward_scaler']
-            real_makespan_greedy.append(makespan)
-            c_max_g.append(makespan)
+        # baseline_model.block_indices = []
+        # baseline_model.eval()
+        # pred_seq_greedy, _, _ = baseline_model(input_data, device, greedy=True)
+        # real_makespan_greedy = list()
+        # for sequence_g in pred_seq_greedy:
+        #     scheduler = Scheduler(jobs_datas[n])
+        #     makespan = -scheduler.run(sequence_g.tolist()) / params['reward_scaler']
+        #     real_makespan_greedy.append(makespan)
+        #     c_max_g.append(makespan)
 
         ave_makespan += sum(real_makespan) / (params["batch_size"] * params["log_step"])
         """
         vanila actor critic
         """
         if cfg.ppo == False:
+            if s == 1:
+                be  = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)
+            else:
+                be = cfg.beta * be+(1-cfg.beta) * torch.tensor(real_makespan).to(device)
             act_optim.zero_grad()
-            adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - torch.tensor(real_makespan_greedy).detach().unsqueeze(1).to(device)
-            act_loss = (ll_old * adv).mean()
+            adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - be #torch.tensor(real_makespan_greedy).detach().unsqueeze(1).to(device)
+            act_loss = -(ll_old * adv).mean()
             act_loss.backward()
             act_optim.step()
             nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=10.0, norm_type=2)
@@ -441,16 +406,34 @@ def train_model(params, log_path=None):
                     act_lr_scheduler.step()
 
             #print(act_lr_scheduler.get_last_lr())
-            if s % cfg.interval== 0:
-                if stats.ttest_rel(c_max, c_max_g)[1]<0.05:
-                    c_max = list()
-                    c_max_g = list()
-                    baseline_model.load_state_dict(act_model.state_dict())
 
-                else:
-                    c_max = list()
-                    c_max_g = list()
+
+
             ave_act_loss += act_loss.item()
+        if cfg.ppo == True:
+            for k in range(params["iteration"]):  # K-epoch
+
+                adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - torch.tensor(real_makespan_greedy).detach().unsqueeze(1).to(device)
+                _, ll_new, _ = act_model(input_data, device, pred_seq)  # pi(seq|inputs)
+                ratio = torch.exp(ll_new - ll_old.detach()).unsqueeze(-1)  #
+                surr1 = ratio * adv
+                surr2 = torch.clamp(ratio, 1 - params["epsilon"], 1 + params["epsilon"]) * adv
+                act_loss = -torch.min(surr1, surr2).mean()
+                act_optim.zero_grad()
+                act_loss.backward()
+                act_optim.step()
+                nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=10.0, norm_type=2)
+                if params["is_lr_decay"]:
+                    act_lr_scheduler.step()
+                ave_act_loss += act_loss.item()
+            # if s % cfg.interval== 0:
+            #     if stats.ttest_rel(c_max, c_max_g)[1]<0.05:
+            #         c_max = list()
+            #         c_max_g = list()
+            #         baseline_model.load_state_dict(act_model.state_dict())
+            #     else:
+            #         c_max = list()
+            #         c_max_g = list()
 
         """
         vanila actor critic
@@ -530,7 +513,7 @@ if __name__ == '__main__':
     # parser.add_argument("--graph_embedding_size", type=int, default=64, help="")
 
     params = {
-        "num_of_process": 6,
+        "num_of_process": 5,
         "num_of_blocks": 100,
         "step": cfg.step,
         "log_step": cfg.log_step,
