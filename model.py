@@ -133,13 +133,11 @@ class GCRN(nn.Module):
 ###
         if final == False:
             H = torch.concat(placeholder_for_multi_head, dim = 2)
-
             H = H.reshape(batch_size*num_nodes, -1)
             H = F.relu(self.Embedding1(H))
             #print(H.shape)
             X = X.reshape(batch_size*num_nodes, -1)
             H = self.BN1((1 - cfg.alpha)*H + cfg.alpha*X)
-            #H = F.dropout(H, p = cfg.dropout)
         else:
             H = empty.reshape(batch_size, num_nodes, self.num_edge_cat * self.graph_embedding_size)
             H = H.reshape(batch_size * num_nodes, -1)

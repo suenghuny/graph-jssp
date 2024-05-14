@@ -77,7 +77,7 @@ class PtrNet1(nn.Module):
             # self.Ws = nn.ParameterList(self.Ws)
             # [glorot(W) for W in self.Ws]
 
-            self.Vec = [nn.Parameter(torch.cuda.FloatTensor(augmented_hidden_size+2, augmented_hidden_size)) for _ in range(self.n_multi_head)]
+            self.Vec = [nn.Parameter(torch.FloatTensor(augmented_hidden_size+2, augmented_hidden_size)) for _ in range(self.n_multi_head)]
             self.Vec = nn.ParameterList(self.Vec)
             self.W_q = [nn.Linear(2*augmented_hidden_size, augmented_hidden_size, bias=False).to(device)  for _ in range(self.n_multi_head)]
             self.W_q_weights = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_q])
@@ -86,7 +86,7 @@ class PtrNet1(nn.Module):
             self.W_ref_weights = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_ref])
             self.W_ref_biases = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_ref])
 
-            self.Vec3 = [nn.Parameter(torch.cuda.FloatTensor(augmented_hidden_size+2, augmented_hidden_size)) for _ in range(self.n_multi_head)]
+            self.Vec3 = [nn.Parameter(torch.FloatTensor(augmented_hidden_size+2, augmented_hidden_size)) for _ in range(self.n_multi_head)]
             self.Vec3 = nn.ParameterList(self.Vec3)
             self.W_q3 = [nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False).to(device)  for _ in range(self.n_multi_head)]
             self.W_q_weights3 = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_q3])
@@ -95,7 +95,7 @@ class PtrNet1(nn.Module):
             self.W_ref_weights3 = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_ref3])
             self.W_ref_biases3 = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_ref3])
 
-            self.Vec4 = [nn.Parameter(torch.cuda.FloatTensor(augmented_hidden_size+2, augmented_hidden_size)) for _ in range(self.n_multi_head)]
+            self.Vec4 = [nn.Parameter(torch.FloatTensor(augmented_hidden_size+2, augmented_hidden_size)) for _ in range(self.n_multi_head)]
             self.Vec4 = nn.ParameterList(self.Vec4)
             self.W_q4 = [nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False).to(device)  for _ in range(self.n_multi_head)]
             self.W_q_weights4 = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_q4])
@@ -106,7 +106,7 @@ class PtrNet1(nn.Module):
 
 
 
-            self.Vec2 = nn.Parameter(torch.cuda.FloatTensor(augmented_hidden_size))
+            self.Vec2 = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
             self.W_q2 = nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False)
             self.W_ref2 = nn.Linear(augmented_hidden_size+2,augmented_hidden_size, bias=False)
             self.dec_input = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
