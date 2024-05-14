@@ -26,7 +26,9 @@ class AdaptiveScheduler:
         self.j_count =   {key: 0 for key in self.j_keys}
         self.m_keys =  [j + 1 for j in range(self.num_mc)]
         self.m_count = {key: 0 for key in self.m_keys}
-        self.mask1 = [[0 for i in range(self.num_mc)] for j in range(self.num_job)]
+
+
+        self.mask1 =  [[0 for i in range(self.num_mc)] for j in range(self.num_job)]
         self.mask2 =  [[1 for i in range(self.num_mc)] for j in range(self.num_job)]
 
 
@@ -95,6 +97,9 @@ class AdaptiveScheduler:
         self.j_count =   {key: 0 for key in self.j_keys}
         self.m_keys =  [j + 1 for j in range(self.num_mc)]
         self.m_count = {key: 0 for key in self.m_keys}
+
+        self.mask1 = [[0 for i in range(self.num_mc)] for j in range(self.num_job)]
+        self.mask2 = [[1 for i in range(self.num_mc)] for j in range(self.num_job)]
 
     def get_node_feature(self):
         node_features = []

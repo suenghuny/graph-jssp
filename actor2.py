@@ -141,6 +141,59 @@ class PtrNet1(nn.Module):
                             range(count)]
         self.job_count = [[0 for j in range(self.params['num_jobs'])] for _ in range(count)]
 
+    def get_jssp_instance(self, instance):
+        self.instance = instance
+        self.mask1_temp = [instance.mask1 for instance in self.instance]
+        self.mask2_temp = [instance.mask2 for instance in self.instance]
+
+    def init_mask(self):
+        dummy_instance = self.instance[0]
+        shape0 = torch.tensor(dummy_instance.mask1).to(device).shape[0]
+        shape1 = torch.tensor(dummy_instance.mask1).to(device).shape[1]
+        mask1 = torch.zeros([len(self.instance), shape0, shape1]).to(device)
+        mask2 = torch.zeros([len(self.instance), shape0, shape1]).to(device)
+        for idx in range(len(self.instance)):
+            instance = self.instance[idx]
+            for i in range(len(instance.mask1)):
+                instance.mask1[i][0] = 1
+
+            mask1[idx] = torch.tensor(instance.mask1).to(device)
+
+
+
+
+            mask2[idx] = torch.tensor(instance.mask2).to(device)
+        return mask1, mask2
+
+    def update_mask(self, job_selections):
+        dummy_instance = self.instance[0]
+        shape0 = torch.tensor(dummy_instance.mask1).to(device).shape[0]
+        shape1 = torch.tensor(dummy_instance.mask1).to(device).shape[1]
+        mask1 = torch.zeros([len(self.instance), shape0, shape1]).to(device)
+        mask2 = torch.zeros([len(self.instance), shape0, shape1]).to(device)
+        for idx in range(len(self.instance)):
+            instance = self.instance[idx]
+            job_selection = job_selections[idx]
+
+            if 1 not in instance.mask1[job_selection]:
+                instance.mask1[job_selection][0] = 1
+            else:
+                index = instance.mask1[job_selection].index(1)
+                instance.mask1[job_selection][index] = 0
+                if index + 1 < len(instance.mask1[job_selection]):
+                    instance.mask1[job_selection][index + 1] = 1
+
+            if 0 not in instance.mask2[job_selection]:
+                instance.mask2[job_selection][0] = 0
+            else:
+                if 1 in instance.mask2[job_selection]:
+                    index = instance.mask2[job_selection].index(1)
+                    instance.mask2[job_selection][index] = 0
+
+            mask1[idx] = torch.tensor(instance.mask1).to(device)
+            mask2[idx] = torch.tensor(instance.mask2).to(device)
+        return mask1, mask2
+
 
     def _initialize_weights(self, init_min=-0.5, init_max=0.5):
         for param in self.parameters():
@@ -193,19 +246,20 @@ class PtrNet1(nn.Module):
     def forward(self, x, device, scheduler_list, y=None, greedy = False):
         node_features, heterogeneous_edges = x
         node_features = torch.tensor(node_features).to(device).float()
-        batch = node_features.shape[0]
-        block_num = node_features.shape[1] - 2
-
         pi_list, log_ps = [], []
         log_probabilities = list()
-
-
-        enc_h, h_emb, embed, batch, block_num = self.encoder(node_features, heterogeneous_edges)
+        enc_h, h_emb, embed, batch, num_operations = self.encoder(node_features, heterogeneous_edges)
         h_pi_t_minus_one = self.v_1.unsqueeze(0).repeat(batch, 1).unsqueeze(0).to(device)
 
-
+        mask1_debug, mask2_debug = self.init_mask()
         ref_temp = enc_h
-        for i in range(block_num):
+        batch_size = h_pi_t_minus_one.shape[1]
+        for i in range(num_operations):
+
+            mask1_debug = mask1_debug.reshape(batch_size, -1)
+            mask2_debug = mask2_debug.reshape(batch_size, -1)
+
+
             job_count = torch.tensor(self.job_count)
             mask2 = torch.tensor(deepcopy(self.mask_debug), dtype=torch.float)
             for b in range(job_count.shape[0]):
@@ -218,29 +272,24 @@ class PtrNet1(nn.Module):
             fin_placeholder = mask2.clone().to(device)
             mask2 = mask2.view(self.count, -1).to(device)
             mask0 = torch.tensor(self.mask_debug0, dtype=torch.float).view(self.count, -1).to(device)
+            #print(mask2.shape, mask0.shape)
 
             if i == 0:
-                for nb in range(10): # 하드코딩
+                for nb in range(batch_size): # 하드코딩
                     scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb])
             else:
-                for nb in range(len(next_block.tolist())):
+                for nb in range(batch_size):
                     next_b = next_block[nb].item()
                     scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb], i = next_b)
-            est_placeholder = est_placeholder.reshape(batch,-1).unsqueeze(2)
+            est_placeholder = est_placeholder.reshape(batch, -1).unsqueeze(2)
             fin_placeholder = fin_placeholder.reshape(batch, -1).unsqueeze(2)
             ref = torch.concat([ref_temp, est_placeholder, fin_placeholder],dim = 2)
-            #print(ref_temp.shape, est_placeholder.shape)
-
-#            print(enc_h.shape, est_placeholder.shape, fin_placeholder.shape)
-
-
             h_c = self.decoder(h_emb, h_pi_t_minus_one)
             query = h_c.squeeze(0)
-            query = self.glimpse(query, ref, mask0, mask2)
-            logits = self.pointer(query, ref, mask2)
+            query = self.glimpse(query, ref, mask2_debug)
+            logits = self.pointer(query, ref, mask1_debug)
             log_p = torch.log_softmax(logits / self.T, dim=-1)
             if y == None:
-
                 if greedy == False:
                     next_block_index = self.block_selecter(log_p)
                 else:
@@ -250,15 +299,13 @@ class PtrNet1(nn.Module):
                 sample_space = self.sample_space.to(device)
                 next_block = sample_space[next_block_index].to(device)
 
+                mask1_debug, mask2_debug = self.update_mask(next_block.tolist())
+
                 for b_prime in range(len(next_block.tolist())):
                     job = next_block[b_prime]
                     self.job_count[b_prime][job] += 1
                     mask_array = np.array(self.mask_debug0[b_prime][job])
-                    # 첫 번째 1의 인덱스 찾기
-
                     idx = np.where(mask_array == 1)[0]
-                    # 1이 존재하면 해당 위치를 0으로 변경
-
                     if idx.size > 0:
                         self.mask_debug0[b_prime][job][idx[0]] = 0
             else:
@@ -276,18 +323,15 @@ class PtrNet1(nn.Module):
             h_pi_t_minus_one = torch.gather(input=enc_h, dim=1, index=next_block_index.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, embed)).squeeze(1).unsqueeze(0)  # 다음 sequence의 input은 encoder의 output 중에서 현재 sequence에 해당하는 embedding이 된다.
             pi_list.append(next_block)
         pi = torch.stack(pi_list, dim=1)
-        if y == None:
-            log_probabilities = torch.stack(log_probabilities, dim=1)
-            ll = log_probabilities.sum(dim=1)
-        else:
-            log_probabilities = torch.stack(log_probabilities, dim=1)
-            ll = log_probabilities.sum(dim=1)
+        log_probabilities = torch.stack(log_probabilities, dim=1)
+        ll = log_probabilities.sum(dim=1)
+
 
         self.job_count = deepcopy(self.dummy_job_count)
         _ = 1
         return pi, ll, _
 
-    def glimpse(self, query, ref, mask0, mask2, inf=1e8):
+    def glimpse(self, query, ref, mask0):
         """
         query는 decoder의 출력
         ref는   encoder의 출력
