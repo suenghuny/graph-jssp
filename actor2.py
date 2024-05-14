@@ -258,7 +258,7 @@ class PtrNet1(nn.Module):
 
             mask1_debug = mask1_debug.reshape(batch_size, -1)
             mask2_debug = mask2_debug.reshape(batch_size, -1)
-
+##
 
             job_count = torch.tensor(self.job_count)
             mask2 = torch.tensor(deepcopy(self.mask_debug), dtype=torch.float)
