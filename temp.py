@@ -11,7 +11,7 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 from time import time
 from datetime import datetime
 
-from actor2 import PtrNet1
+from actor3 import PtrNet1
 from critic import PtrNet2
 from jssp import Scheduler
 from jssp2 import AdaptiveScheduler
@@ -247,8 +247,7 @@ def train_model(params, log_path=None):
                 scheduler_list_val = [AdaptiveScheduler(orb_list[p - 1]) for _ in range(num_val)]
                 val_makespan = list()
 
-                act_model.get_jssp_instance(scheduler_list_val)
-                baseline_model.get_jssp_instance(scheduler_list_val)
+
 
 
                 act_model.init_mask_job_count(num_val)
@@ -304,8 +303,6 @@ def train_model(params, log_path=None):
         else:
             for scheduler in scheduler_list:
                 scheduler.reset()
-
-        act_model.get_jssp_instance(scheduler_list)
 
         if params['gnn'] == True:
             heterogeneous_edges = list()

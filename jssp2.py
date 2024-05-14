@@ -37,6 +37,7 @@ class AdaptiveScheduler:
     def adaptive_run(self, est_holder, fin_holder, i= None):
         estI_list=list()
         gentI_list=list()
+
         for I in range(self.num_job):
             try:
                 gen_tI = int(self.pt[I][self.key_count[I]])
@@ -52,7 +53,9 @@ class AdaptiveScheduler:
                 gen_tI = int(self.pt[I][self.key_count[I]])
                 gen_mI = int(self.ms[I][self.key_count[I]])
                 estI = max(self.j_count[I], self.m_count[gen_mI])
+
                 index_of_one = (est_holder[I] == 1)
+
                 if len(estI_list)>0 and np.max(estI_list)!=0:
                     est_holder[I][index_of_one] = estI/np.max(estI_list)
                     fin_holder[I][index_of_one] = (estI+gen_tI)/np.max(gentI_list)

@@ -248,31 +248,18 @@ class PtrNet1(nn.Module):
         node_features = torch.tensor(node_features).to(device).float()
         pi_list, log_ps = [], []
         log_probabilities = list()
-        enc_h, h_emb, embed, batch, num_operations = self.encoder(node_features, heterogeneous_edges)
+        h_bar, h_emb, embed, batch, num_operations = self.encoder(node_features, heterogeneous_edges)
         h_pi_t_minus_one = self.v_1.unsqueeze(0).repeat(batch, 1).unsqueeze(0).to(device)
 
         mask1_debug, mask2_debug = self.init_mask()
-        ref_temp = enc_h
+
         batch_size = h_pi_t_minus_one.shape[1]
         for i in range(num_operations):
+            est_placeholder = mask1_debug.clone().to(device)
+            fin_placeholder = mask2_debug.clone().to(device)
 
             mask1_debug = mask1_debug.reshape(batch_size, -1)
             mask2_debug = mask2_debug.reshape(batch_size, -1)
-##
-
-            job_count = torch.tensor(self.job_count)
-            mask2 = torch.tensor(deepcopy(self.mask_debug), dtype=torch.float)
-            for b in range(job_count.shape[0]):
-                for k in range(job_count.shape[1]):
-                    try: mask2[b, k, job_count[b, k]] = 1
-                    except IndexError: pass
-
-
-            est_placeholder = mask2.clone().to(device)
-            fin_placeholder = mask2.clone().to(device)
-            mask2 = mask2.view(self.count, -1).to(device)
-            mask0 = torch.tensor(self.mask_debug0, dtype=torch.float).view(self.count, -1).to(device)
-            #print(mask2.shape, mask0.shape)
 
             if i == 0:
                 for nb in range(batch_size): # 하드코딩
@@ -281,9 +268,9 @@ class PtrNet1(nn.Module):
                 for nb in range(batch_size):
                     next_b = next_block[nb].item()
                     scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb], i = next_b)
-            est_placeholder = est_placeholder.reshape(batch, -1).unsqueeze(2)
-            fin_placeholder = fin_placeholder.reshape(batch, -1).unsqueeze(2)
-            ref = torch.concat([ref_temp, est_placeholder, fin_placeholder],dim = 2)
+            est_placeholder = est_placeholder.reshape(batch_size, -1).unsqueeze(2)
+            fin_placeholder = fin_placeholder.reshape(batch_size, -1).unsqueeze(2)
+            ref = torch.concat([h_bar, est_placeholder, fin_placeholder],dim = 2)
             h_c = self.decoder(h_emb, h_pi_t_minus_one)
             query = h_c.squeeze(0)
             query = self.glimpse(query, ref, mask2_debug)
@@ -301,13 +288,7 @@ class PtrNet1(nn.Module):
 
                 mask1_debug, mask2_debug = self.update_mask(next_block.tolist())
 
-                for b_prime in range(len(next_block.tolist())):
-                    job = next_block[b_prime]
-                    self.job_count[b_prime][job] += 1
-                    mask_array = np.array(self.mask_debug0[b_prime][job])
-                    idx = np.where(mask_array == 1)[0]
-                    if idx.size > 0:
-                        self.mask_debug0[b_prime][job][idx[0]] = 0
+
             else:
                 log_p = log_p.squeeze(0)
                 next_block_index = self.block_indices[i].long()
