@@ -3,94 +3,14 @@ import collections
 import numpy as np
 import simpy
 import random
-import matplotlib.pyplot as plt
-import plotly
-import plotly.express as px
 import pandas as pd
 from collections import defaultdict
 import os
 import pickle
 import time
 
-pt_tmp = pd.read_excel("JSP_dataset.xlsx", sheet_name="Processing Time", index_col=[0])
-ms_tmp = pd.read_excel("JSP_dataset.xlsx", sheet_name="Machines Sequence", index_col=[0])
-print()
-
-
-
-"""
-FT10 Problem(Fisher and Thompson, 1963)
-"""
-
-
-class Job:
-    def __init__(self, env, id, job_data):
-        self.env = env
-        self.id = id
-        self.n = len(job_data)
-        self.m = [job_data[i][0] for i in range(len(job_data))]
-        self.d = [job_data[i][1] for i in range(len(job_data))]
-        self.o = [Operation(env, self.id, i, self.m[i], self.d[i]) for i in range(self.n)]
-        self.completed = 0
-        self.scheduled = 0
-        # List to track waiting operations
-        self.finished = env.event()
-        self.execute()
-
-    def execute(self):
-        self.env.process(self.next_operation_ready())
-
-    def next_operation_ready(self):
-        for i in range(self.n):
-            self.o[i].waiting.succeed()
-            yield self.o[i].finished
-        self.finished.succeed()
-
-
-class Operation:
-    def __init__(self, env, job_id, op_id, machine, duration):
-        self.env = env
-        self.job_id = job_id
-        self.op_id = op_id
-        self.machine = machine
-        self.duration = duration
-        self.starting_time = 0.0
-        self.finishing_time = 0.0
-        self.waiting = self.env.event()
-        self.finished = self.env.event()
-
-
-class Machine:
-    def __init__(self, env, id):
-        self.id = id
-        self.env = env
-        self.machine = simpy.Resource(self.env, capacity=1)
-        self.queue = simpy.Store(self.env)
-        self.available_num = 0
-        self.waiting_operations = {}
-        self.availability = self.env.event()
-        self.availability.succeed()
-        self.workingtime_log = []
-        self.execute()
-
-    def execute(self):
-        self.env.process(self.processing())
-
-    def processing(self):
-        while True:
-            op = yield self.queue.get()
-            self.available_num += 1
-            yield self.availability
-            self.availability = self.env.event()
-            yield op.waiting  # waiting이 succeed로 바뀔 떄까지 기다림
-            starting_time = self.env.now
-            op.starting_time = starting_time
-            yield self.env.timeout(op.duration)
-            finishing_time = self.env.now
-            op.finishing_time = finishing_time
-            op.finished.succeed()
-            self.workingtime_log.append((op.job_id, starting_time, finishing_time))
-            self.availability.succeed()
+pt_tmp = pd.read_excel("JSP_dataset.xlsx", sheet_name="Processing Time", index_col=[0], engine = 'openpyxl')
+ms_tmp = pd.read_excel("JSP_dataset.xlsx", sheet_name="Machines Sequence", index_col=[0], engine = 'openpyxl')
 
 
 class AdaptiveScheduler:
@@ -106,9 +26,13 @@ class AdaptiveScheduler:
         self.j_count =   {key: 0 for key in self.j_keys}
         self.m_keys =  [j + 1 for j in range(self.num_mc)]
         self.m_count = {key: 0 for key in self.m_keys}
+        self.mask1 = [[0 for i in range(self.num_mc)] for j in range(self.num_job)]
+        self.mask2 =  [[1 for i in range(self.num_mc)] for j in range(self.num_job)]
+
+
+
 
     def adaptive_run(self, est_holder, fin_holder, i= None):
-
         estI_list=list()
         gentI_list=list()
         for I in range(self.num_job):
@@ -126,7 +50,6 @@ class AdaptiveScheduler:
                 gen_tI = int(self.pt[I][self.key_count[I]])
                 gen_mI = int(self.ms[I][self.key_count[I]])
                 estI = max(self.j_count[I], self.m_count[gen_mI])
-
                 index_of_one = (est_holder[I] == 1)
                 if len(estI_list)>0 and np.max(estI_list)!=0:
                     est_holder[I][index_of_one] = estI/np.max(estI_list)
@@ -136,7 +59,6 @@ class AdaptiveScheduler:
                 gentI_list.append(estI+gen_tI)
             except IndexError:
                 pass
-
         if i != None:
             gen_t = int(self.pt[i][self.key_count[i]])
             gen_m = int(self.ms[i][self.key_count[i]])
@@ -147,8 +69,6 @@ class AdaptiveScheduler:
             elif self.m_count[gen_m] > self.j_count[i]:
                 self.j_count[i] = self.m_count[gen_m]
             self.key_count[i] = self.key_count[i] + 1
-
-
         return est_holder, est_holder
 
     def run(self, sequence):
@@ -193,25 +113,17 @@ class AdaptiveScheduler:
             for o in range(len(job)):
                 ops = job[o]
                 sum_ops_o = [float(job[k][1]) for k in range(0, o+1)]
-                #print([float(job[k][1]) for k in range(0, o+1)])
                 sum_ops_o.append(0)
                 sum_ops_o = sum(sum_ops_o)
                 node_features.append([float(ops[1])/np.max(empty), sum_ops_o/sum_ops, (o+1)/len(job)])
-                #print([float(ops[1])/np.max(empty), sum_ops_o/sum_ops, (o+1)/len(job)])
-                #node_features.append([float(ops[1]) / np.max(empty), sum_ops_o / sum_ops])
-
-                #print([float(ops[1])/np.max(empty), sum_ops_o/sum_ops, (o+1)/len(job)])
         node_features.append([0., 1., 1])
         node_features.append([0., 0., 0])
         return node_features
 
     def get_fully_connected_edge_index(self):
-        #jk = 0
         n = len(self.jobs_data)*len(self.jobs_data)
         rows = [i // n for i in range(n ** 2)]
         cols = [i % n for i in range(n ** 2)]
-    #return [rows, cols]
-
         return [rows, cols]
 
 
@@ -231,8 +143,6 @@ class AdaptiveScheduler:
                         edge_index[0].append(m)
                         edge_index[1].append(m_prime)
         return edge_index
-        # print(machine_sharing)
-        # print(edge_index)
 
 
     def get_edge_index_precedence(self):
