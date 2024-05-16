@@ -107,7 +107,7 @@ def train_model(params, log_path=None):
         b += 1
 
 
-        if s % 20 == 1:
+        if s % 100 == 1:
             for p in problem_list:
                 num_val = 50
                 scheduler_list_val = [AdaptiveScheduler(orb_list[p - 1]) for _ in range(num_val)]
@@ -145,8 +145,8 @@ def train_model(params, log_path=None):
                     vessl.log(step=s, payload={
                         'mean makespan_{}'.format('ORB' + str(p)): (np.mean(val_makespan) / opt_list[p - 1] - 1) * 100})
                 else:
-                    min_makespans.append((np.min(val_makespan) / 944 - 1) * 100)
-                    mean_makespans.append((np.mean(val_makespan) / 944 - 1) * 100)
+                    min_makespans.append((np.min(val_makespan) / opt_list[p - 1] - 1) * 100)
+                    mean_makespans.append((np.mean(val_makespan) / opt_list[p - 1] - 1) * 100)
                     min_m = pd.DataFrame(min_makespans)
                     mean_m = pd.DataFrame(mean_makespans)
                     min_m.to_csv('min_makespan.csv')

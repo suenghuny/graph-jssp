@@ -27,6 +27,13 @@ class Categorical(nn.Module):
         return torch.multinomial(log_p.exp(), 1).long().squeeze(1)
 
 
+class Predictor(nn.Module):
+    def __init_(self):
+        super().__init__()
+        self.fc1 = nn.linear()
+
+
+
 class PtrNet1(nn.Module):
     def __init__(self, params):
         super().__init__()
@@ -242,6 +249,20 @@ class PtrNet1(nn.Module):
         enc_h = enc_h[:, :-2]
         return enc_h, h, embed, batch, block_num
 
+    def branch_and_cut_masking(self, scheduler, mask, i):
+        available_operations = mask
+        avail_nodes = np.array(available_operations)
+        avail_nodes_indices = np.where(avail_nodes == 1)[0].tolist()
+        lower_bound_list = scheduler.get_lower_bound(mask)
+        makespan_list = scheduler.rollout_run(i, mask)
+        for i in range(len(avail_nodes_indices)):
+            k = avail_nodes_indices[i]
+            if lower_bound_list[i]>=makespan_list[i]:
+                mask[k] = 0
+        return mask
+
+
+
 
     def forward(self, x, device, scheduler_list, y=None, greedy = False):
         node_features, heterogeneous_edges = x
@@ -257,25 +278,33 @@ class PtrNet1(nn.Module):
         for i in range(num_operations):
             est_placeholder = mask1_debug.clone().to(device)
             fin_placeholder = mask2_debug.clone().to(device)
-
             mask1_debug = mask1_debug.reshape(batch_size, -1)
             mask2_debug = mask2_debug.reshape(batch_size, -1)
 
             if i == 0:
                 for nb in range(batch_size): # 하드코딩
-                    #earliest_start_time, earliest_finish_time = scheduler_list[nb].get_earliest_start_and_finish_time(mask1_debug[nb].cpu().numpy())
                     scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb])
-            else:
+                    mask = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i)
+                    if 1 not in mask:
+                        pass
+                    else:
+                        mask1_debug[nb, :] = torch.tensor(mask).to(device)
 
+            else:
                 for nb in range(batch_size):
                     k = next_block_index[nb].item()
                     scheduler_list[nb].add_selected_operation(k)
-                    #earliest_start_time, earliest_finish_time = scheduler_list[nb].get_earliest_start_and_finish_time(mask1_debug[nb].cpu().numpy())
-                    #print(earliest_start_time.shape, earliest_finish_time.shape)
-
                     next_b = next_block[nb].item()
                     scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb], i = next_b)
-
+                    mask = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i)
+                    if 1 not in mask:pass
+                    else:
+                        mask1_debug[nb, :] = torch.tensor(mask).to(device)
+                    #print(mask1_debug[nb, :])
+                    # if not np.array_equal(past, mask1_debug[nb, :].cpu().numpy()):
+                    #     print("ㅋㅋㅋ")
+            est_placeholder = est_placeholder.reshape(batch_size, -1)*mask1_debug
+            fin_placeholder = fin_placeholder.reshape(batch_size, -1) * mask1_debug
 
             est_placeholder = est_placeholder.reshape(batch_size, -1).unsqueeze(2)
             fin_placeholder = fin_placeholder.reshape(batch_size, -1).unsqueeze(2)

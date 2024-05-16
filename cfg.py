@@ -7,7 +7,7 @@ def get_cfg():
     parser.add_argument("--log_step", type=int, default=10, help="")
 
     parser.add_argument("--save_step", type=int, default=40, help="")
-    parser.add_argument("--batch_size", type=int, default=12, help="")
+    parser.add_argument("--batch_size", type=int, default=8, help="")
     parser.add_argument("--C", type=float, default=10, help="")
     parser.add_argument("--T", type=float, default=1.0, help="")
     parser.add_argument("--iteration", type=int, default=2, help="")

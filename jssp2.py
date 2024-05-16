@@ -25,9 +25,6 @@ class GraphVisualizer:
         self.edge_labels = None
         self._create_disjunctive_graph()
 
-    def rollout_heuristic(self):
-        self.G_rollout = deepcopy(self.G)
-
     def _create_disjunctive_graph(self):
         dummy_start = 'Start'
         dummy_end = 'End'
@@ -83,7 +80,6 @@ class GraphVisualizer:
         earliest_finish_time = earliest_finish_time / np.max(fin_list)
 
         return earliest_start_time, earliest_finish_time
-        #print(avail_nodes_indices)
 
 
 
@@ -104,12 +100,21 @@ class GraphVisualizer:
         for k_prime in machine_sharing_operation:
             if k != k_prime:
                 self.G.add_edge(k, k_prime, weight=-1*processing_time)
-
-        #print(self.flattend_machine_sequence_list)
         if k in self.flattend_machine_sequence_list[m]:
             self.flattend_machine_sequence_list[m].remove(k)
 
-
+    def get_lower_bound(self, k):
+        m = self.flattend_machine_allocation_dict[k]
+        machine_sharing_operation = self.flattend_machine_sequence_list[m]
+        processing_time = self.flattend_processing_time_dict[k]
+        for k_prime in machine_sharing_operation:
+            if k != k_prime:
+                self.G.add_edge(k, k_prime, weight=-1*processing_time)
+        longest_path = -1*self.get_longest_path(k, 'End')
+        for k_prime in machine_sharing_operation:
+            if k != k_prime:
+                self.G.remove_edge(k, k_prime)
+        return longest_path
 
 
     def show(self):
@@ -124,7 +129,7 @@ class AdaptiveScheduler:
     def __init__(self, input_data):
         self.jobs_data = input_data
         self.input_data = input_data
-        self.num_mc = len(self.input_data)   # number of machines
+        self.num_mc = len(self.input_data[0])   # number of machines
         self.num_job = len(self.input_data)  # number of jobs
         self.pt = [[ops[1] for ops in job] for job in self.input_data] # processing_time
         self.ms = [[ops[0]+1 for ops in job] for job in self.input_data] # job 별 machine sequence
@@ -133,9 +138,19 @@ class AdaptiveScheduler:
         self.j_count = {key: 0 for key in self.j_keys}
         self.m_keys =  [j + 1 for j in range(self.num_mc)]
         self.m_count = {key: 0 for key in self.m_keys}
+        self.num_ops = self.num_job*self.num_mc
+
+        self.job_id_ops = list()
+        j = 0
+        for job in self.input_data:
+            for ops in job:
+                self.job_id_ops.append(j)
+            j+=1
+
+
+
         self.mask1 =  [[0 for _ in range(self.num_mc)] for _ in range(self.num_job)]
         self.mask2 =  [[1 for _ in range(self.num_mc)] for _ in range(self.num_job)]
-
         data = self.pt
         self.graph = GraphVisualizer((data, self.ms))
 
@@ -152,10 +167,34 @@ class AdaptiveScheduler:
     def get_earliest_start_and_finish_time(self, available_operations):
         earliest_start_time, earliest_finish_time = self.graph.get_earliest_start_and_finish_time(available_operations)
         return earliest_start_time, earliest_finish_time
+
+    def get_lower_bound(self, available_operations):
+        avail_nodes = np.array(available_operations)
+        avail_nodes_indices = np.where(avail_nodes == 1)[0].tolist()
+        lower_bound_list = list()
+        for k_prime in avail_nodes_indices:
+            lower_bound = self.graph.get_lower_bound(k_prime)
+            lower_bound_list.append(lower_bound)
+        return lower_bound_list
+
     def adaptive_run(self, est_holder, fin_holder, i= None):
-        estI_list=list()
-        gentI_list=list()
-        for I in range(self.num_job):
+        if i != None:                                         # 이전 스텝에서 선택된 Job(Operation)에 대한 update
+            try:
+                gen_t = int(self.pt[i][self.key_count[i]])        # 선택된 operation에 대한 processing time 선택
+                gen_m = int(self.ms[i][self.key_count[i]])        # 선택된 operation에 대한 machine_sequence 선택
+                self.j_count[i] = self.j_count[i] + gen_t          # Job i에 대한 누적 작업 완료시간 업데이트
+                self.m_count[gen_m] = self.m_count[gen_m] + gen_t  # Machine gen_m에 대한 누적 작업 완료시간 업데이트
+                if self.m_count[gen_m] < self.j_count[i]:
+                    self.m_count[gen_m] = self.j_count[i]
+                elif self.m_count[gen_m] > self.j_count[i]:
+                    self.j_count[i] = self.m_count[gen_m]          # if 및 elif 문은 각각의 누적 작업 완료시간을 큰 녀석으로 업데이트 한다는 의미
+                self.key_count[i] = self.key_count[i] + 1          # 해당 Job이 몇번 선택되었는지 count하는 것 업데이트
+            except IndexError:
+                pass
+
+        estI_list = list()
+        gentI_list = list()
+        for I in range(self.num_job): # 아직 선택되지 않은 녀석들(선택될 가능성이 있는 애들)에 대한 이야기
             try:
                 gen_tI = int(self.pt[I][self.key_count[I]])
                 gen_mI = int(self.ms[I][self.key_count[I]])
@@ -164,7 +203,6 @@ class AdaptiveScheduler:
                 gentI_list.append(estI+gen_tI)
             except IndexError:
                 pass
-
         for I in range(self.num_job):
             try:
                 gen_tI = int(self.pt[I][self.key_count[I]])
@@ -179,19 +217,57 @@ class AdaptiveScheduler:
                 gentI_list.append(estI+gen_tI)
             except IndexError:
                 pass
-        if i != None:
-            gen_t = int(self.pt[i][self.key_count[i]])
-            gen_m = int(self.ms[i][self.key_count[i]])
-            self.j_count[i] = self.j_count[i] + gen_t
-            self.m_count[gen_m] = self.m_count[gen_m] + gen_t
-            if self.m_count[gen_m] < self.j_count[i]:
-                self.m_count[gen_m] = self.j_count[i]
-            elif self.m_count[gen_m] > self.j_count[i]:
-                self.j_count[i] = self.m_count[gen_m]
-            self.key_count[i] = self.key_count[i] + 1
 
-        #print(est_holder.shape)
-        # return est_holder, est_holder
+
+
+    def rollout_run(self, t_th, available_operations):
+        avail_nodes = np.array(available_operations)
+        avail_nodes_indices = np.where(avail_nodes == 1)[0].tolist()
+        makespan_list = list()
+        for k_prime in avail_nodes_indices:
+            i_prime = self.job_id_ops[k_prime]
+            key_count = deepcopy(self.key_count)
+            j_count = deepcopy(self.j_count)
+            m_count = deepcopy(self.m_count)
+            if i_prime != None:                                         # 이전 스텝에서 선택된 Job(Operation)에 대한 update
+                try:
+                    gen_t = int(self.pt[i_prime][key_count[i_prime]])        # 선택된 operation에 대한 processing time 선택
+                    gen_m = int(self.ms[i_prime][key_count[i_prime]])        # 선택된 operation에 대한 machine_sequence 선택
+                    j_count[i_prime] = j_count[i_prime] + gen_t          # Job i에 대한 누적 작업 완료시간 업데이트
+                    m_count[gen_m] = m_count[gen_m] + gen_t  # Machine gen_m에 대한 누적 작업 완료시간 업데이트
+                    if m_count[gen_m] < j_count[i_prime]:
+                        m_count[gen_m] = j_count[i_prime]
+                    elif m_count[gen_m] > j_count[i_prime]:
+                        j_count[i_prime] = m_count[gen_m]          # if 및 elif 문은 각각의 누적 작업 완료시간을 큰 녀석으로 업데이트 한다는 의미
+                    key_count[i_prime] = key_count[i_prime] + 1
+                except IndexError:pass
+
+            for _ in range(self.num_ops-t_th-1):
+                pt_list = list()
+                for i in range(self.num_job):
+                    try:
+                        pt = self.pt[i][key_count[i]]
+                        pt_list.append(pt)
+                    except IndexError as IE:
+                        pt_list.append(float('inf'))
+
+                if len(pt_list)>0:
+                    i = np.argmin(pt_list)
+                    gen_t = int(self.pt[i][key_count[i]])
+                    gen_m = int(self.ms[i][key_count[i]])
+                    j_count[i] = j_count[i] + gen_t
+                    m_count[gen_m] = m_count[gen_m] + gen_t
+                    if m_count[gen_m] < j_count[i]:
+                        m_count[gen_m] = j_count[i]
+                    elif m_count[gen_m] > j_count[i]:
+                        j_count[i] = m_count[gen_m]
+                    key_count[i] = key_count[i] + 1
+
+
+            makespan = max(j_count.values())
+            makespan_list.append(makespan)
+        return makespan_list
+
 
     def run(self, sequence):
         for i in sequence:
