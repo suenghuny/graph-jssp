@@ -112,7 +112,6 @@ def train_model(params, log_path=None):
                 num_val = 50
                 scheduler_list_val = [AdaptiveScheduler(orb_list[p - 1]) for _ in range(num_val)]
                 val_makespan = list()
-
                 act_model.get_jssp_instance(scheduler_list_val)
                 baseline_model.get_jssp_instance(scheduler_list_val)
 
@@ -194,7 +193,7 @@ def train_model(params, log_path=None):
             makespan = -scheduler.run(sequence.tolist()) / params['reward_scaler']
             real_makespan.append(makespan)
             c_max.append(makespan)
-
+        # print(real_makespan)
         ave_makespan += sum(real_makespan) / (params["batch_size"] * params["log_step"])
         """
 
