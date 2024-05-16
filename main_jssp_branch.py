@@ -34,7 +34,7 @@ opt_list = [1059, 888, 1005, 1005, 887, 1010, 397, 899, 934, 944]
 orb_list = []
 for i in ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10']:
     df = pd.read_excel("orb.xlsx", sheet_name=i, engine='openpyxl')
-    orb_data = list()
+    orb_data = list()#
     for row, column in df.iterrows():
         job = []
         for j in range(0, len(column.tolist()), 2):
