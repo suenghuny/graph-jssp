@@ -255,39 +255,30 @@ class PtrNet1(nn.Module):
 
         batch_size = h_pi_t_minus_one.shape[1]
         for i in range(num_operations):
+            est_placeholder = mask1_debug.clone().to(device)
+            fin_placeholder = mask2_debug.clone().to(device)
+
             mask1_debug = mask1_debug.reshape(batch_size, -1)
             mask2_debug = mask2_debug.reshape(batch_size, -1)
-            earliest_start_time_tensor = torch.zeros_like(mask1_debug)
-            earliest_finish_time_tensor = torch.zeros_like(mask2_debug)
+
             if i == 0:
                 for nb in range(batch_size): # 하드코딩
-                    earliest_start_time, earliest_finish_time = scheduler_list[nb].get_earliest_start_and_finish_time(mask1_debug[nb].cpu().numpy())
-
-                    earliest_start_time_tensor[nb, :] = torch.tensor(earliest_start_time).to(device)
-                    earliest_finish_time_tensor[nb, :] = torch.tensor(earliest_finish_time).to(device)
-
-
-                    # scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb])
-                    # print("전",est_placeholder[nb])
-                    # print("후", torch.tensor(earliest_start_time).to(device))
-                    #print(earliest_start_time_tensor.shape, est_placeholder.shape)
+                    #earliest_start_time, earliest_finish_time = scheduler_list[nb].get_earliest_start_and_finish_time(mask1_debug[nb].cpu().numpy())
+                    scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb])
             else:
+
                 for nb in range(batch_size):
                     k = next_block_index[nb].item()
                     scheduler_list[nb].add_selected_operation(k)
-                    earliest_start_time, earliest_finish_time = scheduler_list[nb].get_earliest_start_and_finish_time(mask1_debug[nb].cpu().numpy())
-
-                    earliest_start_time_tensor[nb,:] = torch.tensor(earliest_start_time).to(device)
-                    earliest_finish_time_tensor[nb,:] = torch.tensor(earliest_finish_time).to(device)
-
+                    #earliest_start_time, earliest_finish_time = scheduler_list[nb].get_earliest_start_and_finish_time(mask1_debug[nb].cpu().numpy())
                     #print(earliest_start_time.shape, earliest_finish_time.shape)
 
-                    # next_b = next_block[nb].item()
-                    # scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb], i = next_b)
+                    next_b = next_block[nb].item()
+                    scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb], i = next_b)
 
 
-            est_placeholder = earliest_start_time_tensor.unsqueeze(2)
-            fin_placeholder = earliest_finish_time_tensor.unsqueeze(2)
+            est_placeholder = est_placeholder.reshape(batch_size, -1).unsqueeze(2)
+            fin_placeholder = fin_placeholder.reshape(batch_size, -1).unsqueeze(2)
             ref = torch.concat([h_bar, est_placeholder, fin_placeholder],dim = 2)
             h_c = self.decoder(h_emb, h_pi_t_minus_one)
             query = h_c.squeeze(0)
@@ -308,10 +299,9 @@ class PtrNet1(nn.Module):
             pi_list.append(next_block)
 
         for nb in range(batch_size):
-            # k = next_block_index[nb].item()
-            # scheduler_list[nb].add_selected_operation(k)
-            makespan = scheduler_list[nb].get_longest_path()
-            #print(makespan)
+            k = next_block_index[nb].item()
+            scheduler_list[nb].add_selected_operation(k)
+            #makespan = scheduler_list[nb].get_longest_path()
 
         pi = torch.stack(pi_list, dim=1)
         log_probabilities = torch.stack(log_probabilities, dim=1)
