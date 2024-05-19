@@ -100,6 +100,24 @@ def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=Non
     return np.min(val_makespan), np.mean(val_makespan)
 
 
+def load_checkpoint(act_model, filepath):
+    checkpoint = torch.load(filepath)
+
+    # epoch를 로드
+    epoch = checkpoint['epoch']
+
+    # 모델의 state_dict를 로드
+    act_model.load_state_dict(checkpoint['model_state_dict_actor'])
+
+    # 옵티마이저의 state_dict를 로드
+
+    # 기타 정보 로드
+    ave_act_loss = checkpoint['ave_act_loss']
+    ave_cri_loss = checkpoint['ave_cri_loss']
+    ave_makespan = checkpoint['ave_makespan']
+
+    return epoch, ave_act_loss, ave_cri_loss, ave_makespan
+
 def train_model(params, log_path=None):
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     date = datetime.now().strftime('%m%d_%H_%M')
@@ -113,6 +131,7 @@ def train_model(params, log_path=None):
     ave_cri_loss = 0.0
 
     act_model = PtrNet1(params).to(device)
+    load_checkpoint(act_model = act_model, filepath="result\\model\\ppo\\0518_09_20_step6081_act.pt")
     baseline_model = PtrNet1(params).to(device)
     baseline_model.load_state_dict(act_model.state_dict())
     if params["optimizer"] == 'Adam':
@@ -151,7 +170,7 @@ def train_model(params, log_path=None):
                 eval_number = 2
                 min_makespan, mean_makespan = evaluation(act_model, baseline_model, p, eval_number, device) # upperbound를 확인 하기 위해 2번을 임의로 돌린다.
 
-                eval_number = 50
+                eval_number = 200
                 min_makespan_list = [min_makespan] * eval_number
                 min_makespan, mean_makespan = evaluation(act_model, baseline_model, p, eval_number, device,
                                                          upperbound=min_makespan_list)

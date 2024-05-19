@@ -59,6 +59,7 @@ class GraphVisualizer:
         self.pos[dummy_end] = (len(self.processing_time)+2, len(processing_time_list)/2)
         self.edge_labels = {(u, v): d['weight'] for u, v, d in self.G.edges(data=True)}
 
+
     def get_earliest_start_and_finish_time(self, available_operations):
         avail_nodes = np.array(available_operations)
         avail_nodes_indices = np.where(avail_nodes == 1)[0]
@@ -88,8 +89,8 @@ class GraphVisualizer:
         try:
             shortest_path_length = nx.bellman_ford_path_length(self.G, source=fm, target=to, weight='weight')
             return shortest_path_length
-        except nx.NetworkXNoPath:
-            return None
+        except:
+            self.show()
 
 
 
@@ -110,7 +111,9 @@ class GraphVisualizer:
         for k_prime in machine_sharing_operation:
             if k != k_prime:
                 self.G.add_edge(k, k_prime, weight=-1*processing_time)
-        longest_path = -1*self.get_longest_path(k, 'End')
+
+
+        longest_path = -1*self.get_longest_path('Start', 'End')
         for k_prime in machine_sharing_operation:
             if k != k_prime:
                 self.G.remove_edge(k, k_prime)
@@ -130,7 +133,7 @@ class AdaptiveScheduler:
         self.jobs_data = input_data
         self.input_data = input_data
         self.num_mc = len(self.input_data[0])   # number of machines
-        self.num_job = len(self.input_data)  # number of jobs
+        self.num_job = len(self.input_data)     # number of jobs
         self.pt = [[ops[1] for ops in job] for job in self.input_data] # processing_time
         self.ms = [[ops[0]+1 for ops in job] for job in self.input_data] # job 별 machine sequence
         self.j_keys = [j for j in range(self.num_job)]
@@ -168,10 +171,9 @@ class AdaptiveScheduler:
         earliest_start_time, earliest_finish_time = self.graph.get_earliest_start_and_finish_time(available_operations)
         return earliest_start_time, earliest_finish_time
 
-    def get_lower_bound(self, available_operations):
-        avail_nodes = np.array(available_operations)
-        avail_nodes_indices = np.where(avail_nodes == 1)[0].tolist()
+    def get_lower_bound(self, avail_nodes_indices):
         lower_bound_list = list()
+        #print(avail_nodes_indices)
         for k_prime in avail_nodes_indices:
             lower_bound = self.graph.get_lower_bound(k_prime)
             lower_bound_list.append(lower_bound)
@@ -220,9 +222,7 @@ class AdaptiveScheduler:
 
 
 
-    def rollout_run(self, t_th, available_operations):
-        avail_nodes = np.array(available_operations)
-        avail_nodes_indices = np.where(avail_nodes == 1)[0].tolist()
+    def rollout_run(self, t_th, avail_nodes_indices):
         makespan_list = list()
         for k_prime in avail_nodes_indices:
             i_prime = self.job_id_ops[k_prime]
@@ -284,18 +284,27 @@ class AdaptiveScheduler:
         return makespan
 
     def reset(self):
-        self.num_mc = len(self.input_data)   # number of machines
-        self.num_job = len(self.input_data)  # number of jobs
+        self.num_mc = len(self.input_data[0])   # number of machines
+        self.num_job = len(self.input_data)     # number of jobs
         self.pt = [[ops[1] for ops in job] for job in self.input_data] # processing_time
         self.ms = [[ops[0]+1 for ops in job] for job in self.input_data] # job 별 machine sequence
         self.j_keys = [j for j in range(self.num_job)]
         self.key_count = {key: 0 for key in self.j_keys}
-        self.j_count =   {key: 0 for key in self.j_keys}
+        self.j_count = {key: 0 for key in self.j_keys}
         self.m_keys =  [j + 1 for j in range(self.num_mc)]
         self.m_count = {key: 0 for key in self.m_keys}
+        self.num_ops = self.num_job*self.num_mc
+        self.job_id_ops = list()
+        j = 0
+        for job in self.input_data:
+            for ops in job:
+                self.job_id_ops.append(j)
+            j+=1
+        self.mask1 =  [[0 for _ in range(self.num_mc)] for _ in range(self.num_job)]
+        self.mask2 =  [[1 for _ in range(self.num_mc)] for _ in range(self.num_job)]
+        data = self.pt
+        self.graph = GraphVisualizer((data, self.ms))
 
-        self.mask1 = [[0 for i in range(self.num_mc)] for j in range(self.num_job)]
-        self.mask2 = [[1 for i in range(self.num_mc)] for j in range(self.num_job)]
 
     def get_node_feature(self):
         node_features = []
@@ -382,5 +391,4 @@ class AdaptiveScheduler:
                     edge_index[0].append(jk-1)
                     edge_index[1].append(jk)
                     jk += 1
-        #print(edge_index)
         return edge_index

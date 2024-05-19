@@ -5,7 +5,6 @@ def get_cfg():
     parser.add_argument("--vessl", type=bool, default=False, help="vessl AI 사용여부")
     parser.add_argument("--step", type=int, default=400001, help="")
     parser.add_argument("--log_step", type=int, default=10, help="")
-
     parser.add_argument("--save_step", type=int, default=40, help="")
     parser.add_argument("--batch_size", type=int, default=8, help="")
     parser.add_argument("--C", type=float, default=10, help="")
@@ -27,7 +26,7 @@ def get_cfg():
     parser.add_argument("--entropy_weight", type=float, default=0.00001, help="")
     parser.add_argument("--reward_scaler", type=float, default=15, help="")
     parser.add_argument("--n_multi_head", type=int, default=2, help="")
-    parser.add_argument("--k_hop", type=int, default=4, help="")
+    parser.add_argument("--k_hop", type=int, default=2, help="")
     parser.add_argument("--dot_product", type=bool, default=True, help="")
     parser.add_argument("--interval", type=int, default=40, help="")
     parser.add_argument("--fully_connected", type=bool, default=False, help="")

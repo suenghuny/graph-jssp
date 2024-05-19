@@ -82,7 +82,6 @@ class PtrNet1(nn.Module):
             self.W_ref =[nn.Linear(augmented_hidden_size+2,augmented_hidden_size, bias=False).to(device) for _ in range(self.n_multi_head)]
             self.W_ref_weights = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_ref])
             self.W_ref_biases = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_ref])
-
             self.Vec3 = [nn.Parameter(torch.FloatTensor(augmented_hidden_size+2, augmented_hidden_size)) for _ in range(self.n_multi_head)]
             self.Vec3 = nn.ParameterList(self.Vec3)
             self.W_q3 = [nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False).to(device)  for _ in range(self.n_multi_head)]
@@ -91,7 +90,6 @@ class PtrNet1(nn.Module):
             self.W_ref3 =[nn.Linear(augmented_hidden_size+2,augmented_hidden_size, bias=False).to(device) for _ in range(self.n_multi_head)]
             self.W_ref_weights3 = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_ref3])
             self.W_ref_biases3 = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_ref3])
-
             self.Vec4 = [nn.Parameter(torch.FloatTensor(augmented_hidden_size+2, augmented_hidden_size)) for _ in range(self.n_multi_head)]
             self.Vec4 = nn.ParameterList(self.Vec4)
             self.W_q4 = [nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False).to(device)  for _ in range(self.n_multi_head)]
@@ -100,9 +98,6 @@ class PtrNet1(nn.Module):
             self.W_ref4 =[nn.Linear(augmented_hidden_size+2,augmented_hidden_size, bias=False).to(device) for _ in range(self.n_multi_head)]
             self.W_ref_weights4 = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_ref4])
             self.W_ref_biases4 = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_ref4])
-
-
-
             self.Vec2 = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
             self.W_q2 = nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False)
             self.W_ref2 = nn.Linear(augmented_hidden_size+2,augmented_hidden_size, bias=False)
@@ -124,19 +119,11 @@ class PtrNet1(nn.Module):
             self.n_glimpse = params["n_glimpse"]
             self.h_act = nn.ReLU()
             # self.mask = [[[0 for i in range(params['num_machine'])] for j in range(params['num_jobs'])] for _ in range(params['batch_size'])]
-            self.block_indices = []
-            self.block_selecter = Categorical()  # {'greedy': Greedy(), 'sampling': Categorical()}.get(params["decode_type"], None)
-            self.block_selecter_greedy = Greedy()
+            self.operation_indices = []
+            self.job_selecter = Categorical()
             self.last_block_index = 0
             self.params = params
-            self.sample_space = [[j for i in range(params['num_machine'])] for j in range(params['num_jobs'])]
-            self.sample_space = torch.tensor(self.sample_space).view(-1)
 
-            self.mask_debug = [[[0 for i in range(params['num_machine'])] for j in range(params['num_jobs'])] for _ in range(params['batch_size'])]
-            self.mask_debug0 = [[[1 for i in range(params['num_machine'])] for j in range(params['num_jobs'])] for _ in range(params['batch_size'])]
-
-            self.job_count = [[0 for j in range(params['num_jobs'])] for _ in range(params['batch_size'])]
-            self.dummy_job_count = deepcopy(self.job_count)
 
 
 
@@ -163,12 +150,7 @@ class PtrNet1(nn.Module):
             instance = self.instance[idx]
             for i in range(len(instance.mask1)):
                 instance.mask1[i][0] = 1
-
             mask1[idx] = torch.tensor(instance.mask1).to(device)
-
-
-
-
             mask2[idx] = torch.tensor(instance.mask2).to(device)
         return mask1, mask2
 
@@ -207,137 +189,159 @@ class PtrNet1(nn.Module):
             nn.init.uniform_(param.data, init_min, init_max)
 
     def encoder(self, node_features, heterogeneous_edges):
-
         batch = node_features.shape[0]
-        block_num = node_features.shape[1]-2
+        operation_num = node_features.shape[1]-2
         node_num = node_features.shape[1]
         node_reshaped_features = node_features.reshape(batch * node_num, -1)
-
         node_embedding = self.Embedding(node_reshaped_features)
         node_embedding = node_embedding.reshape(batch, node_num, -1)
-        if cfg.gnn_type == 'gcrl':
-            if cfg.k_hop == 1:
-                enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
-            if cfg.k_hop == 2:
-                enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
-                enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True, final = True)
-            if cfg.k_hop == 3:
-                enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
-                enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
-                enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True, final = True)
-            if cfg.k_hop == 4:
-                enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
-                enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
-                enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
-                enc_h = self.GraphEmbedding3(heterogeneous_edges, enc_h, mini_batch=True, final = True)
-            if cfg.k_hop == 5:
-                enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
-                enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
-                enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
-                enc_h = self.GraphEmbedding3(heterogeneous_edges, enc_h, mini_batch=True)
-        else:
 
-            batch = node_embedding.shape[0]
-            enc_h = list()
-            for b in range(batch):
-                A = self.get_heterogeneous_adjacency_matrix(heterogeneous_edges[b][0], heterogeneous_edges[b][1], heterogeneous_edges[b][2],n_node_features=102)
-                enc = self.GraphEmbedding(A, node_embedding[b])
-                enc_h.append(enc)
-            enc_h =torch.stack(enc_h, dim = 0)
+        if cfg.k_hop == 1:
+            enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
+        if cfg.k_hop == 2:
+            enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
+            enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True, final = True)
+        if cfg.k_hop == 3:
+            enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
+            enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
+            enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True, final = True)
+        if cfg.k_hop == 4:
+            enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
+            enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
+            enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
+            enc_h = self.GraphEmbedding3(heterogeneous_edges, enc_h, mini_batch=True, final = True)
+        if cfg.k_hop == 5:
+            enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
+            enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
+            enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
+            enc_h = self.GraphEmbedding3(heterogeneous_edges, enc_h, mini_batch=True)
+
         embed = enc_h.size(2)
-        h = enc_h.mean(dim = 1).unsqueeze(0)
-        enc_h = enc_h[:, :-2]
-        return enc_h, h, embed, batch, block_num
+        h = enc_h.mean(dim = 1).unsqueeze(0) # 모든 node embedding에 대한 평균을 낸다.
+        enc_h = enc_h[:, :-2]                # dummy node(source, sink)는 제외한다.
+        return enc_h, h, embed, batch, operation_num
 
-    def branch_and_cut_masking(self, scheduler, mask, i):
+    def branch_and_cut_masking(self, scheduler, mask, i, upperbound):
         available_operations = mask
         avail_nodes = np.array(available_operations)
-        avail_nodes_indices = np.where(avail_nodes == 1)[0].tolist()
-        lower_bound_list = scheduler.get_lower_bound(mask)
-        makespan_list = scheduler.rollout_run(i, mask)
+        avail_nodes_indices = np.where(avail_nodes == 1)[0].tolist() # 현재 시점에 가능한 operation들의 모임이다.
+        lower_bound_list = scheduler.get_lower_bound(avail_nodes_indices) # 해당 opeartion을 선택했을 때의 lower bound 구하기
+        if upperbound == None: # upperbound가 없을 수도 있음(첫번쨰 rollout 할때)
+            makespan_list = scheduler.rollout_run(i, avail_nodes_indices) # 그때는 SPT로 rollout 한번 해본다.
         for i in range(len(avail_nodes_indices)):
             k = avail_nodes_indices[i]
-            if lower_bound_list[i]>=makespan_list[i]:
+            if upperbound == None:
+                upperbound = np.min(makespan_list)
+            else:
+                upperbound = upperbound
+            if lower_bound_list[i] >= upperbound: # 해당 operation을 선택했을 때, upperbound보다 크다는 건 해볼 가치가 없다고 볼 수 있음. 그래서 masking함
                 mask[k] = 0
         return mask
 
 
 
 
-    def forward(self, x, device, scheduler_list, y=None, greedy = False):
+    def forward(self, x, device, scheduler_list, num_job, num_machine, upperbound= None):
         node_features, heterogeneous_edges = x
         node_features = torch.tensor(node_features).to(device).float()
         pi_list, log_ps = [], []
         log_probabilities = list()
-        h_bar, h_emb, embed, batch, num_operations = self.encoder(node_features, heterogeneous_edges)
+        sample_space = [[j for i in range(num_machine)] for j in range(num_job)]
+        sample_space = torch.tensor(sample_space).view(-1)
+
+        h_bar, h_emb, embed, batch, num_operations = \
+            self.encoder(node_features, heterogeneous_edges)
         h_pi_t_minus_one = self.v_1.unsqueeze(0).repeat(batch, 1).unsqueeze(0).to(device)
 
-        mask1_debug, mask2_debug = self.init_mask()
 
+
+        mask1_debug, mask2_debug = self.init_mask()
         batch_size = h_pi_t_minus_one.shape[1]
         for i in range(num_operations):
             est_placeholder = mask1_debug.clone().to(device)
             fin_placeholder = mask2_debug.clone().to(device)
             mask1_debug = mask1_debug.reshape(batch_size, -1)
             mask2_debug = mask2_debug.reshape(batch_size, -1)
-
             if i == 0:
-                for nb in range(batch_size): # 하드코딩
+                """
+                Earliest Start Time (est_placeholder)
+                Earliest Finish Time (fin_placeholder) 확인하는 로직
+                i == 0일 때는 아직 선택된 operation이 없으므로,
+                adaptive_run에 선택된 변수(i)에 대한 정보가 없음
+                
+                """
+                for nb in range(batch_size):
                     scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb])
-                    mask = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i)
+                    if upperbound != None:
+                        ub = upperbound[nb]
+                    else:
+                        ub = upperbound
+                    """
+                    Branch and Cut 로직에 따라 masking을 수행함
+                    모두 다 masking 처리할 수도 있으므로, 모두다 masking할 경우에는 mask로 복원 (if 1 not in mask)
+                    """
+                    mask = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub)
                     if 1 not in mask:
                         pass
                     else:
                         mask1_debug[nb, :] = torch.tensor(mask).to(device)
 
             else:
+                """
+                Earliest Start Time (est_placeholder)
+                Earliest Finish Time (fin_placeholder) 확인하는 로직
+                i == 0일 때는 아직 선택된 operation이 없으므로,
+                adaptive_run에 선택된 변수(i)에 대한 정보는 이전에 선택된 index(next_operation_index)에서 추출
+
+                """
                 for nb in range(batch_size):
-                    k = next_block_index[nb].item()
-                    scheduler_list[nb].add_selected_operation(k)
+                    k = next_operation_index[nb].item()
+                    scheduler_list[nb].add_selected_operation(k) # 그림으로 설명 예정
                     next_b = next_block[nb].item()
                     scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb], i = next_b)
-                    mask = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i)
+                    if upperbound != None:
+                        ub = upperbound[nb]
+                    else:
+                        ub = upperbound
+                    mask = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub)
+                    """
+                    Branch and Cut 로직에 따라 masking을 수행함
+                    모두 다 masking 처리할 수도 있으므로, 모두다 masking할 경우에는 mask로 복원 (if 1 not in mask)
+                    
+                    """
+
                     if 1 not in mask:pass
                     else:
                         mask1_debug[nb, :] = torch.tensor(mask).to(device)
-                    #print(mask1_debug[nb, :])
-                    # if not np.array_equal(past, mask1_debug[nb, :].cpu().numpy()):
-                    #     print("ㅋㅋㅋ")
+
             est_placeholder = est_placeholder.reshape(batch_size, -1)*mask1_debug
             fin_placeholder = fin_placeholder.reshape(batch_size, -1) * mask1_debug
-
             est_placeholder = est_placeholder.reshape(batch_size, -1).unsqueeze(2)
             fin_placeholder = fin_placeholder.reshape(batch_size, -1).unsqueeze(2)
-            ref = torch.concat([h_bar, est_placeholder, fin_placeholder],dim = 2)
-            h_c = self.decoder(h_emb, h_pi_t_minus_one)
-            query = h_c.squeeze(0)
-            query = self.glimpse(query, ref, mask2_debug)
-            logits = self.pointer(query, ref, mask1_debug)
-            log_p = torch.log_softmax(logits / self.T, dim=-1)
+            ref = torch.concat([h_bar, est_placeholder, fin_placeholder],dim = 2) # additional information 만드는 부분
 
-            if greedy == False:
-                next_block_index = self.block_selecter(log_p)
-            else:
-                next_block_index = self.block_selecter_greedy(log_p)
-            log_probabilities.append(log_p.gather(1, next_block_index.unsqueeze(1)))
-            self.block_indices.append(next_block_index)
-            sample_space = self.sample_space.to(device)
-            next_block = sample_space[next_block_index].to(device)
+            h_c = self.decoder(h_emb, h_pi_t_minus_one) # decoding 만드는 부분
+            query = h_c.squeeze(0)
+            query = self.glimpse(query, ref, mask2_debug) # multi-head attention 부분
+            logits = self.pointer(query, ref, mask1_debug) # logit 구하는 부분
+            log_p = torch.log_softmax(logits / self.T, dim=-1) # log_softmax로 구하는 부분
+
+            next_operation_index = self.job_selecter(log_p)
+            log_probabilities.append(log_p.gather(1, next_operation_index.unsqueeze(1)))
+            self.operation_indices.append(next_operation_index)
+            sample_space = sample_space.to(device)
+            next_block = sample_space[next_operation_index].to(device)
             mask1_debug, mask2_debug = self.update_mask(next_block.tolist())
-            h_pi_t_minus_one = torch.gather(input=h_bar, dim=1, index=next_block_index.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, embed)).squeeze(1).unsqueeze(0)  # 다음 sequence의 input은 encoder의 output 중에서 현재 sequence에 해당하는 embedding이 된다.
+            h_pi_t_minus_one = torch.gather(input=h_bar, dim=1, index=next_operation_index.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, embed)).squeeze(1).unsqueeze(0)  # 다음 sequence의 input은 encoder의 output 중에서 현재 sequence에 해당하는 embedding이 된다.
             pi_list.append(next_block)
 
-        for nb in range(batch_size):
-            k = next_block_index[nb].item()
-            scheduler_list[nb].add_selected_operation(k)
-            #makespan = scheduler_list[nb].get_longest_path()
+
 
         pi = torch.stack(pi_list, dim=1)
         log_probabilities = torch.stack(log_probabilities, dim=1)
         ll = log_probabilities.sum(dim=1)
 
 
-        self.job_count = deepcopy(self.dummy_job_count)
         _ = 1
         return pi, ll, _
 
