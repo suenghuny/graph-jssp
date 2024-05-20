@@ -192,6 +192,8 @@ class PtrNet1(nn.Module):
         batch = node_features.shape[0]
         operation_num = node_features.shape[1]-2
         node_num = node_features.shape[1]
+
+
         node_reshaped_features = node_features.reshape(batch * node_num, -1)
         node_embedding = self.Embedding(node_reshaped_features)
         node_embedding = node_embedding.reshape(batch, node_num, -1)
@@ -272,19 +274,19 @@ class PtrNet1(nn.Module):
                 """
                 for nb in range(batch_size):
                     scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb])
-                    if upperbound != None:
-                        ub = upperbound[nb]
-                    else:
-                        ub = upperbound
-                    """
-                    Branch and Cut 로직에 따라 masking을 수행함
-                    모두 다 masking 처리할 수도 있으므로, 모두다 masking할 경우에는 mask로 복원 (if 1 not in mask)
-                    """
-                    mask = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub)
-                    if 1 not in mask:
-                        pass
-                    else:
-                        mask1_debug[nb, :] = torch.tensor(mask).to(device)
+                    # if upperbound != None:
+                    #     ub = upperbound[nb]
+                    # else:
+                    #     ub = upperbound
+                    # """
+                    # Branch and Cut 로직에 따라 masking을 수행함
+                    # 모두 다 masking 처리할 수도 있으므로, 모두다 masking할 경우에는 mask로 복원 (if 1 not in mask)
+                    # """
+                    # mask = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub)
+                    # if 1 not in mask:
+                    #     pass
+                    # else:
+                    #     mask1_debug[nb, :] = torch.tensor(mask).to(device)
 
             else:
                 """
@@ -299,20 +301,20 @@ class PtrNet1(nn.Module):
                     scheduler_list[nb].add_selected_operation(k) # 그림으로 설명 예정
                     next_b = next_block[nb].item()
                     scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb], i = next_b)
-                    if upperbound != None:
-                        ub = upperbound[nb]
-                    else:
-                        ub = upperbound
-                    mask = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub)
-                    """
-                    Branch and Cut 로직에 따라 masking을 수행함
-                    모두 다 masking 처리할 수도 있으므로, 모두다 masking할 경우에는 mask로 복원 (if 1 not in mask)
-                    
-                    """
-
-                    if 1 not in mask:pass
-                    else:
-                        mask1_debug[nb, :] = torch.tensor(mask).to(device)
+                    # if upperbound != None:
+                    #     ub = upperbound[nb]
+                    # else:
+                    #     ub = upperbound
+                    # mask = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub)
+                    # """
+                    # Branch and Cut 로직에 따라 masking을 수행함
+                    # 모두 다 masking 처리할 수도 있으므로, 모두다 masking할 경우에는 mask로 복원 (if 1 not in mask)
+                    #
+                    # """
+                    #
+                    # if 1 not in mask:pass
+                    # else:
+                    #     mask1_debug[nb, :] = torch.tensor(mask).to(device)
 
             est_placeholder = est_placeholder.reshape(batch_size, -1)*mask1_debug
             fin_placeholder = fin_placeholder.reshape(batch_size, -1) * mask1_debug

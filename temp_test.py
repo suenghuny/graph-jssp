@@ -14,7 +14,6 @@ from datetime import datetime
 
 from actor2 import PtrNet1
 from critic import PtrNet2
-from jssp import Scheduler
 from jssp2 import AdaptiveScheduler
 from cfg import get_cfg
 
@@ -30,18 +29,31 @@ if cfg.vessl == True:
     vessl.init()
 
 
-opt_list = [1059, 888, 1005, 1005, 887, 1010, 397, 899, 934, 944]
+# opt_list = [1059, 888, 1005, 1005, 887, 1010, 397, 899, 934, 944]
+# orb_list = []
+# for i in ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10']:
+#     df = pd.read_excel("orb.xlsx", sheet_name=i, engine='openpyxl')
+#     orb_data = list()#
+#     for row, column in df.iterrows():
+#         job = []
+#         for j in range(0, len(column.tolist()), 2):
+#             element = (column.tolist()[j], column.tolist()[j + 1])
+#             job.append(element)
+#         orb_data.append(job)
+#     orb_list.append(orb_data)
+opt_list = [3007, 3224, 3292, 3299, 3039]
 orb_list = []
-for i in ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10']:
-    df = pd.read_excel("orb.xlsx", sheet_name=i, engine='openpyxl')
-    orb_data = list()#
+for i in ['41', '42', '43', '44', '45']:
+    df = pd.read_excel("dmu.xlsx", sheet_name=i, engine='openpyxl')
+    orb_data = list()
     for row, column in df.iterrows():
         job = []
         for j in range(0, len(column.tolist()), 2):
-            element = (column.tolist()[j], column.tolist()[j + 1])
+            element = (column.tolist()[j],  column.tolist()[j+1])
             job.append(element)
         orb_data.append(job)
     orb_list.append(orb_data)
+    print(orb_data)
 
 
 def generate_jssp_instance(num_jobs, num_machine, batch_size):
@@ -71,9 +83,10 @@ def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=Non
 
     act_model.eval()
 
-    scheduler = Scheduler(orb_list[p - 1])  # scheduler는 validation(ORB set)에 대해 수행
-    num_job = len(scheduler.job_list)
-    num_machine = len(scheduler.machine_list)
+    scheduler = AdaptiveScheduler(orb_list[p - 1])  # scheduler는 validation(ORB set)에 대해 수행
+    num_job =scheduler.num_job
+    num_machine = scheduler.num_mc
+    print(num_job, num_machine)
 
     node_feature = scheduler.get_node_feature()
     node_feature = [node_feature for _ in range(int(eval_number))]
@@ -94,7 +107,7 @@ def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=Non
                                     num_job=num_job,
                                     upperbound = upperbound)
     for sequence in pred_seq:
-        scheduler = Scheduler(orb_list[p - 1])
+        scheduler = AdaptiveScheduler(orb_list[p - 1])
         makespan = scheduler.run(sequence.tolist())
         val_makespan.append(makespan)
     return np.min(val_makespan), np.mean(val_makespan)
@@ -131,7 +144,7 @@ def train_model(params, log_path=None):
     ave_cri_loss = 0.0
 
     act_model = PtrNet1(params).to(device)
-    load_checkpoint(act_model = act_model, filepath="result\\model\\ppo\\0518_09_20_step6081_act.pt")
+    load_checkpoint(act_model = act_model, filepath="result\\model\\ppo\\0520_08_59_step5081_act.pt")
     baseline_model = PtrNet1(params).to(device)
     baseline_model.load_state_dict(act_model.state_dict())
     if params["optimizer"] == 'Adam':
@@ -170,7 +183,7 @@ def train_model(params, log_path=None):
                 eval_number = 2
                 min_makespan, mean_makespan = evaluation(act_model, baseline_model, p, eval_number, device) # upperbound를 확인 하기 위해 2번을 임의로 돌린다.
 
-                eval_number = 200
+                eval_number = 50
                 min_makespan_list = [min_makespan] * eval_number
                 min_makespan, mean_makespan = evaluation(act_model, baseline_model, p, eval_number, device,
                                                          upperbound=min_makespan_list)
@@ -206,7 +219,7 @@ def train_model(params, log_path=None):
         heterogeneous_edges = list()
         node_features = list()
         for n in range(params['batch_size']):
-            scheduler = Scheduler(jobs_datas[n])
+            scheduler = AdaptiveScheduler(jobs_datas[n])
             node_feature = scheduler.get_node_feature()
             node_features.append(node_feature)
             edge_precedence = scheduler.get_edge_index_precedence()

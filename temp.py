@@ -14,20 +14,19 @@ from datetime import datetime
 
 from actor2 import PtrNet1
 from critic import PtrNet2
-from jssp import Scheduler
 from jssp2 import AdaptiveScheduler
 from cfg import get_cfg
-
-cfg = get_cfg()
 import random
-
-numbers = list(range(10))
-random.shuffle(numbers)
+cfg = get_cfg()
 
 if cfg.vessl == True:
     import vessl
-
     vessl.init()
+
+
+np.random.seed(42)
+random.seed(42)
+torch.manual_seed(42)
 
 
 opt_list = [1059, 888, 1005, 1005, 887, 1010, 397, 899, 934, 944]
@@ -50,7 +49,7 @@ def generate_jssp_instance(num_jobs, num_machine, batch_size):
         temp = []
         for job in range(num_jobs):
             machine_sequence = list(range(num_machine))
-            random.shuffle(machine_sequence)
+            np.random.shuffle(machine_sequence)
             empty = list()
             for ops in range(num_machine):
                 empty.append((machine_sequence[ops], np.random.randint(1, 100)))
@@ -71,9 +70,9 @@ def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=Non
 
     act_model.eval()
 
-    scheduler = Scheduler(orb_list[p - 1])  # scheduler는 validation(ORB set)에 대해 수행
-    num_job = len(scheduler.job_list)
-    num_machine = len(scheduler.machine_list)
+    scheduler = AdaptiveScheduler(orb_list[p - 1])  # scheduler는 validation(ORB set)에 대해 수행
+    num_job = scheduler.num_mc
+    num_machine =scheduler.num_job
 
     node_feature = scheduler.get_node_feature()
     node_feature = [node_feature for _ in range(int(eval_number))]
@@ -94,7 +93,7 @@ def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=Non
                                     num_job=num_job,
                                     upperbound = upperbound)
     for sequence in pred_seq:
-        scheduler = Scheduler(orb_list[p - 1])
+        scheduler = AdaptiveScheduler(orb_list[p - 1])
         makespan = scheduler.run(sequence.tolist())
         val_makespan.append(makespan)
     return np.min(val_makespan), np.mean(val_makespan)
@@ -173,10 +172,20 @@ def train_model(params, log_path=None):
         act_model.block_indices = []
         baseline_model.block_indices = []
 
-        num_job = 10
-        num_machine = 10
+
 
         if s % cfg.gen_step == 1:
+            # dt1 = (6, 6)
+            # dt2 = (10, 10)
+            # dt3 = (15, 15)
+            # dt4 = (20, 20)
+            # dt5 = (30, 20)
+            num_jobs = [6,10,15,20,30]
+            num_machines = [6, 10, 15, 20, 20]
+            d = np.random.choice([0,1,2,3,4])
+            num_job = num_jobs[d]
+            num_machine = num_machines[d]
+
             jobs_datas, scheduler_list = generate_jssp_instance(num_jobs=num_job, num_machine=num_machine, batch_size=params['batch_size'])
             makespan_list_for_upperbound_recording = [[] for _ in range(params['batch_size'])]
         else:
@@ -187,7 +196,7 @@ def train_model(params, log_path=None):
         heterogeneous_edges = list()
         node_features = list()
         for n in range(params['batch_size']):
-            scheduler = Scheduler(jobs_datas[n])
+            scheduler = AdaptiveScheduler(jobs_datas[n])
             node_feature = scheduler.get_node_feature()
             node_features.append(node_feature)
             edge_precedence = scheduler.get_edge_index_precedence()
@@ -217,7 +226,7 @@ def train_model(params, log_path=None):
         real_makespan = list()
         for n in range(len(node_features)):
             sequence = pred_seq[n]
-            scheduler = Scheduler(jobs_datas[n])
+            scheduler = AdaptiveScheduler(jobs_datas[n])
             makespan = -scheduler.run(sequence.tolist()) / params['reward_scaler']
             real_makespan.append(makespan)
             c_max.append(makespan)

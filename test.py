@@ -36,10 +36,14 @@ if cfg.vessl == True:
     vessl.init()
 
 
-opt_list = [1059, 888, 1005, 1005, 887, 1010, 397, 899, 934, 944]
+# opt_list = [1059, 888, 1005, 1005, 887, 1010, 397, 899, 934, 944]
+# orb_list = []
+# for i in ['01','02','03','04','05','06','07','08','09','10']:
+#     df = pd.read_excel("orb.xlsx", sheet_name=i)
+opt_list = [3007, 3224, 3292, 3299, 3039]
 orb_list = []
-for i in ['01','02','03','04','05','06','07','08','09','10']:
-    df = pd.read_excel("orb.xlsx", sheet_name=i)
+for i in ['41', '42', '43', '44', '45']:
+    df = pd.read_excel("dmu.xlsx", sheet_name=i)
     orb_data = list()
     for row, column in df.iterrows():
         job = []
@@ -59,7 +63,7 @@ def train_model(params, log_path=None):
         f.write(''.join('%s,%s\n' % item for item in params.items()))
 
     epoch = 0
-    PATH = model_dir + "/ppo/" + "1114_00_20_step7681_act.pt"
+    PATH = model_dir + "/ppo/" + "0520_08_59_step5081_act.pt"
     checkpoint = torch.load(PATH)
     act_model = PtrNet1(params).to(device)
     act_model.load_state_dict(checkpoint['model_state_dict_actor'])
@@ -76,7 +80,7 @@ def train_model(params, log_path=None):
         act_lr_scheduler = optim.lr_scheduler.StepLR(act_optim, step_size=params["lr_decay_step"],
                                                      gamma=params["lr_decay"])
 
-    p = 10
+    p = 5
     num_val = 200
     scheduler_list_val = [AdaptiveScheduler(orb_list[p - 1]) for _ in range(num_val)]
     val_makespan = list()

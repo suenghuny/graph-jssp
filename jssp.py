@@ -85,6 +85,7 @@ class Scheduler:
         self.env = simpy.Environment()
         self.job_list = []
         self.jobs_data = jobs_data
+        self.num_machine = len(self.jobs_data[0])
         self.machine_list = []
         self.c_max = 0
         for i in range(len(self.jobs_data)):
@@ -152,6 +153,8 @@ class Scheduler:
     def get_machine_sharing_edge_index(self):
         jk = 0
         machine_sharing = [[] for _ in range(len(self.job_list))]
+
+
         for job in self.jobs_data:
             for k in range(len(job)):
                 ops = job[k]
