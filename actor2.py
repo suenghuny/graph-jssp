@@ -9,7 +9,7 @@ import cfg
 cfg = cfg.get_cfg()
 from model import GCRN, NodeEmbedding
 from model_fastgtn import FastGTNs
-device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+device = torch.device(cfg.device)
 
 class Greedy(nn.Module):
     def __init__(self):
@@ -37,7 +37,7 @@ class Predictor(nn.Module):
 class PtrNet1(nn.Module):
     def __init__(self, params):
         super().__init__()
-        device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        device = torch.device(cfg.device)
         self.gnn = params["gnn"]
         self.n_multi_head = params["n_multi_head"]
         if self.gnn == True:

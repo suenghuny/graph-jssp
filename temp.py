@@ -180,13 +180,14 @@ def train_model(params, log_path=None):
             # dt3 = (15, 15)
             # dt4 = (20, 20)
             # dt5 = (30, 20)
-            num_jobs = [6,10,15,20,30]
-            num_machines = [6, 10, 15, 20, 20]
-            d = np.random.choice([0,1,2,3,4])
-            num_job = num_jobs[d]
-            num_machine = num_machines[d]
+            # num_jobs = [6,10,15,20,30]
+            # num_machines = [6, 10, 15, 20, 20]
+            # d = np.random.choice([0,1,2,3,4])
+            num_job = np.random.randint(5, 10)
+            num_machine = np.random.randint(num_job, 10)
 
             jobs_datas, scheduler_list = generate_jssp_instance(num_jobs=num_job, num_machine=num_machine, batch_size=params['batch_size'])
+            print(jobs_datas)
             makespan_list_for_upperbound_recording = [[] for _ in range(params['batch_size'])]
         else:
             for scheduler in scheduler_list:

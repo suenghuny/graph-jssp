@@ -42,7 +42,7 @@ if cfg.vessl == True:
 #     df = pd.read_excel("orb.xlsx", sheet_name=i)
 opt_list = [3007, 3224, 3292, 3299, 3039]
 orb_list = []
-for i in ['41', '42', '43', '44', '45']:
+for i in ['71', '45']:
     df = pd.read_excel("dmu.xlsx", sheet_name=i)
     orb_data = list()
     for row, column in df.iterrows():

@@ -41,10 +41,10 @@ if cfg.vessl == True:
 #             job.append(element)
 #         orb_data.append(job)
 #     orb_list.append(orb_data)
-opt_list = [3007, 3224, 3292, 3299, 3039]
+opt_list = [3007, 3224, 3292, 3299, 3039,3333]
 orb_list = []
-for i in ['41', '42', '43', '44', '45']:
-    df = pd.read_excel("dmu.xlsx", sheet_name=i, engine='openpyxl')
+for i in ['71', '72']:
+    df = pd.read_excel("ta.xlsx", sheet_name=i, engine='openpyxl')
     orb_data = list()
     for row, column in df.iterrows():
         job = []
@@ -132,7 +132,7 @@ def load_checkpoint(act_model, filepath):
     return epoch, ave_act_loss, ave_cri_loss, ave_makespan
 
 def train_model(params, log_path=None):
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    device = torch.device(cfg.device)
     date = datetime.now().strftime('%m%d_%H_%M')
     param_path = params["log_dir"] + '/ppo' + '/%s_%s_param.csv' % (date, "train")
     print(f'generate {param_path}')
@@ -164,7 +164,7 @@ def train_model(params, log_path=None):
 
     c_max = list()
     c_max_g = list()
-    baseline_update = 30
+    baseline_update = 25
     b = 0
     for s in range(epoch + 1, params["step"]):
         problem_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
@@ -175,18 +175,12 @@ def train_model(params, log_path=None):
 
         """
         b += 1
-
-
         if s % 100 == 1:
             val_makespans = list()
             for p in problem_list:
-                eval_number = 2
-                min_makespan, mean_makespan = evaluation(act_model, baseline_model, p, eval_number, device) # upperbound를 확인 하기 위해 2번을 임의로 돌린다.
-
-                eval_number = 50
-                min_makespan_list = [min_makespan] * eval_number
-                min_makespan, mean_makespan = evaluation(act_model, baseline_model, p, eval_number, device,
-                                                         upperbound=min_makespan_list)
+                eval_number = 30
+                min_makespan_list = [3] * eval_number
+                min_makespan, mean_makespan = evaluation(act_model, baseline_model, p, eval_number, device, upperbound=min_makespan_list)
                 print("ORB{}".format(p), (min_makespan / opt_list[p - 1] - 1) * 100,
                       ( mean_makespan / opt_list[p - 1] - 1) * 100, min_makespan)
                 if cfg.vessl == True:
