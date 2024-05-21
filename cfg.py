@@ -35,7 +35,7 @@ def get_cfg():
     parser.add_argument("--dropout", type=float, default=0.3, help="")
     parser.add_argument("--gen_step", type=int, default=5, help="")
     parser.add_argument("--beta", type=str, default=0.95, help="")
-    parser.add_argument("--device", type=str, default="cpu", help="")
+    parser.add_argument("--device", type=str, default="cuda:0", help="")
 
     return parser.parse_args()
 
