@@ -39,7 +39,7 @@ def set_seed(seed):
     torch.backends.cudnn.benchmark = False
 
 # Example usage:
-set_seed(25) # 30 했었음
+set_seed(20) # 30 했었음
 # opt_list = [1059, 888, 1005, 1005, 887, 1010, 397, 899, 934, 944]
 # orb_list = []
 # for i in ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10']:
@@ -54,8 +54,8 @@ set_seed(25) # 30 했었음
 #     orb_list.append(orb_data)
 opt_list = [3007, 3224, 3292, 3299, 3039,3333]
 orb_list = []
-for i in ['41','42','43','44','45']:
-    df = pd.read_excel("dmu.xlsx", sheet_name=i, engine='openpyxl')
+for i in ['71']:
+    df = pd.read_excel("ta.xlsx", sheet_name=i, engine='openpyxl')
     orb_data = list()
     for row, column in df.iterrows():
         job = []
@@ -155,7 +155,7 @@ def train_model(params, log_path=None):
     ave_cri_loss = 0.0
 
     act_model = PtrNet1(params).to(device)
-    load_checkpoint(act_model = act_model, filepath="result\\model\\ppo\\0520_08_59_step5081_act.pt")
+    load_checkpoint(act_model = act_model, filepath="result\\model\\ppo\\0521_11_07_step21681_act.pt")
     baseline_model = PtrNet1(params).to(device)
     baseline_model.load_state_dict(act_model.state_dict())
     if params["optimizer"] == 'Adam':
@@ -189,7 +189,7 @@ def train_model(params, log_path=None):
         if s % 100 == 1:
             val_makespans = list()
             for p in problem_list:
-                eval_number = 30
+                eval_number = 2
                 min_makespan_list = [3] * eval_number
                 min_makespan, mean_makespan = evaluation(act_model, baseline_model, p, eval_number, device, upperbound=min_makespan_list)
                 print("ORB{}".format(p), (min_makespan / opt_list[p - 1] - 1) * 100,

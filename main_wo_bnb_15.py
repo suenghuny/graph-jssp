@@ -16,16 +16,11 @@ from actor2 import PtrNet1
 from critic import PtrNet2
 from jssp2 import AdaptiveScheduler
 from cfg import get_cfg
-
-cfg = get_cfg()
 import random
-
-numbers = list(range(10))
-random.shuffle(numbers)
+cfg = get_cfg()
 
 if cfg.vessl == True:
     import vessl
-
     vessl.init()
 
 def set_seed(seed):
@@ -39,32 +34,20 @@ def set_seed(seed):
     torch.backends.cudnn.benchmark = False
 
 # Example usage:
-set_seed(22) # 30 했었음
-# opt_list = [1059, 888, 1005, 1005, 887, 1010, 397, 899, 934, 944]
-# orb_list = []
-# for i in ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10']:
-#     df = pd.read_excel("orb.xlsx", sheet_name=i, engine='openpyxl')
-#     orb_data = list()#
-#     for row, column in df.iterrows():
-#         job = []
-#         for j in range(0, len(column.tolist()), 2):
-#             element = (column.tolist()[j], column.tolist()[j + 1])
-#             job.append(element)
-#         orb_data.append(job)
-#     orb_list.append(orb_data)
-opt_list = [3007, 3224, 3292, 3299, 3039,3333,1,1,1,1,1,1,1,1]
+set_seed(20) # 30 했었음
+
+opt_list = [1059, 888, 1005, 1005, 887, 1010, 397, 899, 934, 944]
 orb_list = []
-for i in ['71']:
-    df = pd.read_excel("ta.xlsx", sheet_name=i, engine='openpyxl')
-    orb_data = list()
+for i in ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10']:
+    df = pd.read_excel("orb.xlsx", sheet_name=i, engine='openpyxl')
+    orb_data = list()#
     for row, column in df.iterrows():
         job = []
         for j in range(0, len(column.tolist()), 2):
-            element = (column.tolist()[j],  column.tolist()[j+1])
+            element = (column.tolist()[j], column.tolist()[j + 1])
             job.append(element)
         orb_data.append(job)
     orb_list.append(orb_data)
-    print(orb_data)
 
 
 def generate_jssp_instance(num_jobs, num_machine, batch_size):
@@ -73,7 +56,7 @@ def generate_jssp_instance(num_jobs, num_machine, batch_size):
         temp = []
         for job in range(num_jobs):
             machine_sequence = list(range(num_machine))
-            random.shuffle(machine_sequence)
+            np.random.shuffle(machine_sequence)
             empty = list()
             for ops in range(num_machine):
                 empty.append((machine_sequence[ops], np.random.randint(1, 100)))
@@ -95,9 +78,8 @@ def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=Non
     act_model.eval()
 
     scheduler = AdaptiveScheduler(orb_list[p - 1])  # scheduler는 validation(ORB set)에 대해 수행
-    num_job =scheduler.num_job
-    num_machine = scheduler.num_mc
-    print(num_job, num_machine)
+    num_job = scheduler.num_mc
+    num_machine =scheduler.num_job
 
     node_feature = scheduler.get_node_feature()
     node_feature = [node_feature for _ in range(int(eval_number))]
@@ -124,24 +106,6 @@ def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=Non
     return np.min(val_makespan), np.mean(val_makespan)
 
 
-def load_checkpoint(act_model, filepath):
-    checkpoint = torch.load(filepath)
-
-    # epoch를 로드
-    epoch = checkpoint['epoch']
-
-    # 모델의 state_dict를 로드
-    act_model.load_state_dict(checkpoint['model_state_dict_actor'])
-
-    # 옵티마이저의 state_dict를 로드
-
-    # 기타 정보 로드
-    ave_act_loss = checkpoint['ave_act_loss']
-    ave_cri_loss = checkpoint['ave_cri_loss']
-    ave_makespan = checkpoint['ave_makespan']
-
-    return epoch, ave_act_loss, ave_cri_loss, ave_makespan
-
 def train_model(params, log_path=None):
     device = torch.device(cfg.device)
     date = datetime.now().strftime('%m%d_%H_%M')
@@ -155,7 +119,6 @@ def train_model(params, log_path=None):
     ave_cri_loss = 0.0
 
     act_model = PtrNet1(params).to(device)
-    load_checkpoint(act_model = act_model, filepath="result\\model\\ppo\\0521_11_07_step21681_act.pt")#20481(최고), 18281
     baseline_model = PtrNet1(params).to(device)
     baseline_model.load_state_dict(act_model.state_dict())
     if params["optimizer"] == 'Adam':
@@ -175,10 +138,10 @@ def train_model(params, log_path=None):
 
     c_max = list()
     c_max_g = list()
-    baseline_update = 25
+    baseline_update = 30
     b = 0
     for s in range(epoch + 1, params["step"]):
-        problem_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10,11,12,13]
+        problem_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         """
         변수별 shape 
         inputs : batch_size X number_of_blocks X number_of_process
@@ -186,14 +149,19 @@ def train_model(params, log_path=None):
 
         """
         b += 1
+
+
         if s % 100 == 1:
             val_makespans = list()
             for p in problem_list:
                 eval_number = 2
-                min_makespan_list = [3] * eval_number
+                min_makespan, mean_makespan = evaluation(act_model, baseline_model, p, eval_number, device) # upperbound를 확인 하기 위해 2번을 임의로 돌린다.
+
+                eval_number = 50
+                min_makespan_list = [min_makespan] * eval_number
                 min_makespan, mean_makespan = evaluation(act_model, baseline_model, p, eval_number, device, upperbound=min_makespan_list)
                 print("ORB{}".format(p), (min_makespan / opt_list[p - 1] - 1) * 100,
-                      ( mean_makespan / opt_list[p - 1] - 1) * 100, mean_makespan, min_makespan)
+                      ( mean_makespan / opt_list[p - 1] - 1) * 100, min_makespan)
                 if cfg.vessl == True:
                     vessl.log(step=s, payload={
                         'min makespan_{}'.format('ORB' + str(p)): (min_makespan / opt_list[p - 1] - 1) * 100})
@@ -210,11 +178,22 @@ def train_model(params, log_path=None):
         act_model.block_indices = []
         baseline_model.block_indices = []
 
-        num_job = 10
-        num_machine = 10
+
 
         if s % cfg.gen_step == 1:
+            # dt1 = (6, 6)
+            # dt2 = (10, 10)
+            # dt3 = (15, 15)
+            # dt4 = (20, 20)
+            # dt5 = (30, 20)
+            # num_jobs = [6,10,15,20,30]
+            # num_machines = [6, 10, 15, 20, 20]
+            # d = np.random.choice([0,1,2,3,4])
+            num_job = np.random.randint(5, 15)
+            num_machine = np.random.randint(num_job, 15)
+
             jobs_datas, scheduler_list = generate_jssp_instance(num_jobs=num_job, num_machine=num_machine, batch_size=params['batch_size'])
+
             makespan_list_for_upperbound_recording = [[] for _ in range(params['batch_size'])]
         else:
             for scheduler in scheduler_list:
@@ -254,7 +233,7 @@ def train_model(params, log_path=None):
         real_makespan = list()
         for n in range(len(node_features)):
             sequence = pred_seq[n]
-            scheduler = Scheduler(jobs_datas[n])
+            scheduler = AdaptiveScheduler(jobs_datas[n])
             makespan = -scheduler.run(sequence.tolist()) / params['reward_scaler']
             real_makespan.append(makespan)
             c_max.append(makespan)
@@ -333,8 +312,8 @@ if __name__ == '__main__':
         os.makedirs(log_dir + "/ppo")
 
     model_dir = "./result/model"
-    if not os.path.exists(model_dir + "/ppo"):
-        os.makedirs(model_dir + "/ppo")
+    if not os.path.exists(model_dir + "/ppo_wo_bnb"):
+        os.makedirs(model_dir + "/ppo_wo_bnb")
 
     # parser.add_argument("--vessl", type=bool, default=False, help="vessl AI 사용여부")
     # parser.add_argument("--step", type=int, default=400001, help="")

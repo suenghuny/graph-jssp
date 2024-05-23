@@ -55,7 +55,7 @@ class NodeEmbedding(nn.Module):
 class GCRN(nn.Module):
     def __init__(self, feature_size, embedding_size, graph_embedding_size, layers, num_edge_cat, attention = False):
         super(GCRN, self).__init__()
-        device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        #device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.num_edge_cat = num_edge_cat
         self.feature_size =feature_size
         self.graph_embedding_size = graph_embedding_size
