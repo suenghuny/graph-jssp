@@ -38,23 +38,16 @@ def set_seed(seed):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
+def heuristic_eval(p):
+    scheduler = AdaptiveScheduler(orb_list[p - 1])
+    makespan_heu = scheduler.heuristic_run()
+    return makespan_heu
+
 # Example usage:
 set_seed(22) # 30 했었음
-# opt_list = [1059, 888, 1005, 1005, 887, 1010, 397, 899, 934, 944]
-# orb_list = []
-# for i in ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10']:
-#     df = pd.read_excel("orb.xlsx", sheet_name=i, engine='openpyxl')
-#     orb_data = list()#
-#     for row, column in df.iterrows():
-#         job = []
-#         for j in range(0, len(column.tolist()), 2):
-#             element = (column.tolist()[j], column.tolist()[j + 1])
-#             job.append(element)
-#         orb_data.append(job)
-#     orb_list.append(orb_data)
 opt_list = [3007, 3224, 3292, 3299, 3039,3333,1,1,1,1,1,1,1,1]
 orb_list = []
-for i in ['71']:
+for i in ['21', '22','31', '32']:
     df = pd.read_excel("ta.xlsx", sheet_name=i, engine='openpyxl')
     orb_data = list()
     for row, column in df.iterrows():
@@ -155,7 +148,7 @@ def train_model(params, log_path=None):
     ave_cri_loss = 0.0
 
     act_model = PtrNet1(params).to(device)
-    load_checkpoint(act_model = act_model, filepath="result\\model\\ppo\\0521_11_07_step21681_act.pt")#20481(최고), 18281
+    load_checkpoint(act_model = act_model, filepath="result\\model\\ppo\\0525_19_22_step4081_act.pt")#20481(최고), 18281
     baseline_model = PtrNet1(params).to(device)
     baseline_model.load_state_dict(act_model.state_dict())
     if params["optimizer"] == 'Adam':
@@ -164,8 +157,7 @@ def train_model(params, log_path=None):
         act_optim = optim.RMSprop(act_model.parameters(), lr=params["lr"])
 
     if params["is_lr_decay"]:
-        act_lr_scheduler = optim.lr_scheduler.StepLR(act_optim, step_size=params["lr_decay_step"],
-                                                     gamma=params["lr_decay"])
+        act_lr_scheduler = optim.lr_scheduler.StepLR(act_optim, step_size=params["lr_decay_step"],gamma=params["lr_decay"])
 
     mse_loss = nn.MSELoss()
     t1 = time()
@@ -189,8 +181,9 @@ def train_model(params, log_path=None):
         if s % 100 == 1:
             val_makespans = list()
             for p in problem_list:
-                eval_number = 2
-                min_makespan_list = [3] * eval_number
+                min_makespan = heuristic_eval(p)
+                eval_number = 30
+                min_makespan_list = [min_makespan] * eval_number
                 min_makespan, mean_makespan = evaluation(act_model, baseline_model, p, eval_number, device, upperbound=min_makespan_list)
                 print("ORB{}".format(p), (min_makespan / opt_list[p - 1] - 1) * 100,
                       ( mean_makespan / opt_list[p - 1] - 1) * 100, mean_makespan, min_makespan)

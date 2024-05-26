@@ -172,8 +172,8 @@ def train_model(params, log_path=None):
                     mean_makespans.append((mean_makespan / opt_list[p - 1] - 1) * 100)
                     min_m = pd.DataFrame(min_makespans)
                     mean_m = pd.DataFrame(mean_makespans)
-                    min_m.to_csv('min_makespan.csv')
-                    mean_m.to_csv('mean_makespan.csv')
+                    min_m.to_csv('min_makespan_bnb_15.csv')
+                    mean_m.to_csv('mean_makespan_bnb_15.csv')
 
         act_model.block_indices = []
         baseline_model.block_indices = []
@@ -312,8 +312,8 @@ if __name__ == '__main__':
         os.makedirs(log_dir + "/ppo")
 
     model_dir = "./result/model"
-    if not os.path.exists(model_dir + "/ppo_wo_bnb"):
-        os.makedirs(model_dir + "/ppo_wo_bnb")
+    if not os.path.exists(model_dir + "/ppo_bnb_15"):
+        os.makedirs(model_dir + "/ppo_bnb_15")
 
     # parser.add_argument("--vessl", type=bool, default=False, help="vessl AI 사용여부")
     # parser.add_argument("--step", type=int, default=400001, help="")

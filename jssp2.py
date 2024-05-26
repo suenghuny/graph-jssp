@@ -176,20 +176,18 @@ class AdaptiveScheduler:
         return lower_bound_list
 
     def adaptive_run(self, est_holder, fin_holder, i= None):
-        if i != None:                                         # 이전 스텝에서 선택된 Job(Operation)에 대한 update
-            try:
-                gen_t = int(self.pt[i][self.key_count[i]])        # 선택된 operation에 대한 processing time 선택
-                gen_m = int(self.ms[i][self.key_count[i]])        # 선택된 operation에 대한 machine_sequence 선택
-                self.j_count[i] = self.j_count[i] + gen_t          # Job i에 대한 누적 작업 완료시간 업데이트
-                self.m_count[gen_m] = self.m_count[gen_m] + gen_t  # Machine gen_m에 대한 누적 작업 완료시간 업데이트
-                if self.m_count[gen_m] < self.j_count[i]:
-                    self.m_count[gen_m] = self.j_count[i]
-                elif self.m_count[gen_m] > self.j_count[i]:
-                    self.j_count[i] = self.m_count[gen_m]          # if 및 elif 문은 각각의 누적 작업 완료시간을 큰 녀석으로 업데이트 한다는 의미
-                self.key_count[i] = self.key_count[i] + 1          # 해당 Job이 몇번 선택되었는지 count하는 것 업데이트
-            except IndexError:
-                pass
-
+        if i != None:
+            #print(self.key_count[i])
+            gen_t = int(self.pt[i][self.key_count[i]])        # 선택된 operation에 대한 processing time 선택
+            gen_m = int(self.ms[i][self.key_count[i]])        # 선택된 operation에 대한 machine_sequence 선택
+            self.j_count[i] = self.j_count[i] + gen_t          # Job i에 대한 누적 작업 완료시간 업데이트
+            self.m_count[gen_m] = self.m_count[gen_m] + gen_t  # Machine gen_m에 대한 누적 작업 완료시간 업데이트
+            if self.m_count[gen_m] < self.j_count[i]:
+                self.m_count[gen_m] = self.j_count[i]
+            elif self.m_count[gen_m] > self.j_count[i]:
+                self.j_count[i] = self.m_count[gen_m]          # if 및 elif 문은 각각의 누적 작업 완료시간을 큰 녀석으로 업데이트 한다는 의미
+            self.key_count[i] = self.key_count[i] + 1          # 해당 Job이 몇번 선택되었는지 count하는 것 업데이트
+        makespan = max(self.j_count.values())
         estI_list = list()
         gentI_list = list()
         for I in range(self.num_job): # 아직 선택되지 않은 녀석들(선택될 가능성이 있는 애들)에 대한 이야기
@@ -199,26 +197,63 @@ class AdaptiveScheduler:
                 estI = max(self.j_count[I], self.m_count[gen_mI])
                 estI_list.append(estI)
                 gentI_list.append(estI+gen_tI)
-            except IndexError:
+            except IndexError: # IndexError가 난다는 것은 해당 Job이 available 하지 않음을(완료되었음을) 의미함
                 pass
         for I in range(self.num_job):
             try:
                 gen_tI = int(self.pt[I][self.key_count[I]])
                 gen_mI = int(self.ms[I][self.key_count[I]])
                 estI = max(self.j_count[I], self.m_count[gen_mI])
-                index_of_one = (est_holder[I] == 1)
                 if len(estI_list)>0 and np.max(estI_list)!=0:
-                    est_holder[I][index_of_one] = estI/np.max(estI_list)
-                    fin_holder[I][index_of_one] = (estI+gen_tI)/np.max(gentI_list)
-                else:pass
+                    est_holder[I][self.key_count[I]] = estI/np.max(estI_list)
+                    fin_holder[I][self.key_count[I]] = (estI+gen_tI)/np.max(gentI_list)
+                else: # 첫번째 operation에 대해서는 1로 처리한다.
+                    pass
                 estI_list.append(estI)
                 gentI_list.append(estI+gen_tI)
             except IndexError:
                 pass
+        return makespan
+
+    def get_critical_path(self):
+        critical_path_list = list()
+        #print(self.key_count)
+        for j_prime, i_prime in self.key_count.items():
+            # key는 job_id
+            # value는 이번에 해야할 operation에 index가 됨 (index error가 난다는 것은 완료된 job임을 의미한다)
+            if i_prime != self.num_mc:
+                key_count = deepcopy(self.key_count)
+                j_count = deepcopy(self.j_count)
+                m_count = deepcopy(self.m_count)
+                try:
+                    gen_t = int(self.pt[j_prime][key_count[j_prime]])  # 선택된 operation에 대한 processing time 선택
+                    gen_m = int(self.ms[j_prime][key_count[j_prime]])  # 선택된 operation에 대한 machine_sequence 선택
+                    j_count[j_prime] = j_count[j_prime] + gen_t  # Job i에 대한 누적 작업 완료시간 업데이트
+                    m_count[gen_m] = m_count[gen_m] + gen_t  # Machine gen_m에 대한 누적 작업 완료시간 업데이트
+                    if m_count[gen_m] < j_count[j_prime]:
+                        m_count[gen_m] = j_count[j_prime]
+                    elif m_count[gen_m] > j_count[j_prime]:
+                        j_count[j_prime] = m_count[gen_m]  # if 및 elif 문은 각각의 누적 작업 완료시간을 큰 녀석으로 업데이트 한다는 의미
+                except IndexError as IE:
+                    pass
+
+                key_count[j_prime] = key_count[j_prime] + 1
+                longest_path_list = list()
+                for j in range(len(self.pt)):
+                    try:
+                        gen_j = np.sum(self.pt[j][key_count[j]:])
+                        gen_m = self.ms[j][key_count[j]]
+                        m_count[gen_m] = m_count[gen_m] + gen_j
+                        j_count[j] = j_count[j]+gen_j
+                        longest_path_list.append(np.max([m_count[gen_m], j_count[j]]))
+                    except IndexError:
+                        longest_path_list.append(0)
+                        pass
+                critical_path_list.append(np.max(longest_path_list))
+        return critical_path_list
 
 
-
-    def rollout_run(self, t_th, avail_nodes_indices):
+    def rollout_run(self, t_th, avail_nodes_indices): #
         makespan_list = list()
         for k_prime in avail_nodes_indices:
             i_prime = self.job_id_ops[k_prime]
@@ -258,12 +293,38 @@ class AdaptiveScheduler:
                     elif m_count[gen_m] > j_count[i]:
                         j_count[i] = m_count[gen_m]
                     key_count[i] = key_count[i] + 1
-
-
             makespan = max(j_count.values())
             makespan_list.append(makespan)
         return makespan_list
 
+
+
+    def heuristic_run(self):
+        num_operation = len(self.pt)*len(self.pt[0])
+        num_machine = len(self.pt[0])
+        for _ in range(num_operation):
+            pt_list = list()
+            for key, value in self.key_count.items():
+                try:
+                    pt = self.pt[key][value]
+                    try:
+                        pt_list.append(pt/(num_machine-value))
+                    except ZeroDivisionError as ZE:
+                        pt_list.append(float('inf'))
+                except IndexError as IE:
+                    pt_list.append(float('inf'))
+            i = np.argmin(pt_list)
+            gen_t = int(self.pt[i][self.key_count[i]])
+            gen_m = int(self.ms[i][self.key_count[i]])
+            self.j_count[i] = self.j_count[i] + gen_t
+            self.m_count[gen_m] = self.m_count[gen_m] + gen_t
+            if self.m_count[gen_m] < self.j_count[i]:
+                self.m_count[gen_m] = self.j_count[i]
+            elif self.m_count[gen_m] > self.j_count[i]:
+                self.j_count[i] = self.m_count[gen_m]
+            self.key_count[i] = self.key_count[i] + 1
+        makespan = max(self.j_count.values())
+        return makespan
 
     def run(self, sequence):
         for i in sequence:

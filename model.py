@@ -91,11 +91,11 @@ class GCRN(nn.Module):
         self.BN2 = nn.BatchNorm1d(feature_size)
 
     #def forward(self, A, X, num_nodes=None, mini_batch=False):
-    def _prepare_attentional_mechanism_input(self, Wq, Wv,A,k, mini_batch):
+    def _prepare_attentional_mechanism_input(self, Wq, Wv,A):
         Wh1 = Wq
         Wh2 = Wv
         e = Wh1 @ Wh2.T
-        return e*A
+        return F.leaky_relu(e)
     def forward(self, A, X, mini_batch, layer = 0, final = False):
         batch_size = X.shape[0]
         num_nodes = X.shape[1]
@@ -107,15 +107,19 @@ class GCRN(nn.Module):
         for m in range(self.n_multi_head):
             if final == False:
                 empty = torch.zeros(batch_size, num_nodes, self.num_edge_cat, self.graph_embedding_size).to(device)
-            else:pass
+            else:
+                pass
             for b in range(batch_size):
                 for e in range(self.num_edge_cat):
                     E = torch.sparse_coo_tensor(A[b][e],torch.ones(torch.tensor(torch.tensor(A[b][e]).shape[1])),(num_nodes, num_nodes)).to(device).to_dense()
                     Wh = X[b] @ self.Ws[e][m*self.feature_size:(m+1)*self.feature_size]
                     Wq = X[b] @ self.Wq[e][m*self.feature_size:(m+1)*self.feature_size]
                     Wv = X[b] @ self.Wv[e][m*self.feature_size:(m+1)*self.feature_size]
-                    a = self._prepare_attentional_mechanism_input(Wq, Wv,E, e, mini_batch=mini_batch)
-                    a = F.leaky_relu(a)
+                    a = self._prepare_attentional_mechanism_input(Wq, Wv,E)
+
+                    zero_vec = -9e15 * torch.ones_like(E)
+                    a = torch.where(E > 0, a, zero_vec)
+
                     a = F.softmax(a, dim=1)
                     H = a@Wh
                     if final == False:
@@ -132,7 +136,6 @@ class GCRN(nn.Module):
             H = torch.concat(placeholder_for_multi_head, dim = 2)
             H = H.reshape(batch_size*num_nodes, -1)
             H = F.relu(self.Embedding1(H))
-            #print(H.shape)
             X = X.reshape(batch_size*num_nodes, -1)
             H = self.BN1((1 - cfg.alpha)*H + cfg.alpha*X)
         else:
@@ -141,10 +144,8 @@ class GCRN(nn.Module):
             H = F.relu(self.Embedding1_mean(H))
             X = X.reshape(batch_size * num_nodes, -1)
             H = self.BN1((1 - cfg.alpha)*H + cfg.alpha*X)
-            #H = F.dropout(H, p = cfg.dropout)
 
         Z = self.Embedding2(H)
         Z = self.BN2(H + Z)
-        #Z = F.dropout(Z)
         Z = Z.reshape(batch_size, num_nodes, -1)
         return Z

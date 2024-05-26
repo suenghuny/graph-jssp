@@ -11,13 +11,15 @@ import os
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 from time import time
 from datetime import datetime
-
 from actor2 import PtrNet1
-from critic import PtrNet2
 from jssp2 import AdaptiveScheduler
 from cfg import get_cfg
 import random
 cfg = get_cfg()
+
+
+baseline_reset = True
+
 
 if cfg.vessl == True:
     import vessl
@@ -38,8 +40,8 @@ set_seed(20) # 30 했었음
 
 opt_list = [1059, 888, 1005, 1005, 887, 1010, 397, 899, 934, 944]
 orb_list = []
-for i in ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10']:
-    df = pd.read_excel("orb.xlsx", sheet_name=i, engine='openpyxl')
+for i in ['21', '22', '31', '32']:
+    df = pd.read_excel("ta.xlsx", sheet_name=i, engine='openpyxl')
     orb_data = list()#
     for row, column in df.iterrows():
         job = []
@@ -67,13 +69,18 @@ def generate_jssp_instance(num_jobs, num_machine, batch_size):
         scheduler_list.append(AdaptiveScheduler(jobs_datas[n]))
     return jobs_datas, scheduler_list
 
+
+def heuristic_eval(p):
+    scheduler = AdaptiveScheduler(orb_list[p - 1])
+    makespan_heu = scheduler.heuristic_run()
+    return makespan_heu
+
+
 def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=None):
     scheduler_list_val = [AdaptiveScheduler(orb_list[p - 1]) for _ in range(eval_number)]
     val_makespan = list()
     act_model.get_jssp_instance(scheduler_list_val)
     baseline_model.get_jssp_instance(scheduler_list_val)
-    act_model.init_mask_job_count(eval_number)
-    baseline_model.init_mask_job_count(eval_number)
 
     act_model.eval()
 
@@ -86,11 +93,7 @@ def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=Non
     edge_precedence = scheduler.get_edge_index_precedence()
     edge_antiprecedence = scheduler.get_edge_index_antiprecedence()
     edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
-    edge_fcn = scheduler.get_fully_connected_edge_index()
-    if cfg.fully_connected == True:
-        heterogeneous_edges = (edge_precedence, edge_antiprecedence, edge_machine_sharing, edge_fcn)
-    else:
-        heterogeneous_edges = (edge_precedence, edge_antiprecedence, edge_machine_sharing)
+    heterogeneous_edges = (edge_precedence, edge_antiprecedence, edge_machine_sharing)
     heterogeneous_edges = [heterogeneous_edges for _ in range(eval_number)]
     input_data = (node_feature, heterogeneous_edges)
     pred_seq, ll_old, _ = act_model(input_data,
@@ -103,6 +106,7 @@ def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=Non
         scheduler = AdaptiveScheduler(orb_list[p - 1])
         makespan = scheduler.run(sequence.tolist())
         val_makespan.append(makespan)
+    #print("크크크", val_makespan)
     return np.min(val_makespan), np.mean(val_makespan)
 
 
@@ -125,23 +129,19 @@ def train_model(params, log_path=None):
         act_optim = optim.Adam(act_model.parameters(), lr=params["lr"])
     elif params["optimizer"] == "RMSProp":
         act_optim = optim.RMSprop(act_model.parameters(), lr=params["lr"])
-
     if params["is_lr_decay"]:
         act_lr_scheduler = optim.lr_scheduler.StepLR(act_optim, step_size=params["lr_decay_step"],
                                                      gamma=params["lr_decay"])
 
-    mse_loss = nn.MSELoss()
     t1 = time()
     ave_makespan = 0
     min_makespans = []
     mean_makespans = []
 
     c_max = list()
-    c_max_g = list()
-    baseline_update = 30
     b = 0
     for s in range(epoch + 1, params["step"]):
-        problem_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        problem_list = [1, 2, 3, 4]
         """
         변수별 shape 
         inputs : batch_size X number_of_blocks X number_of_process
@@ -149,52 +149,44 @@ def train_model(params, log_path=None):
 
         """
         b += 1
-
-
-        if s % 100 == 1:
-            val_makespans = list()
+        validation_records_min = [[] for _ in problem_list]
+        validation_records_mean = [[] for _ in problem_list]
+        if s % 100 == 1: # Evaluation 수행
             for p in problem_list:
-                eval_number = 2
-                min_makespan, mean_makespan = evaluation(act_model, baseline_model, p, eval_number, device) # upperbound를 확인 하기 위해 2번을 임의로 돌린다.
-
-                eval_number = 50
+                min_makespan = heuristic_eval(p)
+                eval_number = 10
                 min_makespan_list = [min_makespan] * eval_number
                 min_makespan, mean_makespan = evaluation(act_model, baseline_model, p, eval_number, device, upperbound=min_makespan_list)
-                print("ORB{}".format(p), (min_makespan / opt_list[p - 1] - 1) * 100,
-                      ( mean_makespan / opt_list[p - 1] - 1) * 100, min_makespan)
+                print("TA{}".format(problem_list[p-1]), min_makespan, mean_makespan)
                 if cfg.vessl == True:
                     vessl.log(step=s, payload={
-                        'min makespan_{}'.format('ORB' + str(p)): (min_makespan / opt_list[p - 1] - 1) * 100})
+                        'min makespan_{}'.format('TA' + str(problem_list[p-1])): min_makespan})
                     vessl.log(step=s, payload={
-                        'mean makespan_{}'.format('ORB' + str(p)): ( mean_makespan / opt_list[p - 1] - 1) * 100})
+                        'mean makespan_{}'.format('TA' + str(problem_list[p-1])): mean_makespan})
                 else:
-                    min_makespans.append((min_makespan / opt_list[p - 1] - 1) * 100)
-                    mean_makespans.append((mean_makespan / opt_list[p - 1] - 1) * 100)
-                    min_m = pd.DataFrame(min_makespans)
-                    mean_m = pd.DataFrame(mean_makespans)
-                    min_m.to_csv('min_makespan.csv')
-                    mean_m.to_csv('mean_makespan.csv')
+                    validation_records_min[p-1].append(min_makespan)
+                    validation_records_mean[p-1].append(mean_makespan)
+                    min_m = pd.DataFrame(validation_records_min)
+                    mean_m = pd.DataFrame(validation_records_mean)
+                    min_m = min_m.transpose()
+                    mean_m = mean_m.transpose()
+                    min_m.columns = problem_list
+                    mean_m.columns = problem_list
+                    min_m.to_csv('min_makespan_wo_bnb.csv')
+                    mean_m.to_csv('mean_makespan_wo_bnb.csv')
 
         act_model.block_indices = []
         baseline_model.block_indices = []
 
-
-
-        if s % cfg.gen_step == 1:
-            # dt1 = (6, 6)
-            # dt2 = (10, 10)
-            # dt3 = (15, 15)
-            # dt4 = (20, 20)
-            # dt5 = (30, 20)
-            # num_jobs = [6,10,15,20,30]
-            # num_machines = [6, 10, 15, 20, 20]
-            # d = np.random.choice([0,1,2,3,4])
-            num_job = np.random.randint(5, 10)
-            num_machine = np.random.randint(num_job, 10)
-
+        if s % cfg.gen_step == 1:                            # 훈련용 Data Instance 새롭게 생성
+            num_job = np.random.randint(5, 15)
+            num_machine = np.random.randint(num_job, 15)
             jobs_datas, scheduler_list = generate_jssp_instance(num_jobs=num_job, num_machine=num_machine, batch_size=params['batch_size'])
-
-            makespan_list_for_upperbound_recording = [[] for _ in range(params['batch_size'])]
+            makespan_list_for_upperbound = list()
+            for scheduler in scheduler_list:
+                c_max_heu = scheduler.heuristic_run()
+                makespan_list_for_upperbound.append(c_max_heu)
+                scheduler.reset()
         else:
             for scheduler in scheduler_list:
                 scheduler.reset()
@@ -209,25 +201,12 @@ def train_model(params, log_path=None):
             edge_precedence = scheduler.get_edge_index_precedence()
             edge_antiprecedence = scheduler.get_edge_index_antiprecedence()
             edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
-            edge_fcn = scheduler.get_fully_connected_edge_index()
-            if cfg.fully_connected == True:
-                heterogeneous_edge = (edge_precedence, edge_antiprecedence, edge_machine_sharing, edge_fcn)
-            else:
-                heterogeneous_edge = (edge_precedence, edge_antiprecedence, edge_machine_sharing)
+            heterogeneous_edge = (edge_precedence, edge_antiprecedence, edge_machine_sharing)
             heterogeneous_edges.append(heterogeneous_edge)
         input_data = (node_features, heterogeneous_edges)
         act_model.train()
-        if s % cfg.gen_step == 1:
-            pred_seq, ll_old, _ = act_model(input_data, device, scheduler_list=scheduler_list,
-                                            num_machine=num_machine,
-                                            num_job=num_job
-                                            )
-        else:
-            upperbound_list = [np.min(makespan) for makespan in makespan_list_for_upperbound_recording]
-            pred_seq, ll_old, _ = act_model(input_data, device, scheduler_list=scheduler_list,
-                                            num_machine=num_machine,
-                                            num_job=num_job,
-                                            upperbound = upperbound_list
+        pred_seq, ll_old, _ = act_model(input_data, device, scheduler_list=scheduler_list,num_machine=num_machine, num_job=num_job,
+                                            upperbound = makespan_list_for_upperbound
                                             )
 
         real_makespan = list()
@@ -237,43 +216,34 @@ def train_model(params, log_path=None):
             makespan = -scheduler.run(sequence.tolist()) / params['reward_scaler']
             real_makespan.append(makespan)
             c_max.append(makespan)
-            makespan_list_for_upperbound_recording[n].append(makespan)
         ave_makespan += sum(real_makespan) / (params["batch_size"] * params["log_step"])
         """
-
         vanila actor critic
-
         """
-        if s == 1:
-            be = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)
+        if baseline_reset == False:
+            if s == 1:
+                be = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)             #  baseline을 구하는 부분
+            else:
+                be = cfg.beta * be + (1 - cfg.beta) * torch.tensor(real_makespan).to(device)
         else:
-            be = cfg.beta * be + (1 - cfg.beta) * torch.tensor(real_makespan).to(device)
+            if s % cfg.gen_step == 1:
+                be = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)             #  baseline을 구하는 부분
+            else:
+                be = cfg.beta * be + (1 - cfg.beta) * torch.tensor(real_makespan).to(device)
+
         act_optim.zero_grad()
-        adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(
-            device) - be  # torch.tensor(real_makespan_greedy).detach().unsqueeze(1).to(device)
+        adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - be  # torch.tensor(real_makespan_greedy).detach().unsqueeze(1).to(device)
         act_loss = -(ll_old * adv).mean()
         act_loss.backward()
         act_optim.step()
         nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=10.0, norm_type=2)
         if act_lr_scheduler.get_last_lr()[0] >= 1e-4:
             if params["is_lr_decay"]:
-                # print(act_lr_scheduler.get_last_lr())
                 act_lr_scheduler.step()
-
-        # print(act_lr_scheduler.get_last_lr())
-
         ave_act_loss += act_loss.item()
-
-        """
-        vanila actor critic
-
-        """
-
-        #
 
         if s % params["log_step"] == 0:
             t2 = time()
-
             print('step:%d/%d, actic loss:%1.3f, crictic loss:%1.3f, L:%1.3f, %dmin%dsec' % (
                 s, params["step"], ave_act_loss / ((s + 1) * params["iteration"]),
                 ave_cri_loss / ((s + 1) * params["iteration"]), ave_makespan, (t2 - t1) // 60, (t2 - t1) % 60))
@@ -312,30 +282,11 @@ if __name__ == '__main__':
         os.makedirs(log_dir + "/ppo")
 
     model_dir = "./result/model"
-    if not os.path.exists(model_dir + "/ppo_wo_bnb"):
-        os.makedirs(model_dir + "/ppo_wo_bnb")
-
-    # parser.add_argument("--vessl", type=bool, default=False, help="vessl AI 사용여부")
-    # parser.add_argument("--step", type=int, default=400001, help="")
-    # parser.add_argument("--save_step", type=int, default=10, help="")
-    # parser.add_argument("--batch_size", type=int, default=24, help="")
-    # parser.add_argument("--n_hidden", type=int, default=1024, help="")
-    # parser.add_argument("--C", type=float, default=10, help="")
-    # parser.add_argument("--T", type=int, default=1, help="")
-    # parser.add_argument("--iteration", type=int, default=1, help="")
-    # parser.add_argument("--epsilon", type=float, default=0.18, help="")
-    # parser.add_argument("--n_glimpse", type=int, default=2, help="")
-    # parser.add_argument("--n_process", type=int, default=3, help="")
-    # parser.add_argument("--lr", type=float, default=1.2e-4, help="")
-    # parser.add_argument("--lr_decay", type=float, default=0.98, help="")
-    # parser.add_argument("--lr_decay_step", type=int, default=30000, help="")
-    # parser.add_argument("--layers", type=str, default="[128, 108 ,96]", help="")
-    # parser.add_argument("--n_embedding", type=int, default=128, help="")
-    # parser.add_argument("--graph_embedding_size", type=int, default=64, help="")
+    if not os.path.exists(model_dir + "/ppo_bnb"):
+        os.makedirs(model_dir + "/ppo_bnb")
 
     params = {
         "num_of_process": 5,
-        "num_of_blocks": 100,
         "step": cfg.step,
         "log_step": cfg.log_step,
         "log_dir": log_dir,
@@ -348,22 +299,17 @@ if __name__ == '__main__':
         "use_logit_clipping": True,
         "C": cfg.C,
         "T": cfg.T,
-        "decode_type": "sampling",
         "iteration": cfg.iteration,
         "epsilon": cfg.epsilon,
         "optimizer": "Adam",
         "n_glimpse": cfg.n_glimpse,
         "n_process": cfg.n_process,
         "lr": cfg.lr,
-        "is_lr_decay": True,
+        "is_lr_decay": cfg.is_lr_decay,
         "lr_decay": cfg.lr_decay,
-
-        "num_machine": 10,
-        "num_jobs": 10,
         "lr_decay_step": cfg.lr_decay_step,
         "lr_decay_step_critic": cfg.lr_decay_step_critic,
         "load_model": load_model,
-        "gnn": True,
         "layers": eval(cfg.layers),
         "lr_critic": cfg.lr_critic,
         "n_embedding": cfg.n_embedding,

@@ -103,6 +103,8 @@ def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=Non
         scheduler = AdaptiveScheduler(orb_list[p - 1])
         makespan = scheduler.run(sequence.tolist())
         val_makespan.append(makespan)
+    scheduler.reset()
+    c_max_heu = scheduler.heuristic_run()
     return np.min(val_makespan), np.mean(val_makespan)
 
 
@@ -172,8 +174,8 @@ def train_model(params, log_path=None):
                     mean_makespans.append((mean_makespan / opt_list[p - 1] - 1) * 100)
                     min_m = pd.DataFrame(min_makespans)
                     mean_m = pd.DataFrame(mean_makespans)
-                    min_m.to_csv('min_makespan.csv')
-                    mean_m.to_csv('mean_makespan.csv')
+                    min_m.to_csv('min_makespan_wo_bnb_10.csv')
+                    mean_m.to_csv('mean_makespan_wo_bnb_10.csv')
 
         act_model.block_indices = []
         baseline_model.block_indices = []
@@ -181,14 +183,6 @@ def train_model(params, log_path=None):
 
 
         if s % cfg.gen_step == 1:
-            # dt1 = (6, 6)
-            # dt2 = (10, 10)
-            # dt3 = (15, 15)
-            # dt4 = (20, 20)
-            # dt5 = (30, 20)
-            # num_jobs = [6,10,15,20,30]
-            # num_machines = [6, 10, 15, 20, 20]
-            # d = np.random.choice([0,1,2,3,4])
             num_job = np.random.randint(5, 10)
             num_machine = np.random.randint(num_job, 10)
 
