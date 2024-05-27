@@ -1,15 +1,7 @@
-import copy
-import collections
 import numpy as np
-import simpy
-import random
 import matplotlib.pyplot as plt
 from copy import deepcopy
 import pandas as pd
-from collections import defaultdict
-import os
-import pickle
-import time
 
 import networkx as nx
 pt_tmp = pd.read_excel("JSP_dataset.xlsx", sheet_name="Processing Time", index_col=[0], engine = 'openpyxl')
@@ -163,6 +155,7 @@ class AdaptiveScheduler:
     def show(self):
         self.graph.show()
 
+
     def get_earliest_start_and_finish_time(self, available_operations):
         earliest_start_time, earliest_finish_time = self.graph.get_earliest_start_and_finish_time(available_operations)
         return earliest_start_time, earliest_finish_time
@@ -176,8 +169,8 @@ class AdaptiveScheduler:
         return lower_bound_list
 
     def adaptive_run(self, est_holder, fin_holder, i= None):
+        #print("ad", self.key_count.values())
         if i != None:
-            #print(self.key_count[i])
             gen_t = int(self.pt[i][self.key_count[i]])        # 선택된 operation에 대한 processing time 선택
             gen_m = int(self.ms[i][self.key_count[i]])        # 선택된 operation에 대한 machine_sequence 선택
             self.j_count[i] = self.j_count[i] + gen_t          # Job i에 대한 누적 작업 완료시간 업데이트
@@ -188,6 +181,7 @@ class AdaptiveScheduler:
                 self.j_count[i] = self.m_count[gen_m]          # if 및 elif 문은 각각의 누적 작업 완료시간을 큰 녀석으로 업데이트 한다는 의미
             self.key_count[i] = self.key_count[i] + 1          # 해당 Job이 몇번 선택되었는지 count하는 것 업데이트
         makespan = max(self.j_count.values())
+
         estI_list = list()
         gentI_list = list()
         for I in range(self.num_job): # 아직 선택되지 않은 녀석들(선택될 가능성이 있는 애들)에 대한 이야기

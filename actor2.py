@@ -1,14 +1,11 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from copy import deepcopy
 import numpy as np
-from utils import _norm
 import cfg
 
 cfg = cfg.get_cfg()
-from model import GCRN, NodeEmbedding
-from model_fastgtn import FastGTNs
+from model import GCRN
 device = torch.device(cfg.device)
 
 class Greedy(nn.Module):
@@ -98,9 +95,6 @@ class PtrNet1(nn.Module):
         self.BN = nn.BatchNorm1d(augmented_hidden_size)
         self.multi_head_embedding =  nn.Linear(self.n_multi_head * augmented_hidden_size, augmented_hidden_size, bias=False)
 
-
-
-
         self._initialize_weights(params["init_min"], params["init_max"])
         self.use_logit_clipping = params["use_logit_clipping"]
         self.C = params["C"]
@@ -141,9 +135,8 @@ class PtrNet1(nn.Module):
         for idx in range(len(self.instance)):
             instance = self.instance[idx]
             job_selection = job_selections[idx]
-
             if 1 not in instance.mask1[job_selection]:
-                instance.mask1[job_selection][0] = 1
+                pass
             else:
                 index = instance.mask1[job_selection].index(1)
                 instance.mask1[job_selection][index] = 0
@@ -159,6 +152,11 @@ class PtrNet1(nn.Module):
 
             mask1[idx] = torch.tensor(instance.mask1).to(device)
             mask2[idx] = torch.tensor(instance.mask2).to(device)
+       # empty=list()
+        #for idx in range(len(self.instance)):
+       #     empty.append(self.instance[idx].mask1.index(1))
+        #print(empty)
+
         return mask1, mask2
 
 
@@ -243,18 +241,17 @@ class PtrNet1(nn.Module):
                 """
                 for nb in range(batch_size):
                     scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb])
-                    ub = upperbound[nb]
-
-
-                    """
-                    Branch and Cut 로직에 따라 masking을 수행함
-                    모두 다 masking 처리할 수도 있으므로, 모두다 masking할 경우에는 mask로 복원 (if 1 not in mask)
-                    """
-                    mask = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub)
-                    if 1 not in mask:
-                        pass
-                    else:
-                        mask1_debug[nb, :] = torch.tensor(mask).to(device)
+                    if self.params['bound_masking'] == True:
+                        ub = upperbound[nb]
+                        """
+                        Branch and Cut 로직에 따라 masking을 수행함
+                        모두 다 masking 처리할 수도 있으므로, 모두다 masking 할 경우에는 mask로 복원 (if 1 not in mask)
+                        """
+                        mask = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub)
+                        if 1 not in mask:
+                            pass
+                        else:
+                            mask1_debug[nb, :] = torch.tensor(mask).to(device)
 
             else:
                 """
@@ -269,26 +266,26 @@ class PtrNet1(nn.Module):
                     scheduler_list[nb].add_selected_operation(k) # 그림으로 설명 예정
                     next_b = next_job[nb].item()
                     scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb], i = next_b)
-                    ub = upperbound[nb]
-                    mask = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub)
-                    """
-                    Branch and Cut 로직에 따라 masking을 수행함
-                    모두 다 masking 처리할 수도 있으므로, 모두다 masking할 경우에는 mask로 복원 (if 1 not in mask)
-                    """
-                    if 1 not in mask:pass
-                    else:
+                    if self.params['bound_masking'] == True:
+                        ub = upperbound[nb]
+                        mask = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub)
+                        """
+                        Branch and Cut 로직에 따라 masking을 수행함
+                        모두 다 masking 처리할 수도 있으므로, 모두다 masking할 경우에는 mask로 복원 (if 1 not in mask)
+                        """
+                        if 1 not in mask:pass
+                        else:
+                            mask1_debug[nb, :] = torch.tensor(mask).to(device)
 
-                        mask1_debug[nb, :] = torch.tensor(mask).to(device)
 
             est_placeholder = est_placeholder.reshape(batch_size, -1) * mask1_debug
             fin_placeholder = fin_placeholder.reshape(batch_size, -1) * mask1_debug
             est_placeholder = est_placeholder.reshape(batch_size, -1).unsqueeze(2)
             fin_placeholder = fin_placeholder.reshape(batch_size, -1).unsqueeze(2)
             ref = torch.concat([h_bar, est_placeholder, fin_placeholder],dim = 2) # additional information 만드는 부분
-
             h_c = self.decoder(h_emb, h_pi_t_minus_one) # decoding 만드는 부분
             query = h_c.squeeze(0)
-            query = self.glimpse(query, ref, mask2_debug) # multi-head attention 부분
+            query = self.glimpse(query, ref, mask2_debug)  # multi-head attention 부분
             logits = self.pointer(query, ref, mask1_debug) # logit 구하는 부분
             log_p = torch.log_softmax(logits / self.T, dim=-1) # log_softmax로 구하는 부분
 
@@ -304,7 +301,6 @@ class PtrNet1(nn.Module):
 
         pi = torch.stack(pi_list, dim=1)
 
-        print(pi.shape)
         log_probabilities = torch.stack(log_probabilities, dim=1)
         ll = log_probabilities.sum(dim=1)
 

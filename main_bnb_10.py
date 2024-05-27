@@ -1,11 +1,8 @@
-import os
-from scipy import stats
 import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
-import matplotlib.pyplot as plt
 import os
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
@@ -16,9 +13,7 @@ from jssp2 import AdaptiveScheduler
 from cfg import get_cfg
 import random
 cfg = get_cfg()
-
-
-baseline_reset = True
+baseline_reset = cfg.baseline_reset
 
 
 if cfg.vessl == True:
@@ -37,10 +32,9 @@ def set_seed(seed):
 
 # Example usage:
 set_seed(20) # 30 했었음
-
 opt_list = [1059, 888, 1005, 1005, 887, 1010, 397, 899, 934, 944]
 orb_list = []
-for i in ['21', '22', '31', '32']:
+for i in ["21","22",'31', '32']:
     df = pd.read_excel("ta.xlsx", sheet_name=i, engine='openpyxl')
     orb_data = list()#
     for row, column in df.iterrows():
@@ -85,8 +79,10 @@ def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=Non
     act_model.eval()
 
     scheduler = AdaptiveScheduler(orb_list[p - 1])  # scheduler는 validation(ORB set)에 대해 수행
-    num_job = scheduler.num_mc
-    num_machine =scheduler.num_job
+
+    num_job = scheduler.num_job
+    num_machine =scheduler.num_mc
+    #print(num_job, num_machine)
 
     node_feature = scheduler.get_node_feature()
     node_feature = [node_feature for _ in range(int(eval_number))]
@@ -140,8 +136,11 @@ def train_model(params, log_path=None):
 
     c_max = list()
     b = 0
+    problem_list = [1, 2, 3, 4]
+    validation_records_min = [[] for _ in problem_list]
+    validation_records_mean = [[] for _ in problem_list]
     for s in range(epoch + 1, params["step"]):
-        problem_list = [1, 2, 3, 4]
+
         """
         변수별 shape 
         inputs : batch_size X number_of_blocks X number_of_process
@@ -149,8 +148,7 @@ def train_model(params, log_path=None):
 
         """
         b += 1
-        validation_records_min = [[] for _ in problem_list]
-        validation_records_mean = [[] for _ in problem_list]
+
         if s % 100 == 1: # Evaluation 수행
             for p in problem_list:
                 min_makespan = heuristic_eval(p)
@@ -179,8 +177,8 @@ def train_model(params, log_path=None):
         baseline_model.block_indices = []
 
         if s % cfg.gen_step == 1:                            # 훈련용 Data Instance 새롭게 생성
-            num_job = np.random.randint(5, 15)
-            num_machine = np.random.randint(num_job, 15)
+            num_job = np.random.randint(5, 10)
+            num_machine = np.random.randint(num_job, 10)
             jobs_datas, scheduler_list = generate_jssp_instance(num_jobs=num_job, num_machine=num_machine, batch_size=params['batch_size'])
             makespan_list_for_upperbound = list()
             for scheduler in scheduler_list:
@@ -268,7 +266,7 @@ def train_model(params, log_path=None):
                         'ave_act_loss': ave_act_loss,
                         'ave_cri_loss': 0,
                         'ave_makespan': ave_makespan},
-                       params["model_dir"] + '/ppo' + '/%s_step%d_act.pt' % (date, s))
+                       params["model_dir"] + '/ppo_bnb' + '/%s_step%d_act.pt' % (date, s))
         #     print('save model...')
 
 
@@ -317,7 +315,9 @@ if __name__ == '__main__':
         "reward_scaler": cfg.reward_scaler,
         "n_multi_head": cfg.n_multi_head,
         "entropy_weight": cfg.entropy_weight,
-        "dot_product": cfg.dot_product
+        "dot_product": cfg.dot_product,
+        "bound_masing": cfg.bound_masking,
+        "baseline_reset": cfg.baseline_reset
     }
 
     train_model(params)
