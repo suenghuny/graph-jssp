@@ -165,8 +165,8 @@ def train_model(params, log_path=None):
                 min_makespan3, mean_makespan3 = evaluation(act_model, baseline_model, p, eval_number, device,upperbound=min_makespan_list)
 
 
-                min_makespan = min_makespan1   + min_makespan2  + min_makespan3
-                mean_makespan = mean_makespan1 + mean_makespan2 + mean_makespan3
+                min_makespan = np.min([min_makespan1, min_makespan2, min_makespan3])
+                mean_makespan = (mean_makespan1 + mean_makespan2 + mean_makespan3)/3
 
 
                 print("TA{}".format(problem_list[p-1]), min_makespan, mean_makespan)
