@@ -133,12 +133,13 @@ class AdaptiveScheduler:
         self.m_count = {key: 0 for key in self.m_keys}
         self.num_ops = self.num_job*self.num_mc
 
-        self.job_id_ops = list()
-        j = 0
-        for job in self.input_data:
+        self.ops_by_job = dict()
+        k = 0
+        for j in range(len(self.input_data)):
+            job = self.input_data[j]
             for ops in job:
-                self.job_id_ops.append(j)
-            j+=1
+                self.ops_by_job[k] = j
+            k+=1
 
         self.mask1 =  [[0 for _ in range(self.num_mc)] for _ in range(self.num_job)]
         self.mask2 =  [[1 for _ in range(self.num_mc)] for _ in range(self.num_job)]
@@ -209,12 +210,18 @@ class AdaptiveScheduler:
                 pass
         return makespan
 
+    def check_avail_ops(self, avail_ops):
+        empty2 = list()
+        for j_prime, i_prime in self.key_count.items():
+            empty2.append(j_prime)
+
     def get_critical_path(self):
         critical_path_list = list()
         for j_prime, i_prime in self.key_count.items():
             # key는 job_id
             # value는 이번에 해야할 operation에 index가 됨 (index error가 난다는 것은 완료된 job임을 의미한다)
             if i_prime != self.num_mc:
+                avail_ops.append(j_prime*self.num_mc+i_prime)
                 key_count = deepcopy(self.key_count)
                 j_count = deepcopy(self.j_count)
                 m_count = deepcopy(self.m_count)
@@ -243,6 +250,7 @@ class AdaptiveScheduler:
                         longest_path_list.append(0)
                         pass
                 critical_path_list.append(np.max(longest_path_list))
+        #print("후", avail_ops)
         return critical_path_list
 
 

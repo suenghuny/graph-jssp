@@ -41,23 +41,47 @@ class PtrNet1(nn.Module):
         num_edge_cat = 3
         self.GraphEmbedding = GCRN(feature_size =  params["n_hidden"],
                                    graph_embedding_size= params["graph_embedding_size"],
-                                   embedding_size =  params["n_hidden"],layers =  params["layers"], num_edge_cat = num_edge_cat).to(device)
+                                   embedding_size =  params["n_hidden"],
+                                   layers =  params["layers"],
+                                   num_edge_cat = num_edge_cat).to(device)
         self.GraphEmbedding1 = GCRN(feature_size =  params["n_hidden"],
                                    graph_embedding_size= params["graph_embedding_size"],
-                                   embedding_size =  params["n_hidden"],layers =  params["layers"], num_edge_cat = num_edge_cat).to(device)
+                                   embedding_size =  params["n_hidden"],
+                                    layers =  params["layers"],
+                                    num_edge_cat = num_edge_cat).to(device)
         self.GraphEmbedding2 = GCRN(feature_size= params["n_hidden"],
                                     graph_embedding_size=params["graph_embedding_size"],
-                                    embedding_size=params["n_hidden"], layers=params["layers"],
+                                    embedding_size=params["n_hidden"],
+                                    layers=params["layers"],
                                     num_edge_cat=num_edge_cat).to(device)
 
         self.GraphEmbedding3 = GCRN(feature_size= params["n_hidden"],
                                     graph_embedding_size=params["graph_embedding_size"],
-                                    embedding_size=params["n_hidden"], layers=params["layers"],
+                                    embedding_size=params["n_hidden"],
+                                    layers=params["layers"],
                                     num_edge_cat=num_edge_cat).to(device)
         self.GraphEmbedding4 = GCRN(feature_size= params["n_hidden"],
                                     graph_embedding_size=params["graph_embedding_size"],
-                                    embedding_size=params["n_hidden"], layers=params["layers"],
+                                    embedding_size=params["n_hidden"],
+                                    layers=params["layers"],
                                     num_edge_cat=num_edge_cat).to(device)
+        self.GraphEmbedding5 = GCRN(feature_size=params["n_hidden"],
+                                    graph_embedding_size=params["graph_embedding_size"],
+                                    embedding_size=params["n_hidden"],
+                                    layers=params["layers"],
+                                    num_edge_cat=num_edge_cat).to(device)
+        self.GraphEmbedding6 = GCRN(feature_size=params["n_hidden"],
+                                    graph_embedding_size=params["graph_embedding_size"],
+                                    embedding_size=params["n_hidden"],
+                                    layers=params["layers"],
+                                    num_edge_cat=num_edge_cat).to(device)
+        self.GraphEmbedding7 = GCRN(feature_size=params["n_hidden"],
+                                    graph_embedding_size=params["graph_embedding_size"],
+                                    embedding_size=params["n_hidden"],
+                                    layers=params["layers"],
+                                    num_edge_cat=num_edge_cat).to(device)
+
+
 
         augmented_hidden_size = params["n_hidden"]
         self.Vec = [nn.Parameter(torch.FloatTensor(augmented_hidden_size+2, augmented_hidden_size)) for _ in range(self.n_multi_head)]
@@ -188,17 +212,45 @@ class PtrNet1(nn.Module):
             enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
             enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
             enc_h = self.GraphEmbedding3(heterogeneous_edges, enc_h, mini_batch=True, final = True)
+        if cfg.k_hop == 5:
+            enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
+            enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
+            enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
+            enc_h = self.GraphEmbedding3(heterogeneous_edges, enc_h, mini_batch=True)
+            enc_h = self.GraphEmbedding4(heterogeneous_edges, enc_h, mini_batch=True, final = True)
+        if cfg.k_hop == 6:
+            enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
+            enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
+            enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
+            enc_h = self.GraphEmbedding3(heterogeneous_edges, enc_h, mini_batch=True)
+            enc_h = self.GraphEmbedding4(heterogeneous_edges, enc_h, mini_batch=True)
+            enc_h = self.GraphEmbedding5(heterogeneous_edges, enc_h, mini_batch=True, final = True)
+
+        if cfg.k_hop == 7:
+            enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
+            enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
+            enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
+            enc_h = self.GraphEmbedding3(heterogeneous_edges, enc_h, mini_batch=True)
+            enc_h = self.GraphEmbedding4(heterogeneous_edges, enc_h, mini_batch=True)
+            enc_h = self.GraphEmbedding5(heterogeneous_edges, enc_h, mini_batch=True)
+            enc_h = self.GraphEmbedding6(heterogeneous_edges, enc_h, mini_batch=True, final = True)
 
         embed = enc_h.size(2)
         h = enc_h.mean(dim = 1).unsqueeze(0) # 모든 node embedding에 대한 평균을 낸다.
         enc_h = enc_h[:, :-2]                # dummy node(source, sink)는 제외한다.
         return enc_h, h, embed, batch, operation_num
 
+    def get_critical_check(self, scheduler, mask):
+        available_operations = mask
+        avail_nodes = np.array(available_operations)
+        avail_nodes_indices = np.where(avail_nodes == 1)[0].tolist() # 현재 시점에 가능한 operation들의 모임이다.
+        #print(avail_nodes_indices)
+        scheduler.check_avail_ops(avail_nodes_indices)
     def branch_and_cut_masking(self, scheduler, mask, i, upperbound):
         available_operations = mask
         avail_nodes = np.array(available_operations)
         avail_nodes_indices = np.where(avail_nodes == 1)[0].tolist() # 현재 시점에 가능한 operation들의 모임이다.
-        print(avail_nodes_indices)
+        #print("전", avail_nodes_indices)
         critical_path_list = scheduler.get_critical_path()
         for i in range(len(avail_nodes_indices)):
             k = avail_nodes_indices[i]
@@ -242,6 +294,7 @@ class PtrNet1(nn.Module):
                 """
                 for nb in range(batch_size):
                     scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb])
+                    #self.get_critical_check(scheduler_list[nb],  mask1_debug[nb,:].cpu().numpy())
                     if self.params['bound_masking'] == True:
                         ub = upperbound[nb]
                         """
@@ -253,7 +306,6 @@ class PtrNet1(nn.Module):
                             pass
                         else:
                             mask1_debug[nb, :] = torch.tensor(mask).to(device)
-                    #if self.params['feature_critical_path'] == True:
 
             else:
                 """
@@ -268,6 +320,9 @@ class PtrNet1(nn.Module):
                     scheduler_list[nb].add_selected_operation(k) # 그림으로 설명 예정
                     next_b = next_job[nb].item()
                     scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb], i = next_b)
+
+
+
                     if self.params['bound_masking'] == True:
                         ub = upperbound[nb]
                         mask = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub)
