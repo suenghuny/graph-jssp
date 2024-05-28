@@ -152,15 +152,13 @@ def train_model(params, log_path=None):
         if s % 100 == 1: # Evaluation 수행
             for p in problem_list:
                 min_makespan = heuristic_eval(p)
-                eval_number = 10
+                eval_number = 20
                 min_makespan_list = [min_makespan] * eval_number
                 min_makespan, mean_makespan = evaluation(act_model, baseline_model, p, eval_number, device, upperbound=min_makespan_list)
                 print("TA{}".format(problem_list[p-1]), min_makespan, mean_makespan)
                 if cfg.vessl == True:
-                    vessl.log(step=s, payload={
-                        'min makespan_{}'.format('TA' + str(problem_list[p-1])): min_makespan})
-                    vessl.log(step=s, payload={
-                        'mean makespan_{}'.format('TA' + str(problem_list[p-1])): mean_makespan})
+                    vessl.log(step=s, payload={'min makespan_{}'.format(str(problem_list[p-1])): min_makespan})
+                    vessl.log(step=s, payload={'mean makespan_{}'.format(str(problem_list[p-1])): mean_makespan})
                 else:
                     validation_records_min[p-1].append(min_makespan)
                     validation_records_mean[p-1].append(mean_makespan)
