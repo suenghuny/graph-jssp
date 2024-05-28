@@ -112,9 +112,9 @@ class GCRN(nn.Module):
                 for e in range(self.num_edge_cat):
                     E = torch.sparse_coo_tensor(A[b][e],torch.ones(torch.tensor(torch.tensor(A[b][e]).shape[1])),(num_nodes, num_nodes)).to(device).to_dense()
                     Wh = X[b] @ self.Ws[e][m*self.feature_size:(m+1)*self.feature_size]
-                    Wq = X[b] @ self.Wq[e][m*self.feature_size:(m+1)*self.feature_size]
-                    Wv = X[b] @ self.Wv[e][m*self.feature_size:(m+1)*self.feature_size]
-                    a = self._prepare_attentional_mechanism_input(Wq, Wv,E)
+                    # Wq = X[b] @ self.Wq[e][m*self.feature_size:(m+1)*self.feature_size]
+                    # Wv = X[b] @ self.Wv[e][m*self.feature_size:(m+1)*self.feature_size]
+                    a = self._prepare_attentional_mechanism_input(Wh, Wh,E)
 
                     zero_vec = -9e15 * torch.ones_like(E)
                     a = torch.where(E > 0, a, zero_vec)

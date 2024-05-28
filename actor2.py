@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import cfg
-
+from copy import deepcopy
 cfg = cfg.get_cfg()
 from model import GCRN
 device = torch.device(cfg.device)
@@ -244,14 +244,20 @@ class PtrNet1(nn.Module):
         available_operations = mask
         avail_nodes = np.array(available_operations)
         avail_nodes_indices = np.where(avail_nodes == 1)[0].tolist() # 현재 시점에 가능한 operation들의 모임이다.
-        #print(avail_nodes_indices)
         scheduler.check_avail_ops(avail_nodes_indices)
+
+
     def branch_and_cut_masking(self, scheduler, mask, i, upperbound):
         available_operations = mask
+        copied_mask = deepcopy(mask)
         avail_nodes = np.array(available_operations)
         avail_nodes_indices = np.where(avail_nodes == 1)[0].tolist() # 현재 시점에 가능한 operation들의 모임이다.
-        #print("전", avail_nodes_indices)
         critical_path_list = scheduler.get_critical_path()
+        #copied_maks
+        copied_mask[avail_nodes_indices] = critical_path_list/blahbal
+
+
+
         for i in range(len(avail_nodes_indices)):
             k = avail_nodes_indices[i]
             upperbound = upperbound
@@ -259,8 +265,6 @@ class PtrNet1(nn.Module):
                 if critical_path_list[i] >= upperbound: # 해당 operation을 선택했을 때, upperbound보다 크다는 건 해볼 가치가 없다고 볼 수 있음. 그래서 masking함
                     mask[k] = 0
         return mask
-
-
 
 
     def forward(self, x, device, scheduler_list, num_job, num_machine, upperbound= None):
@@ -273,9 +277,6 @@ class PtrNet1(nn.Module):
 
         h_bar, h_emb, embed, batch, num_operations = self.encoder(node_features, heterogeneous_edges)
         h_pi_t_minus_one = self.v_1.unsqueeze(0).repeat(batch, 1).unsqueeze(0).to(device)
-
-
-
         mask1_debug, mask2_debug = self.init_mask()
         batch_size = h_pi_t_minus_one.shape[1]
 

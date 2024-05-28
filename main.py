@@ -171,8 +171,8 @@ def train_model(params, log_path=None):
 
                 print("TA{}".format(problem_list[p-1]), min_makespan, mean_makespan)
                 if cfg.vessl == True:
-                    vessl.log(step=s, payload={'min makespan_{}'.format(str(problem_list[p-1])): min_makespan})
-                    vessl.log(step=s, payload={'mean makespan_{}'.format(str(problem_list[p-1])): mean_makespan})
+                    vessl.log(step=s, payload={'minmakespan{}'.format(str(problem_list[p-1])): min_makespan})
+                    vessl.log(step=s, payload={'meanmakespan{}'.format(str(problem_list[p-1])): mean_makespan})
                 else:
                     validation_records_min[p-1].append(min_makespan)
                     validation_records_mean[p-1].append(mean_makespan)

@@ -163,14 +163,12 @@ class AdaptiveScheduler:
 
     def get_lower_bound(self, avail_nodes_indices):
         lower_bound_list = list()
-        #print(avail_nodes_indices)
         for k_prime in avail_nodes_indices:
             lower_bound = self.graph.get_lower_bound(k_prime)
             lower_bound_list.append(lower_bound)
         return lower_bound_list
 
     def adaptive_run(self, est_holder, fin_holder, i= None):
-        #print("ad", self.key_count.values())
         if i != None:
             gen_t = int(self.pt[i][self.key_count[i]])        # 선택된 operation에 대한 processing time 선택
             gen_m = int(self.ms[i][self.key_count[i]])        # 선택된 operation에 대한 machine_sequence 선택
@@ -221,7 +219,6 @@ class AdaptiveScheduler:
             # key는 job_id
             # value는 이번에 해야할 operation에 index가 됨 (index error가 난다는 것은 완료된 job임을 의미한다)
             if i_prime != self.num_mc:
-                avail_ops.append(j_prime*self.num_mc+i_prime)
                 key_count = deepcopy(self.key_count)
                 j_count = deepcopy(self.j_count)
                 m_count = deepcopy(self.m_count)
