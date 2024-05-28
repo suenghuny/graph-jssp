@@ -34,7 +34,7 @@ def set_seed(seed):
 set_seed(20) # 30 했었음
 opt_list = [1059, 888, 1005, 1005, 887, 1010, 397, 899, 934, 944]
 orb_list = []
-for i in ["21","22",'31', '32']:
+for i in ["21","22"]:
     df = pd.read_excel("ta.xlsx", sheet_name=i, engine='openpyxl')
     orb_data = list()#
     for row, column in df.iterrows():
@@ -136,7 +136,7 @@ def train_model(params, log_path=None):
 
     c_max = list()
     b = 0
-    problem_list = [1, 2, 3, 4]
+    problem_list = [1, 2]
     validation_records_min = [[] for _ in problem_list]
     validation_records_mean = [[] for _ in problem_list]
     for s in range(epoch + 1, params["step"]):
