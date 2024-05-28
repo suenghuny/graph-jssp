@@ -170,8 +170,8 @@ def train_model(params, log_path=None):
                     mean_m = mean_m.transpose()
                     min_m.columns = problem_list
                     mean_m.columns = problem_list
-                    min_m.to_csv('min_makespan_wo_bnb.csv')
-                    mean_m.to_csv('mean_makespan_wo_bnb.csv')
+                    min_m.to_csv('min_makespan_w_bnb.csv')
+                    mean_m.to_csv('mean_makespan_w_bnb.csv')
 
         act_model.block_indices = []
         baseline_model.block_indices = []
@@ -317,8 +317,7 @@ if __name__ == '__main__':
         "entropy_weight": cfg.entropy_weight,
         "dot_product": cfg.dot_product,
         "bound_masking": cfg.bound_masking,
-        "baseline_reset": cfg.baseline_reset,
-        "feature_critical_path": cfg.feature_critical_path
+        "baseline_reset": cfg.baseline_reset
     }
 
     train_model(params)

@@ -198,6 +198,7 @@ class PtrNet1(nn.Module):
         available_operations = mask
         avail_nodes = np.array(available_operations)
         avail_nodes_indices = np.where(avail_nodes == 1)[0].tolist() # 현재 시점에 가능한 operation들의 모임이다.
+        print(avail_nodes_indices)
         critical_path_list = scheduler.get_critical_path()
         for i in range(len(avail_nodes_indices)):
             k = avail_nodes_indices[i]
@@ -252,6 +253,7 @@ class PtrNet1(nn.Module):
                             pass
                         else:
                             mask1_debug[nb, :] = torch.tensor(mask).to(device)
+                    #if self.params['feature_critical_path'] == True:
 
             else:
                 """

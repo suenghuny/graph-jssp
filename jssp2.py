@@ -211,7 +211,6 @@ class AdaptiveScheduler:
 
     def get_critical_path(self):
         critical_path_list = list()
-        #print(self.key_count)
         for j_prime, i_prime in self.key_count.items():
             # key는 job_id
             # value는 이번에 해야할 operation에 index가 됨 (index error가 난다는 것은 완료된 job임을 의미한다)
