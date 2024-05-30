@@ -84,33 +84,33 @@ class PtrNet1(nn.Module):
 
 
         augmented_hidden_size = params["n_hidden"]
-        self.Vec = [nn.Parameter(torch.FloatTensor(augmented_hidden_size+2, augmented_hidden_size)) for _ in range(self.n_multi_head)]
+        self.Vec = [nn.Parameter(torch.FloatTensor(augmented_hidden_size+3, augmented_hidden_size)) for _ in range(self.n_multi_head)]
         self.Vec = nn.ParameterList(self.Vec)
         self.W_q = [nn.Linear(2*augmented_hidden_size, augmented_hidden_size, bias=False).to(device)  for _ in range(self.n_multi_head)]
         self.W_q_weights = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_q])
         self.W_q_biases = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_q])
-        self.W_ref =[nn.Linear(augmented_hidden_size+2,augmented_hidden_size, bias=False).to(device) for _ in range(self.n_multi_head)]
+        self.W_ref =[nn.Linear(augmented_hidden_size+3,augmented_hidden_size, bias=False).to(device) for _ in range(self.n_multi_head)]
         self.W_ref_weights = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_ref])
         self.W_ref_biases = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_ref])
-        self.Vec3 = [nn.Parameter(torch.FloatTensor(augmented_hidden_size+2, augmented_hidden_size)) for _ in range(self.n_multi_head)]
+        self.Vec3 = [nn.Parameter(torch.FloatTensor(augmented_hidden_size+3, augmented_hidden_size)) for _ in range(self.n_multi_head)]
         self.Vec3 = nn.ParameterList(self.Vec3)
         self.W_q3 = [nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False).to(device)  for _ in range(self.n_multi_head)]
         self.W_q_weights3 = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_q3])
         self.W_q_biases3 = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_q3])
-        self.W_ref3 =[nn.Linear(augmented_hidden_size+2,augmented_hidden_size, bias=False).to(device) for _ in range(self.n_multi_head)]
+        self.W_ref3 =[nn.Linear(augmented_hidden_size+3,augmented_hidden_size, bias=False).to(device) for _ in range(self.n_multi_head)]
         self.W_ref_weights3 = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_ref3])
         self.W_ref_biases3 = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_ref3])
-        self.Vec4 = [nn.Parameter(torch.FloatTensor(augmented_hidden_size+2, augmented_hidden_size)) for _ in range(self.n_multi_head)]
+        self.Vec4 = [nn.Parameter(torch.FloatTensor(augmented_hidden_size+3, augmented_hidden_size)) for _ in range(self.n_multi_head)]
         self.Vec4 = nn.ParameterList(self.Vec4)
         self.W_q4 = [nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False).to(device)  for _ in range(self.n_multi_head)]
         self.W_q_weights4 = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_q4])
         self.W_q_biases4 = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_q4])
-        self.W_ref4 =[nn.Linear(augmented_hidden_size+2,augmented_hidden_size, bias=False).to(device) for _ in range(self.n_multi_head)]
+        self.W_ref4 =[nn.Linear(augmented_hidden_size+3,augmented_hidden_size, bias=False).to(device) for _ in range(self.n_multi_head)]
         self.W_ref_weights4 = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_ref4])
         self.W_ref_biases4 = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_ref4])
         self.Vec2 = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
         self.W_q2 = nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False)
-        self.W_ref2 = nn.Linear(augmented_hidden_size+2,augmented_hidden_size, bias=False)
+        self.W_ref2 = nn.Linear(augmented_hidden_size+3,augmented_hidden_size, bias=False)
         self.dec_input = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
 
         self.v_1 = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
@@ -253,18 +253,10 @@ class PtrNet1(nn.Module):
         avail_nodes = np.array(available_operations)
         avail_nodes_indices = np.where(avail_nodes == 1)[0].tolist() # 현재 시점에 가능한 operation들의 모임이다.
         critical_path_list = scheduler.get_critical_path()
-        #copied_maks
-        copied_mask[avail_nodes_indices] = critical_path_list/blahbal
-
-
-
-        for i in range(len(avail_nodes_indices)):
-            k = avail_nodes_indices[i]
-            upperbound = upperbound
-            if upperbound != None:
-                if critical_path_list[i] >= upperbound: # 해당 operation을 선택했을 때, upperbound보다 크다는 건 해볼 가치가 없다고 볼 수 있음. 그래서 masking함
-                    mask[k] = 0
-        return mask
+        if np.max(critical_path_list)>0:
+            copied_mask[avail_nodes_indices] = critical_path_list
+            copied_mask = copied_mask/np.max(critical_path_list)
+        return mask, copied_mask
 
 
     def forward(self, x, device, scheduler_list, num_job, num_machine, upperbound= None):
@@ -285,6 +277,7 @@ class PtrNet1(nn.Module):
             fin_placeholder = mask2_debug.clone().to(device)
             mask1_debug = mask1_debug.reshape(batch_size, -1)
             mask2_debug = mask2_debug.reshape(batch_size, -1)
+            empty_zero = torch.zeros(batch_size, num_operations).to(device)
             if i == 0:
                 """
                 Earliest Start Time (est_placeholder)
@@ -302,11 +295,13 @@ class PtrNet1(nn.Module):
                         Branch and Cut 로직에 따라 masking을 수행함
                         모두 다 masking 처리할 수도 있으므로, 모두다 masking 할 경우에는 mask로 복원 (if 1 not in mask)
                         """
-                        mask = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub)
-                        if 1 not in mask:
-                            pass
-                        else:
-                            mask1_debug[nb, :] = torch.tensor(mask).to(device)
+                        mask, critical_path = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub)
+                        #print(empty_zero.shape, empty_zero[nb, :].shape, torch.tensor(critical_path).shape)
+                        empty_zero[nb, :] = torch.tensor(critical_path).to(device)
+                        # if 1 not in mask:
+                        #     pass
+                        # else:
+                        #     mask1_debug[nb, :] = torch.tensor(mask).to(device)
 
             else:
                 """
@@ -326,21 +321,26 @@ class PtrNet1(nn.Module):
 
                     if self.params['bound_masking'] == True:
                         ub = upperbound[nb]
-                        mask = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub)
+                        mask, critical_path = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub)
+                        empty_zero[nb, :] = torch.tensor(critical_path).to(device)
                         """
                         Branch and Cut 로직에 따라 masking을 수행함
                         모두 다 masking 처리할 수도 있으므로, 모두다 masking할 경우에는 mask로 복원 (if 1 not in mask)
                         """
-                        if 1 not in mask:pass
-                        else:
-                            mask1_debug[nb, :] = torch.tensor(mask).to(device)
+                        # if 1 not in mask:pass
+                        # else:
 
 
-            est_placeholder = est_placeholder.reshape(batch_size, -1) * mask1_debug
-            fin_placeholder = fin_placeholder.reshape(batch_size, -1) * mask1_debug
+
             est_placeholder = est_placeholder.reshape(batch_size, -1).unsqueeze(2)
             fin_placeholder = fin_placeholder.reshape(batch_size, -1).unsqueeze(2)
-            ref = torch.concat([h_bar, est_placeholder, fin_placeholder],dim = 2) # additional information 만드는 부분
+            empty_zero = empty_zero.unsqueeze(2)
+            #print(est_placeholder.shape, empty_zero.shape)
+            # print("===============================================")
+            # print("st", est_placeholder)
+            # print('fin', fin_placeholder)
+            # print('empty', empty_zero)
+            ref = torch.concat([h_bar, est_placeholder, fin_placeholder, empty_zero],dim = 2) # additional information 만드는 부분
             h_c = self.decoder(h_emb, h_pi_t_minus_one) # decoding 만드는 부분
             query = h_c.squeeze(0)
             query = self.glimpse(query, ref, mask2_debug)  # multi-head attention 부분
