@@ -3,7 +3,7 @@ import argparse
 def get_cfg():
     parser = argparse.ArgumentParser(description="")
     parser.add_argument("--vessl", type=bool, default=False, help="vessl AI 사용여부")
-    parser.add_argument("--step", type=int, default=10001, help="")
+    parser.add_argument("--step", type=int, default=10000001, help="")
     parser.add_argument("--log_step", type=int, default=10, help="")
     parser.add_argument("--save_step", type=int, default=50, help="")
     parser.add_argument("--batch_size", type=int, default=8, help="")
@@ -35,7 +35,7 @@ def get_cfg():
     parser.add_argument("--gen_step", type=int, default=5, help="")
     parser.add_argument("--is_lr_decay", type=bool, default=True, help="lr_decay")
     parser.add_argument("--beta", type=str, default=0.95, help="")
-    parser.add_argument("--device", type=str, default="cuda:0", help="")
+    parser.add_argument("--device", type=str, default="cuda:1", help="")
     parser.add_argument("--bound_masking", type=bool, default=True, help="")
     parser.add_argument("--baseline_reset", type=bool, default=False, help="")
     parser.add_argument("--feature_critical_path", type=bool, default=False, help="")

@@ -64,7 +64,7 @@ def generate_jssp_instance(num_jobs, num_machine, batch_size):
     return jobs_datas, scheduler_list
 
 
-def heuristic_eval(p):
+def heuristic_eval(p): # 불필요(현재로써는)
     scheduler = AdaptiveScheduler(orb_list[p - 1])
     makespan_heu = scheduler.heuristic_run()
     return makespan_heu
@@ -119,10 +119,16 @@ def train_model(params, log_path=None):
     ave_cri_loss = 0.0
 
     act_model = PtrNet1(params).to(device)
-    baseline_model = PtrNet1(params).to(device)
-    baseline_model.load_state_dict(act_model.state_dict())
+
+    baseline_model = PtrNet1(params).to(device) # baseline_model 불필요
+    baseline_model.load_state_dict(act_model.state_dict()) # baseline_model 불필요
     if params["optimizer"] == 'Adam':
         act_optim = optim.Adam(act_model.parameters(), lr=params["lr"])
+        """
+        act_model이라는 신경망 뭉치에 파라미터(가중치, 편향)을 업데이트 할꺼야.
+         
+        """
+
     elif params["optimizer"] == "RMSProp":
         act_optim = optim.RMSprop(act_model.parameters(), lr=params["lr"])
     if params["is_lr_decay"]:
@@ -131,8 +137,6 @@ def train_model(params, log_path=None):
 
     t1 = time()
     ave_makespan = 0
-    min_makespans = []
-    mean_makespans = []
 
     c_max = list()
     b = 0
@@ -142,6 +146,7 @@ def train_model(params, log_path=None):
     for s in range(epoch + 1, params["step"]):
 
         """
+        
         변수별 shape 
         inputs : batch_size X number_of_blocks X number_of_process
         pred_seq : batch_size X number_of_blocks
@@ -188,10 +193,14 @@ def train_model(params, log_path=None):
         act_model.block_indices = []
         baseline_model.block_indices = []
 
-        if s % cfg.gen_step == 1:                            # 훈련용 Data Instance 새롭게 생성
+        if s % cfg.gen_step == 1:                            # 훈련용 Data Instance 새롭게 생성 (gen_step 마다 생성)
+            """
+            
+            훈련용 데이터셋 생성하는 코드
+            """
             num_job = np.random.randint(5, 10)
             num_machine = np.random.randint(num_job, 10)
-            jobs_datas, scheduler_list = generate_jssp_instance(num_jobs=num_job, num_machine=num_machine, batch_size=params['batch_size'])
+            jobs_datas, scheduler_list = generate_jssp_instance(num_jobs=num_job,  num_machine=num_machine, batch_size=params['batch_size'])
             makespan_list_for_upperbound = list()
             for scheduler in scheduler_list:
                 c_max_heu = scheduler.heuristic_run()
@@ -200,27 +209,39 @@ def train_model(params, log_path=None):
         else:
             for scheduler in scheduler_list:
                 scheduler.reset()
-
-        act_model.get_jssp_instance(scheduler_list)
+        """
+        
+        """
+        act_model.get_jssp_instance(scheduler_list) # 훈련해야할 instance를 에이전트가 참조(등록)하는 코드
         heterogeneous_edges = list()
         node_features = list()
+
         for n in range(params['batch_size']):
+            """
+            Instance를 명세하는 부분
+            - Node feature: Operation의 다섯개 feature
+            - Edge: 
+            """
+
+
             scheduler = AdaptiveScheduler(jobs_datas[n])
             node_feature = scheduler.get_node_feature()
             node_features.append(node_feature)
             edge_precedence = scheduler.get_edge_index_precedence()
             edge_antiprecedence = scheduler.get_edge_index_antiprecedence()
             edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
-            heterogeneous_edge = (edge_precedence, edge_antiprecedence, edge_machine_sharing)
+            heterogeneous_edge = (edge_precedence, edge_antiprecedence, edge_machine_sharing) # 세종류의 엑지들을 하나의 변수로 참조시킴
             heterogeneous_edges.append(heterogeneous_edge)
         input_data = (node_features, heterogeneous_edges)
         act_model.train()
-        pred_seq, ll_old, _ = act_model(input_data, device, scheduler_list=scheduler_list,num_machine=num_machine, num_job=num_job,
-                                            upperbound = makespan_list_for_upperbound
+        pred_seq, ll_old, _ = act_model(input_data, device, scheduler_list=scheduler_list,
+                                        num_machine=num_machine, num_job=num_job,
+                                        upperbound = makespan_list_for_upperbound
                                             )
 
+
         real_makespan = list()
-        for n in range(len(node_features)):
+        for n in range(pred_seq.shape[0]): # act_model(agent)가 산출한 해를 평가하는 부분
             sequence = pred_seq[n]
             scheduler = AdaptiveScheduler(jobs_datas[n])
             makespan = -scheduler.run(sequence.tolist()) / params['reward_scaler']
@@ -242,8 +263,16 @@ def train_model(params, log_path=None):
                 be = cfg.beta * be + (1 - cfg.beta) * torch.tensor(real_makespan).to(device)
 
         act_optim.zero_grad()
-        adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - be  # torch.tensor(real_makespan_greedy).detach().unsqueeze(1).to(device)
-        act_loss = -(ll_old * adv).mean()
+        adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - be  # baseline(advantage) 구하는 부분
+        """
+        1. Loss 구하기
+        2. Gradient 구하기 (loss.backward)
+        3. Update 하기(act_optim.step)
+        """
+
+
+
+        act_loss = -(ll_old * adv).mean()                                        # loss 구하는 부분 /  ll_old의 의미 log_theta (pi | s)
         act_loss.backward()
         act_optim.step()
         nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=10.0, norm_type=2)

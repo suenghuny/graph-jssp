@@ -8,14 +8,6 @@ cfg = cfg.get_cfg()
 from model import GCRN
 device = torch.device(cfg.device)
 
-class Greedy(nn.Module):
-    def __init__(self):
-        super().__init__()
-
-    def forward(self, log_p):
-        #print("greedy", log_p.shape)
-        return torch.argmax(log_p, dim=1).long()
-
 
 class Categorical(nn.Module):
     def __init__(self):
@@ -24,11 +16,6 @@ class Categorical(nn.Module):
         return torch.multinomial(log_p.exp(), 1).long().squeeze(1)
 
 
-class Predictor(nn.Module):
-    def __init_(self):
-        super().__init__()
-        self.fc1 = nn.linear()
-
 
 
 class PtrNet1(nn.Module):
@@ -36,9 +23,9 @@ class PtrNet1(nn.Module):
         super().__init__()
         device = torch.device(cfg.device)
         self.n_multi_head = params["n_multi_head"]
-        self.Embedding = nn.Linear(params["num_of_process"],  params["n_hidden"], bias=False).to(device)  # input_shape : num_of_process, output_shape : n_embedding
-
+        self.Embedding = nn.Linear(params["num_of_process"],params["n_hidden"], bias=False).to(device)  # 그림 상에서 Encoder에 FF(feedforward)라고 써져있는 부분
         num_edge_cat = 3
+
         self.GraphEmbedding = GCRN(feature_size =  params["n_hidden"],
                                    graph_embedding_size= params["graph_embedding_size"],
                                    embedding_size =  params["n_hidden"],
@@ -112,13 +99,11 @@ class PtrNet1(nn.Module):
         self.W_q2 = nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False)
         self.W_ref2 = nn.Linear(augmented_hidden_size+3,augmented_hidden_size, bias=False)
         self.dec_input = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
-
         self.v_1 = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
         self.v_f = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
         self.h_embedding = nn.Linear(2 * augmented_hidden_size, augmented_hidden_size, bias=False)
         self.BN = nn.BatchNorm1d(augmented_hidden_size)
         self.multi_head_embedding =  nn.Linear(self.n_multi_head * augmented_hidden_size, augmented_hidden_size, bias=False)
-
         self._initialize_weights(params["init_min"], params["init_max"])
         self.use_logit_clipping = params["use_logit_clipping"]
         self.C = params["C"]
@@ -126,12 +111,11 @@ class PtrNet1(nn.Module):
         self.n_glimpse = params["n_glimpse"]
 
 
-
         self.job_selecter = Categorical()
         self.params = params
 
 
-    def get_jssp_instance(self, instance):
+    def get_jssp_instance(self, instance): # 훈련해야할 instance를 에이전트가 참조(등록)하는 코드
         self.instance = instance
         self.mask1_temp = [instance.mask1 for instance in self.instance]
         self.mask2_temp = [instance.mask2 for instance in self.instance]
@@ -236,8 +220,8 @@ class PtrNet1(nn.Module):
             enc_h = self.GraphEmbedding6(heterogeneous_edges, enc_h, mini_batch=True, final = True)
 
         embed = enc_h.size(2)
-        h = enc_h.mean(dim = 1).unsqueeze(0) # 모든 node embedding에 대한 평균을 낸다.
-        enc_h = enc_h[:, :-2]                # dummy node(source, sink)는 제외한다.
+        h = enc_h.mean(dim = 1).unsqueeze(0) # 모든 node embedding에 대해서(element wise) 평균을 낸다.
+        enc_h = enc_h[:, :-2]                 # dummy node(source, sink)는 제외한다.
         return enc_h, h, embed, batch, operation_num
 
     def get_critical_check(self, scheduler, mask):
@@ -263,14 +247,26 @@ class PtrNet1(nn.Module):
         node_features, heterogeneous_edges = x
         node_features = torch.tensor(node_features).to(device).float()
         pi_list, log_ps = [], []
+
         log_probabilities = list()
+
+
         sample_space = [[j for i in range(num_machine)] for j in range(num_job)]
         sample_space = torch.tensor(sample_space).view(-1)
 
+
         h_bar, h_emb, embed, batch, num_operations = self.encoder(node_features, heterogeneous_edges)
-        h_pi_t_minus_one = self.v_1.unsqueeze(0).repeat(batch, 1).unsqueeze(0).to(device)
+
+        """
+        이 위에 까지가 Encoder
+        이 아래 부터는 Decoder
+        """
+
+        h_pi_t_minus_one = self.v_1.unsqueeze(0).repeat(batch, 1).unsqueeze(0).to(device) # 이녀석이 s.o.s(start of singal)에 해당
         mask1_debug, mask2_debug = self.init_mask()
         batch_size = h_pi_t_minus_one.shape[1]
+
+
 
         for i in range(num_operations):
             est_placeholder = mask1_debug.clone().to(device)
@@ -295,9 +291,8 @@ class PtrNet1(nn.Module):
                         Branch and Cut 로직에 따라 masking을 수행함
                         모두 다 masking 처리할 수도 있으므로, 모두다 masking 할 경우에는 mask로 복원 (if 1 not in mask)
                         """
-                        mask, critical_path = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub)
-                        #print(empty_zero.shape, empty_zero[nb, :].shape, torch.tensor(critical_path).shape)
-                        empty_zero[nb, :] = torch.tensor(critical_path).to(device)
+                        mask, critical_path = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub) # 안중요
+                        empty_zero[nb, :] = torch.tensor(critical_path).to(device)# 안중요
                         # if 1 not in mask:
                         #     pass
                         # else:
@@ -313,9 +308,9 @@ class PtrNet1(nn.Module):
                 """
                 for nb in range(batch_size):
                     k = next_operation_index[nb].item()
-                    scheduler_list[nb].add_selected_operation(k) # 그림으로 설명 예정
+                    scheduler_list[nb].add_selected_operation(k) # 그림으로 설명 예정# 안중요
                     next_b = next_job[nb].item()
-                    scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb], i = next_b)
+                    scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb], i = next_b) # next_b는 이전 스텝에서 선택된 Job이고, Adaptive Run이라는 것은 선택된 Job에 따라 update한 다음에 EST, EFIN을 구하라는 의미
 
 
 
@@ -340,18 +335,29 @@ class PtrNet1(nn.Module):
             # print("st", est_placeholder)
             # print('fin', fin_placeholder)
             # print('empty', empty_zero)
-            ref = torch.concat([h_bar, est_placeholder, fin_placeholder, empty_zero],dim = 2) # additional information 만드는 부분
+            ref = torch.concat([h_bar, est_placeholder, fin_placeholder, empty_zero],dim = 2) # extended node embedding을 만드는 부분(z_t_i에 해당)
             h_c = self.decoder(h_emb, h_pi_t_minus_one) # decoding 만드는 부분
             query = h_c.squeeze(0)
-            query = self.glimpse(query, ref, mask2_debug)  # multi-head attention 부분
-            logits = self.pointer(query, ref, mask1_debug) # logit 구하는 부분
-            log_p = torch.log_softmax(logits / self.T, dim=-1) # log_softmax로 구하는 부분
+            """
+            Query를 만들때에는 이전 단계의 query와 extended node embedding을 가지고 만든다
+            
+            """
 
+
+
+            query = self.glimpse(query, ref, mask2_debug)  # 보는 부분 /  multi-head attention 부분 (mask2는 보는 masking)
+            logits = self.pointer(query, ref, mask1_debug) # 선택하는 부분 / logit 구하는 부분 (#mask1은 선택하는 masking)
+
+
+            log_p = torch.log_softmax(logits / self.T, dim=-1) # log_softmax로 구하는 부분
             next_operation_index = self.job_selecter(log_p)
             log_probabilities.append(log_p.gather(1, next_operation_index.unsqueeze(1)))
             sample_space = sample_space.to(device)
             next_job = sample_space[next_operation_index].to(device)
-            mask1_debug, mask2_debug = self.update_mask(next_job.tolist())
+            mask1_debug, mask2_debug = self.update_mask(next_job.tolist()) # update masking을 수행해주는
+
+
+
             h_pi_t_minus_one = torch.gather(input=h_bar, dim=1, index=next_operation_index.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, embed)).squeeze(1).unsqueeze(0)  # 다음 sequence의 input은 encoder의 output 중에서 현재 sequence에 해당하는 embedding이 된다.
             pi_list.append(next_job)
 
@@ -360,7 +366,7 @@ class PtrNet1(nn.Module):
         pi = torch.stack(pi_list, dim=1)
 
         log_probabilities = torch.stack(log_probabilities, dim=1)
-        ll = log_probabilities.sum(dim=1)
+        ll = log_probabilities.sum(dim=1)    # 각 solution element의 log probability를 더하는 방식
 
 
         _ = 1
