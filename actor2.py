@@ -71,33 +71,39 @@ class PtrNet1(nn.Module):
 
 
         augmented_hidden_size = params["n_hidden"]
-        self.Vec = [nn.Parameter(torch.FloatTensor(augmented_hidden_size+3, augmented_hidden_size)) for _ in range(self.n_multi_head)]
+        self.params = params
+        if self.params['third_feature'] == True:
+            extended_dimension = 3
+        else:
+            extended_dimension = 2
+
+        self.Vec = [nn.Parameter(torch.FloatTensor(augmented_hidden_size+extended_dimension, augmented_hidden_size)) for _ in range(self.n_multi_head)]
         self.Vec = nn.ParameterList(self.Vec)
         self.W_q = [nn.Linear(2*augmented_hidden_size, augmented_hidden_size, bias=False).to(device)  for _ in range(self.n_multi_head)]
         self.W_q_weights = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_q])
         self.W_q_biases = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_q])
-        self.W_ref =[nn.Linear(augmented_hidden_size+3,augmented_hidden_size, bias=False).to(device) for _ in range(self.n_multi_head)]
+        self.W_ref =[nn.Linear(augmented_hidden_size+extended_dimension,augmented_hidden_size, bias=False).to(device) for _ in range(self.n_multi_head)]
         self.W_ref_weights = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_ref])
         self.W_ref_biases = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_ref])
-        self.Vec3 = [nn.Parameter(torch.FloatTensor(augmented_hidden_size+3, augmented_hidden_size)) for _ in range(self.n_multi_head)]
+        self.Vec3 = [nn.Parameter(torch.FloatTensor(augmented_hidden_size+extended_dimension, augmented_hidden_size)) for _ in range(self.n_multi_head)]
         self.Vec3 = nn.ParameterList(self.Vec3)
         self.W_q3 = [nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False).to(device)  for _ in range(self.n_multi_head)]
         self.W_q_weights3 = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_q3])
         self.W_q_biases3 = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_q3])
-        self.W_ref3 =[nn.Linear(augmented_hidden_size+3,augmented_hidden_size, bias=False).to(device) for _ in range(self.n_multi_head)]
+        self.W_ref3 =[nn.Linear(augmented_hidden_size+extended_dimension,augmented_hidden_size, bias=False).to(device) for _ in range(self.n_multi_head)]
         self.W_ref_weights3 = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_ref3])
         self.W_ref_biases3 = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_ref3])
-        self.Vec4 = [nn.Parameter(torch.FloatTensor(augmented_hidden_size+3, augmented_hidden_size)) for _ in range(self.n_multi_head)]
+        self.Vec4 = [nn.Parameter(torch.FloatTensor(augmented_hidden_size+extended_dimension, augmented_hidden_size)) for _ in range(self.n_multi_head)]
         self.Vec4 = nn.ParameterList(self.Vec4)
         self.W_q4 = [nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False).to(device)  for _ in range(self.n_multi_head)]
         self.W_q_weights4 = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_q4])
         self.W_q_biases4 = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_q4])
-        self.W_ref4 =[nn.Linear(augmented_hidden_size+3,augmented_hidden_size, bias=False).to(device) for _ in range(self.n_multi_head)]
+        self.W_ref4 =[nn.Linear(augmented_hidden_size+extended_dimension,augmented_hidden_size, bias=False).to(device) for _ in range(self.n_multi_head)]
         self.W_ref_weights4 = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_ref4])
         self.W_ref_biases4 = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_ref4])
         self.Vec2 = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
         self.W_q2 = nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False)
-        self.W_ref2 = nn.Linear(augmented_hidden_size+3,augmented_hidden_size, bias=False)
+        self.W_ref2 = nn.Linear(augmented_hidden_size+extended_dimension,augmented_hidden_size, bias=False)
         self.dec_input = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
         self.v_1 = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
         self.v_f = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
@@ -112,7 +118,7 @@ class PtrNet1(nn.Module):
 
 
         self.job_selecter = Categorical()
-        self.params = params
+
 
 
     def get_jssp_instance(self, instance): # 훈련해야할 instance를 에이전트가 참조(등록)하는 코드
@@ -285,7 +291,7 @@ class PtrNet1(nn.Module):
                 for nb in range(batch_size):
                     scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb])
                     #self.get_critical_check(scheduler_list[nb],  mask1_debug[nb,:].cpu().numpy())
-                    if self.params['bound_masking'] == True:
+                    if self.params['third_feature'] == True:
                         ub = upperbound[nb]
                         """
                         Branch and Cut 로직에 따라 masking을 수행함
@@ -314,7 +320,8 @@ class PtrNet1(nn.Module):
 
 
 
-                    if self.params['bound_masking'] == True:
+                    if self.params['third_feature'] == True:
+
                         ub = upperbound[nb]
                         mask, critical_path = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub)
                         empty_zero[nb, :] = torch.tensor(critical_path).to(device)
@@ -330,12 +337,10 @@ class PtrNet1(nn.Module):
             est_placeholder = est_placeholder.reshape(batch_size, -1).unsqueeze(2)
             fin_placeholder = fin_placeholder.reshape(batch_size, -1).unsqueeze(2)
             empty_zero = empty_zero.unsqueeze(2)
-            #print(est_placeholder.shape, empty_zero.shape)
-            # print("===============================================")
-            # print("st", est_placeholder)
-            # print('fin', fin_placeholder)
-            # print('empty', empty_zero)
-            ref = torch.concat([h_bar, est_placeholder, fin_placeholder, empty_zero],dim = 2) # extended node embedding을 만드는 부분(z_t_i에 해당)
+            if self.params['third_feature'] == True:
+                ref = torch.concat([h_bar, est_placeholder, fin_placeholder, empty_zero],dim = 2) # extended node embedding을 만드는 부분(z_t_i에 해당)
+            else:
+                ref = torch.concat([h_bar, est_placeholder, fin_placeholder],dim=2)  # extended node embedding을 만드는 부분(z_t_i에 해당)
             h_c = self.decoder(h_emb, h_pi_t_minus_one) # decoding 만드는 부분
             query = h_c.squeeze(0)
             """

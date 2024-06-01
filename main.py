@@ -357,7 +357,7 @@ if __name__ == '__main__':
         "n_multi_head": int(os.environ.get("n_multi_head", 4)),
         "entropy_weight": cfg.entropy_weight,
         "dot_product": cfg.dot_product,
-        "bound_masking": cfg.bound_masking,
+        "third_feature": cfg.third_feature,
         "baseline_reset": cfg.baseline_reset,
         "feature_critical_path": cfg.feature_critical_path
     }
