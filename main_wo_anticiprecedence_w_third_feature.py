@@ -265,7 +265,7 @@ def train_model(params, log_path=None):
                 be = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)  # baseline을 구하는 부분
             else:
                 be = cfg.beta * be + (1 - cfg.beta) * torch.tensor(real_makespan).to(device)
-
+        ####
         act_optim.zero_grad()
         adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - be  # baseline(advantage) 구하는 부분
         """
