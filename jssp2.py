@@ -124,7 +124,7 @@ class AdaptiveScheduler:
         self.input_data = input_data
         self.num_mc = len(self.input_data[0])   # number of machines
         self.num_job = len(self.input_data)     # number of jobs
-        self.pt = [[ops[1] for ops in job] for job in self.input_data] # processing_time
+        self.pt = [[ops[1] for ops in job] for job in self.input_data]  # processing_time
         self.ms = [[ops[0]+1 for ops in job] for job in self.input_data] # job 별 machine sequence
         self.j_keys = [j for j in range(self.num_job)]
         self.key_count = {key: 0 for key in self.j_keys}
@@ -133,14 +133,20 @@ class AdaptiveScheduler:
         self.m_count = {key: 0 for key in self.m_keys}
         self.num_ops = self.num_job*self.num_mc
 
+
         self.ops_by_job = dict()
         k = 0
+        self.processing_time_by_machine = [[] for _ in range(len(self.input_data[0]))]
         for j in range(len(self.input_data)):
             job = self.input_data[j]
             for ops in job:
+                machine = ops[0]
+                processing_time = ops[1]
+                self.processing_time_by_machine[machine].append(processing_time)
                 self.ops_by_job[k] = j
             k+=1
 
+        self.total_processing_time_by_machine = [np.sum(p) for p in self.processing_time_by_machine]
         self.mask1 =  [[0 for _ in range(self.num_mc)] for _ in range(self.num_job)]
         self.mask2 =  [[1 for _ in range(self.num_mc)] for _ in range(self.num_job)]
         data = self.pt
@@ -174,6 +180,7 @@ class AdaptiveScheduler:
             gen_m = int(self.ms[i][self.key_count[i]])        # 선택된 operation에 대한 machine_sequence 선택
             self.j_count[i] = self.j_count[i] + gen_t          # Job i에 대한 누적 작업 완료시간 업데이트
             self.m_count[gen_m] = self.m_count[gen_m] + gen_t  # Machine gen_m에 대한 누적 작업 완료시간 업데이트
+            self.total_processing_time_by_machine[gen_m - 1]-=gen_t
             if self.m_count[gen_m] < self.j_count[i]:
                 self.m_count[gen_m] = self.j_count[i]
             elif self.m_count[gen_m] > self.j_count[i]:
@@ -222,11 +229,14 @@ class AdaptiveScheduler:
                 key_count = deepcopy(self.key_count)
                 j_count = deepcopy(self.j_count)
                 m_count = deepcopy(self.m_count)
+                processing_time_by_machine = deepcopy(self.processing_time_by_machine)
+                total_processing_time_by_machine = deepcopy(self.total_processing_time_by_machine)
                 try:
-                    gen_t = int(self.pt[j_prime][key_count[j_prime]])  # 선택된 operation에 대한 processing time 선택
-                    gen_m = int(self.ms[j_prime][key_count[j_prime]])  # 선택된 operation에 대한 machine_sequence 선택
-                    j_count[j_prime] = j_count[j_prime] + gen_t  # Job i에 대한 누적 작업 완료시간 업데이트
-                    m_count[gen_m] = m_count[gen_m] + gen_t  # Machine gen_m에 대한 누적 작업 완료시간 업데이트
+                    gen_t = int(self.pt[j_prime][key_count[j_prime]])    # 선택된 operation에 대한 processing time 선택
+                    gen_m = int(self.ms[j_prime][key_count[j_prime]])    # 선택된 operation에 대한 machine_sequence 선택
+                    j_count[j_prime] = j_count[j_prime] + gen_t          # Job i에 대한 누적 작업 완료시간 업데이트
+                    m_count[gen_m] = m_count[gen_m] + gen_t              # Machine gen_m에 대한 누적 작업 완료시간 업데이트
+                    total_processing_time_by_machine[gen_m-1] -= gen_t
                     if m_count[gen_m] < j_count[j_prime]:
                         m_count[gen_m] = j_count[j_prime]
                     elif m_count[gen_m] > j_count[j_prime]:
@@ -238,11 +248,12 @@ class AdaptiveScheduler:
                 longest_path_list = list()
                 for j in range(len(self.pt)):
                     try:
-                        gen_j = np.sum(self.pt[j][key_count[j]:])
-                        gen_m = self.ms[j][key_count[j]]
-                        m_count[gen_m] = m_count[gen_m] + gen_j
-                        j_count[j] = j_count[j]+gen_j
-                        longest_path_list.append(np.max([m_count[gen_m], j_count[j]]))
+                        gen_j = np.sum(self.pt[j][key_count[j]:]) # remain processing time (해당 job의 남은 operation에 대한 processing time의 합)
+                        gen_m = self.ms[j][key_count[j]]          # remain processing time (해당 machine의 남은 operation에 대한 processing time의 합)
+                        longest_path_list.append(np.max([
+                                                         m_count[gen_m] + total_processing_time_by_machine[gen_m-1],
+                                                         j_count[j]     + gen_j
+                                                        ]))
                     except IndexError:
                         longest_path_list.append(0)
                         pass
@@ -377,11 +388,9 @@ class AdaptiveScheduler:
             sum_ops = sum([float(job[o][1]) for o in range(len(job))])
             empty2.append(sum_ops)
 
-
         for j in range(len(self.jobs_data)):
             job = self.jobs_data[j]
             sum_ops = sum([float(job[o][1]) for o in range(len(job))])
-
             for o in range(len(job)):
                 ops = job[o]
                 sum_ops_o = [float(job[k][1]) for k in range(0, o+1)]
@@ -390,13 +399,15 @@ class AdaptiveScheduler:
                 node_features.append([
                                       float(ops[1]) / sum_ops,
                                       float(ops[1]) / np.max(empty),
+
                                       sum_ops_o/sum_ops,
                                       sum_ops / np.max(empty2),
-                                      (o+1)/len(job)
+                                      (o+1)/len(job),
+                                      float(ops[1]) / self.total_processing_time_by_machine[ops[0]],
                                      ])
 
-        node_features.append([0., 1., 1, 0, 0])
-        node_features.append([0., 0., 0, 0, 0])
+        node_features.append([0., 1., 1, 0, 0,0])
+        node_features.append([0., 0., 0, 0, 0,0])
         return node_features
 
     def get_fully_connected_edge_index(self):
@@ -435,8 +446,8 @@ class AdaptiveScheduler:
                 else:
                     edge_index[0].append(jk)
                     edge_index[1].append(jk+1)
-                    edge_index[0].append(jk+1)
-                    edge_index[1].append(jk)
+                    # edge_index[0].append(jk+1)
+                    # edge_index[1].append(jk)
                     jk += 1
         return edge_index
 
@@ -450,7 +461,7 @@ class AdaptiveScheduler:
                 else:
                     edge_index[0].append(jk)
                     edge_index[1].append(jk-1)
-                    edge_index[0].append(jk-1)
-                    edge_index[1].append(jk)
+                    # edge_index[0].append(jk-1)
+                    # edge_index[1].append(jk)
                     jk += 1
         return edge_index

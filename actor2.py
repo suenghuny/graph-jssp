@@ -24,8 +24,10 @@ class PtrNet1(nn.Module):
         device = torch.device(cfg.device)
         self.n_multi_head = params["n_multi_head"]
         self.Embedding = nn.Linear(params["num_of_process"],params["n_hidden"], bias=False).to(device)  # 그림 상에서 Encoder에 FF(feedforward)라고 써져있는 부분
-        num_edge_cat = 3
+        self.params = params
 
+
+        num_edge_cat = 3
         self.GraphEmbedding = GCRN(feature_size =  params["n_hidden"],
                                    graph_embedding_size= params["graph_embedding_size"],
                                    embedding_size =  params["n_hidden"],
@@ -71,7 +73,7 @@ class PtrNet1(nn.Module):
 
 
         augmented_hidden_size = params["n_hidden"]
-        self.params = params
+
         if self.params['third_feature'] == True:
             extended_dimension = 3
         else:
