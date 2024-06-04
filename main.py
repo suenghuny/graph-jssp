@@ -272,6 +272,8 @@ def train_model(params, log_path=None):
 
 
 
+
+
         act_loss = -(ll_old * adv).mean()                                        # loss 구하는 부분 /  ll_old의 의미 log_theta (pi | s)
         act_loss.backward()
         act_optim.step()

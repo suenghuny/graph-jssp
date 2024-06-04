@@ -75,7 +75,7 @@ class PtrNet1(nn.Module):
         augmented_hidden_size = params["n_hidden"]
 
         if self.params['third_feature'] == True:
-            extended_dimension = 3
+            extended_dimension = 4
         else:
             extended_dimension = 2
 
@@ -182,7 +182,7 @@ class PtrNet1(nn.Module):
 
     def encoder(self, node_features, heterogeneous_edges):
         batch = node_features.shape[0]
-        operation_num = node_features.shape[1]-2
+        operation_num = node_features.shape[1]
         node_num = node_features.shape[1]
 
 
@@ -229,7 +229,7 @@ class PtrNet1(nn.Module):
 
         embed = enc_h.size(2)
         h = enc_h.mean(dim = 1).unsqueeze(0) # 모든 node embedding에 대해서(element wise) 평균을 낸다.
-        enc_h = enc_h[:, :-2]                 # dummy node(source, sink)는 제외한다.
+        #enc_h = enc_h[:, :-2]                 # dummy node(source, sink)는 제외한다.
         return enc_h, h, embed, batch, operation_num
 
     def get_critical_check(self, scheduler, mask):
@@ -242,13 +242,16 @@ class PtrNet1(nn.Module):
     def branch_and_cut_masking(self, scheduler, mask, i, upperbound):
         available_operations = mask
         copied_mask = deepcopy(mask)
+        copied_mask2 = deepcopy(mask)
         avail_nodes = np.array(available_operations)
         avail_nodes_indices = np.where(avail_nodes == 1)[0].tolist() # 현재 시점에 가능한 operation들의 모임이다.
-        critical_path_list = scheduler.get_critical_path()
+        critical_path_list, critical_path_ij_list = scheduler.get_critical_path()
         if np.max(critical_path_list)>0:
             copied_mask[avail_nodes_indices] = critical_path_list
+            copied_mask2[avail_nodes_indices] = critical_path_ij_list
             copied_mask = copied_mask/np.max(critical_path_list)
-        return mask, copied_mask
+            copied_mask2 = copied_mask2 / np.max(critical_path_ij_list)
+        return mask, copied_mask, copied_mask2
 
 
     def forward(self, x, device, scheduler_list, num_job, num_machine, upperbound= None):
@@ -268,6 +271,7 @@ class PtrNet1(nn.Module):
         """
         이 위에 까지가 Encoder
         이 아래 부터는 Decoder
+    
         """
 
         h_pi_t_minus_one = self.v_1.unsqueeze(0).repeat(batch, 1).unsqueeze(0).to(device) # 이녀석이 s.o.s(start of singal)에 해당
@@ -282,6 +286,7 @@ class PtrNet1(nn.Module):
             mask1_debug = mask1_debug.reshape(batch_size, -1)
             mask2_debug = mask2_debug.reshape(batch_size, -1)
             empty_zero = torch.zeros(batch_size, num_operations).to(device)
+            empty_zero2 = torch.zeros(batch_size, num_operations).to(device)
             if i == 0:
                 """
                 Earliest Start Time (est_placeholder)
@@ -299,8 +304,10 @@ class PtrNet1(nn.Module):
                         Branch and Cut 로직에 따라 masking을 수행함
                         모두 다 masking 처리할 수도 있으므로, 모두다 masking 할 경우에는 mask로 복원 (if 1 not in mask)
                         """
-                        mask, critical_path = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub) # 안중요
+                        mask, critical_path, critical_path2 = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub) # 안중요
+
                         empty_zero[nb, :] = torch.tensor(critical_path).to(device)# 안중요
+                        empty_zero2[nb, :] = torch.tensor(critical_path2).to(device)  # 안중요
                         # if 1 not in mask:
                         #     pass
                         # else:
@@ -325,8 +332,9 @@ class PtrNet1(nn.Module):
                     if self.params['third_feature'] == True:
 
                         ub = upperbound[nb]
-                        mask, critical_path = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub)
-                        empty_zero[nb, :] = torch.tensor(critical_path).to(device)
+                        mask, critical_path, critical_path2 = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub)
+                        empty_zero[nb, :]  = torch.tensor(critical_path).to(device)
+                        empty_zero2[nb, :] = torch.tensor(critical_path2).to(device)  # 안중요
                         """
                         Branch and Cut 로직에 따라 masking을 수행함
                         모두 다 masking 처리할 수도 있으므로, 모두다 masking할 경우에는 mask로 복원 (if 1 not in mask)
@@ -339,8 +347,9 @@ class PtrNet1(nn.Module):
             est_placeholder = est_placeholder.reshape(batch_size, -1).unsqueeze(2)
             fin_placeholder = fin_placeholder.reshape(batch_size, -1).unsqueeze(2)
             empty_zero = empty_zero.unsqueeze(2)
+            empty_zero2 = empty_zero2.unsqueeze(2)
             if self.params['third_feature'] == True:
-                ref = torch.concat([h_bar, est_placeholder, fin_placeholder, empty_zero],dim = 2) # extended node embedding을 만드는 부분(z_t_i에 해당)
+                ref = torch.concat([h_bar, est_placeholder, fin_placeholder, empty_zero, empty_zero2],dim = 2) # extended node embedding을 만드는 부분(z_t_i에 해당)
             else:
                 ref = torch.concat([h_bar, est_placeholder, fin_placeholder],dim=2)  # extended node embedding을 만드는 부분(z_t_i에 해당)
             h_c = self.decoder(h_emb, h_pi_t_minus_one) # decoding 만드는 부분

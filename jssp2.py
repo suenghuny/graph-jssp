@@ -194,7 +194,7 @@ class AdaptiveScheduler:
             try:
                 gen_tI = int(self.pt[I][self.key_count[I]])
                 gen_mI = int(self.ms[I][self.key_count[I]])
-                estI = max(self.j_count[I], self.m_count[gen_mI])
+                estI   = max(self.j_count[I], self.m_count[gen_mI])
                 estI_list.append(estI)
                 gentI_list.append(estI+gen_tI)
             except IndexError: # IndexError가 난다는 것은 해당 Job이 available 하지 않음을(완료되었음을) 의미함
@@ -221,7 +221,8 @@ class AdaptiveScheduler:
             empty2.append(j_prime)
 
     def get_critical_path(self):
-        critical_path_list = list()
+        critical_path_list    = list()
+        critical_path_ij_list = list()
         for j_prime, i_prime in self.key_count.items():
             # key는 job_id
             # value는 이번에 해야할 operation에 index가 됨 (index error가 난다는 것은 완료된 job임을 의미한다)
@@ -229,82 +230,59 @@ class AdaptiveScheduler:
                 key_count = deepcopy(self.key_count)
                 j_count = deepcopy(self.j_count)
                 m_count = deepcopy(self.m_count)
-                processing_time_by_machine = deepcopy(self.processing_time_by_machine)
                 total_processing_time_by_machine = deepcopy(self.total_processing_time_by_machine)
                 try:
                     gen_t = int(self.pt[j_prime][key_count[j_prime]])    # 선택된 operation에 대한 processing time 선택
                     gen_m = int(self.ms[j_prime][key_count[j_prime]])    # 선택된 operation에 대한 machine_sequence 선택
+
+
                     j_count[j_prime] = j_count[j_prime] + gen_t          # Job i에 대한 누적 작업 완료시간 업데이트
-                    m_count[gen_m] = m_count[gen_m] + gen_t              # Machine gen_m에 대한 누적 작업 완료시간 업데이트
-                    total_processing_time_by_machine[gen_m-1] -= gen_t
+                    m_count[gen_m]   = m_count[gen_m]   + gen_t          # Machine gen_m에 대한 누적 작업 완료시간 업데이트
+
                     if m_count[gen_m] < j_count[j_prime]:
                         m_count[gen_m] = j_count[j_prime]
                     elif m_count[gen_m] > j_count[j_prime]:
-                        j_count[j_prime] = m_count[gen_m]  # if 및 elif 문은 각각의 누적 작업 완료시간을 큰 녀석으로 업데이트 한다는 의미
+                        j_count[j_prime] = m_count[gen_m]                # if 및 elif 문은 각각의 누적 작업 완료시간을 큰 녀석으로 업데이트 한다는 의미
+
+                    total_processing_time_by_machine[gen_m - 1] -= gen_t
+
+                    gen_t_cum = j_count[j_prime] + np.sum(self.pt[j_prime][key_count[j_prime]+1:])
+
+                    gen_m_prime = int(self.ms[j_prime][key_count[j_prime]+1])
+                    gen_m_cum = m_count[gen_m_prime]   + total_processing_time_by_machine[gen_m_prime - 1]
+                    critical_path_ij_list.append(np.max([gen_t_cum, gen_m_cum]))
+
+
+
                 except IndexError as IE:
                     pass
-
                 key_count[j_prime] = key_count[j_prime] + 1
                 longest_path_list = list()
-                for j in range(len(self.pt)):
-                    try:
-                        gen_j = np.sum(self.pt[j][key_count[j]:]) # remain processing time (해당 job의 남은 operation에 대한 processing time의 합)
-                        gen_m = self.ms[j][key_count[j]]          # remain processing time (해당 machine의 남은 operation에 대한 processing time의 합)
-                        longest_path_list.append(np.max([
-                                                         m_count[gen_m] + total_processing_time_by_machine[gen_m-1],
-                                                         j_count[j]     + gen_j
+                for j, i in key_count.items():
+                    if i != self.num_mc:
+                        gen_m_prime = self.ms[j][key_count[j]]  # remain processing time (해당 machine의 남은 operation에 대한 processing time의 합)
+
+
+
+                        longest_path_list.append(np.max([m_count[gen_m_prime] + total_processing_time_by_machine[gen_m_prime-1],
+                                                         j_count[j]     + np.sum(self.pt[j][key_count[j]:])
                                                         ]))
-                    except IndexError:
-                        longest_path_list.append(0)
-                        pass
+                    else:pass
+                #print(longest_path_list)
                 critical_path_list.append(np.max(longest_path_list))
         #print("후", avail_ops)
-        return critical_path_list
+
+        # for i in range(len(critical_path_ij_list)):
+        #     if critical_path_ij_list[i] > critical_path_list[i]:
+        #         print("=====똻=====", i)
+        # print("전", critical_path_list)
+        # print("후", critical_path_ij_list)
 
 
-    def rollout_run(self, t_th, avail_nodes_indices): #
-        makespan_list = list()
-        for k_prime in avail_nodes_indices:
-            i_prime = self.job_id_ops[k_prime]
-            key_count = deepcopy(self.key_count)
-            j_count = deepcopy(self.j_count)
-            m_count = deepcopy(self.m_count)
-            if i_prime != None:                                         # 이전 스텝에서 선택된 Job(Operation)에 대한 update
-                try:
-                    gen_t = int(self.pt[i_prime][key_count[i_prime]])        # 선택된 operation에 대한 processing time 선택
-                    gen_m = int(self.ms[i_prime][key_count[i_prime]])        # 선택된 operation에 대한 machine_sequence 선택
-                    j_count[i_prime] = j_count[i_prime] + gen_t          # Job i에 대한 누적 작업 완료시간 업데이트
-                    m_count[gen_m] = m_count[gen_m] + gen_t  # Machine gen_m에 대한 누적 작업 완료시간 업데이트
-                    if m_count[gen_m] < j_count[i_prime]:
-                        m_count[gen_m] = j_count[i_prime]
-                    elif m_count[gen_m] > j_count[i_prime]:
-                        j_count[i_prime] = m_count[gen_m]          # if 및 elif 문은 각각의 누적 작업 완료시간을 큰 녀석으로 업데이트 한다는 의미
-                    key_count[i_prime] = key_count[i_prime] + 1
-                except IndexError:pass
+        return critical_path_list, critical_path_ij_list
 
-            for _ in range(self.num_ops-t_th-1):
-                pt_list = list()
-                for i in range(self.num_job):
-                    try:
-                        pt = self.pt[i][key_count[i]]
-                        pt_list.append(pt)
-                    except IndexError as IE:
-                        pt_list.append(float('inf'))
 
-                if len(pt_list)>0:
-                    i = np.argmin(pt_list)
-                    gen_t = int(self.pt[i][key_count[i]])
-                    gen_m = int(self.ms[i][key_count[i]])
-                    j_count[i] = j_count[i] + gen_t
-                    m_count[gen_m] = m_count[gen_m] + gen_t
-                    if m_count[gen_m] < j_count[i]:
-                        m_count[gen_m] = j_count[i]
-                    elif m_count[gen_m] > j_count[i]:
-                        j_count[i] = m_count[gen_m]
-                    key_count[i] = key_count[i] + 1
-            makespan = max(j_count.values())
-            makespan_list.append(makespan)
-        return makespan_list
+
 
 
 
@@ -399,15 +377,14 @@ class AdaptiveScheduler:
                 node_features.append([
                                       float(ops[1]) / sum_ops,
                                       float(ops[1]) / np.max(empty),
-
                                       sum_ops_o/sum_ops,
                                       sum_ops / np.max(empty2),
                                       (o+1)/len(job),
                                       float(ops[1]) / self.total_processing_time_by_machine[ops[0]],
                                      ])
 
-        node_features.append([0., 1., 1, 0, 0,0])
-        node_features.append([0., 0., 0, 0, 0,0])
+        # node_features.append([0., 1., 1, 0, 0, 0])
+        # node_features.append([0., 0., 0, 0, 0, 0])
         return node_features
 
     def get_fully_connected_edge_index(self):
