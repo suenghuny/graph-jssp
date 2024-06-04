@@ -248,12 +248,14 @@ class PtrNet1(nn.Module):
         critical_path_list, critical_path_ij_list = scheduler.get_critical_path()
         if np.max(critical_path_list)>0:
             copied_mask[avail_nodes_indices] = critical_path_list
-            copied_mask2[avail_nodes_indices] = critical_path_ij_list
             copied_mask = copied_mask/np.max(critical_path_list)
+
+        if np.max(critical_path_ij_list) > 0:
+            copied_mask2[avail_nodes_indices] = critical_path_ij_list
             copied_mask2 = copied_mask2 / np.max(critical_path_ij_list)
         return mask, copied_mask, copied_mask2
 
-
+####
     def forward(self, x, device, scheduler_list, num_job, num_machine, upperbound= None):
         node_features, heterogeneous_edges = x
         node_features = torch.tensor(node_features).to(device).float()

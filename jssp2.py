@@ -190,7 +190,7 @@ class AdaptiveScheduler:
 
         estI_list = list()
         gentI_list = list()
-        for I in range(self.num_job): # 아직 선택되지 않은 녀석들(선택될 가능성이 있는 애들)에 대한 이야기
+        for I in range(self.num_job): # 아직 선택되지 않은 operation들(선택될 가능성이 있는 애들)에 대한 이야기
             try:
                 gen_tI = int(self.pt[I][self.key_count[I]])
                 gen_mI = int(self.ms[I][self.key_count[I]])
@@ -234,8 +234,6 @@ class AdaptiveScheduler:
                 try:
                     gen_t = int(self.pt[j_prime][key_count[j_prime]])    # 선택된 operation에 대한 processing time 선택
                     gen_m = int(self.ms[j_prime][key_count[j_prime]])    # 선택된 operation에 대한 machine_sequence 선택
-
-
                     j_count[j_prime] = j_count[j_prime] + gen_t          # Job i에 대한 누적 작업 완료시간 업데이트
                     m_count[gen_m]   = m_count[gen_m]   + gen_t          # Machine gen_m에 대한 누적 작업 완료시간 업데이트
 
@@ -251,11 +249,8 @@ class AdaptiveScheduler:
                     gen_m_prime = int(self.ms[j_prime][key_count[j_prime]+1])
                     gen_m_cum = m_count[gen_m_prime]   + total_processing_time_by_machine[gen_m_prime - 1]
                     critical_path_ij_list.append(np.max([gen_t_cum, gen_m_cum]))
-
-
-
                 except IndexError as IE:
-                    pass
+                    critical_path_ij_list.append(0)
                 key_count[j_prime] = key_count[j_prime] + 1
                 longest_path_list = list()
                 for j, i in key_count.items():
@@ -268,15 +263,13 @@ class AdaptiveScheduler:
                                                          j_count[j]     + np.sum(self.pt[j][key_count[j]:])
                                                         ]))
                     else:pass
-                #print(longest_path_list)
-                critical_path_list.append(np.max(longest_path_list))
-        #print("후", avail_ops)
+                if len(longest_path_list)>0:
+                    critical_path_list.append(np.max(longest_path_list))
+                else:
+                    critical_path_list.append(0)
+                    #print(critical_path_ij_list)
 
-        # for i in range(len(critical_path_ij_list)):
-        #     if critical_path_ij_list[i] > critical_path_list[i]:
-        #         print("=====똻=====", i)
-        # print("전", critical_path_list)
-        # print("후", critical_path_ij_list)
+
 
 
         return critical_path_list, critical_path_ij_list
