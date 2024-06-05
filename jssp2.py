@@ -412,8 +412,8 @@ class AdaptiveScheduler:
         for job in self.jobs_data:
             for k in range(len(job)):
                 if k == len(job)-1:
-                    edge_index[0].append(jk)
-                    edge_index[1].append(self.num_ops+1)
+                    # edge_index[0].append(jk)
+                    # edge_index[1].append(self.num_ops+1)
                     jk += 1
                 else:
                     edge_index[0].append(jk)
@@ -429,8 +429,8 @@ class AdaptiveScheduler:
         for job in self.jobs_data:
             for k in range(len(job)):
                 if k == 0:
-                    edge_index[0].append(jk)
-                    edge_index[1].append(self.num_ops)
+                    # edge_index[0].append(jk)
+                    # edge_index[1].append(self.num_ops)
                     jk += 1
                 else:
                     edge_index[0].append(jk)
