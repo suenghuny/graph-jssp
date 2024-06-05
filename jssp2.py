@@ -376,8 +376,8 @@ class AdaptiveScheduler:
                                       float(ops[1]) / self.total_processing_time_by_machine[ops[0]],
                                      ])
 
-        # node_features.append([0., 1., 1, 0, 0, 0])
-        # node_features.append([0., 0., 0, 0, 0, 0])
+        node_features.append([0., 0., 0, 0, 0, 0])
+        node_features.append([0., 0., 1, 1, 1, 0])
         return node_features
 
     def get_fully_connected_edge_index(self):
@@ -390,7 +390,6 @@ class AdaptiveScheduler:
     def get_machine_sharing_edge_index(self):
         jk = 0
         machine_sharing = [[] for _ in range(self.num_mc)]
-
         for job in self.jobs_data:
             for k in range(len(job)):
                 ops = job[k]
@@ -409,9 +408,12 @@ class AdaptiveScheduler:
     def get_edge_index_precedence(self):
         jk = 0
         edge_index = [[],[]]
+
         for job in self.jobs_data:
             for k in range(len(job)):
                 if k == len(job)-1:
+                    edge_index[0].append(jk)
+                    edge_index[1].append(self.num_ops+1)
                     jk += 1
                 else:
                     edge_index[0].append(jk)
@@ -427,6 +429,8 @@ class AdaptiveScheduler:
         for job in self.jobs_data:
             for k in range(len(job)):
                 if k == 0:
+                    edge_index[0].append(jk)
+                    edge_index[1].append(self.num_ops)
                     jk += 1
                 else:
                     edge_index[0].append(jk)

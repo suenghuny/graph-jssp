@@ -182,14 +182,11 @@ class PtrNet1(nn.Module):
 
     def encoder(self, node_features, heterogeneous_edges):
         batch = node_features.shape[0]
-        operation_num = node_features.shape[1]
+        operation_num = node_features.shape[1]-2
         node_num = node_features.shape[1]
-
-
         node_reshaped_features = node_features.reshape(batch * node_num, -1)
         node_embedding = self.Embedding(node_reshaped_features)
         node_embedding = node_embedding.reshape(batch, node_num, -1)
-
         if cfg.k_hop == 1:
             enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
         if cfg.k_hop == 2:
@@ -229,7 +226,7 @@ class PtrNet1(nn.Module):
 
         embed = enc_h.size(2)
         h = enc_h.mean(dim = 1).unsqueeze(0) # 모든 node embedding에 대해서(element wise) 평균을 낸다.
-        #enc_h = enc_h[:, :-2]                 # dummy node(source, sink)는 제외한다.
+        enc_h = enc_h[:, :-2]                 # dummy node(source, sink)는 제외한다.
         return enc_h, h, embed, batch, operation_num
 
     def get_critical_check(self, scheduler, mask):
