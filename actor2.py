@@ -16,6 +16,17 @@ class Categorical(nn.Module):
         return torch.multinomial(log_p.exp(), 1).long().squeeze(1)
 
 
+class ExEmbedding(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.fcn1 = nn.Linear(4, 128)
+        self.fcn2 = nn.Linear(128, 64)
+        self.fcn3 = nn.Linear(64, 32)
+    def forward(self, x):
+        x = F.elu(self.fcn1(x))
+        x = F.elu(self.fcn2(x))
+        x = self.fcn3(x)
+        return x
 
 
 class PtrNet1(nn.Module):
@@ -75,7 +86,10 @@ class PtrNet1(nn.Module):
         augmented_hidden_size = params["n_hidden"]
 
         if self.params['third_feature'] == True:
-            extended_dimension = 4
+            if self.params['ex_embedding'] == True:
+                extended_dimension = 32
+            else:
+                extended_dimension = 4
         else:
             extended_dimension = 2
 
@@ -117,9 +131,9 @@ class PtrNet1(nn.Module):
         self.C = params["C"]
         self.T = params["T"]
         self.n_glimpse = params["n_glimpse"]
-
-
         self.job_selecter = Categorical()
+
+        self.ex_embedding = ExEmbedding()
 
 
 
@@ -347,8 +361,16 @@ class PtrNet1(nn.Module):
             fin_placeholder = fin_placeholder.reshape(batch_size, -1).unsqueeze(2)
             empty_zero = empty_zero.unsqueeze(2)
             empty_zero2 = empty_zero2.unsqueeze(2)
+            #print(empty_zero2.shape, est_placeholder.shape, fin_placeholder.shape)
             if self.params['third_feature'] == True:
-                ref = torch.concat([h_bar, est_placeholder, fin_placeholder, empty_zero, empty_zero2],dim = 2) # extended node embedding을 만드는 부분(z_t_i에 해당)
+                if self.params['ex_embedding'] == True:
+                    r_temp = torch.concat([est_placeholder, fin_placeholder, empty_zero, empty_zero2], dim=2)  # extended node embedding을 만드는 부분(z_t_i에 해당)
+                    r_temp = r_temp.reshape(batch_size*num_operations, -1)
+                    ex_embedding = self.ex_embedding(r_temp)
+                    ex_embedding = ex_embedding.reshape(batch_size, num_operations, -1)
+                    ref = torch.concat([h_bar, ex_embedding],dim = 2)
+                else:
+                    ref = torch.concat([h_bar, est_placeholder, fin_placeholder, empty_zero, empty_zero2],dim = 2) # extended node embedding을 만드는 부분(z_t_i에 해당)
             else:
                 ref = torch.concat([h_bar, est_placeholder, fin_placeholder],dim=2)  # extended node embedding을 만드는 부분(z_t_i에 해당)
             h_c = self.decoder(h_emb, h_pi_t_minus_one) # decoding 만드는 부분

@@ -38,4 +38,5 @@ def get_cfg():
     parser.add_argument("--device", type=str, default="cuda:2", help="")
     parser.add_argument("--third_feature", type=bool, default=False, help="")
     parser.add_argument("--baseline_reset", type=bool, default=True, help="")
+    parser.add_argument("--ex_embedding", type=bool, default=True, help="")
     return parser.parse_args()
