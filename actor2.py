@@ -19,9 +19,9 @@ class Categorical(nn.Module):
 class ExEmbedding(nn.Module):
     def __init__(self):
         super().__init__()
-        self.fcn1 = nn.Linear(4, 128)
-        self.fcn2 = nn.Linear(128, 64)
-        self.fcn3 = nn.Linear(64, 32)
+        self.fcn1 = nn.Linear(4, 64)
+        self.fcn2 = nn.Linear(64, 48)
+        self.fcn3 = nn.Linear(48, 32)
     def forward(self, x):
         x = F.elu(self.fcn1(x))
         x = F.elu(self.fcn2(x))

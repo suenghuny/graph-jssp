@@ -161,23 +161,38 @@ def train_model(params, log_path=None):
         if s % 100 == 1:  # Evaluation 수행
             for p in problem_list:
                 min_makespan = heuristic_eval(p)
-                eval_number = 10
+                eval_number = 5
                 min_makespan_list = [min_makespan] * eval_number
                 min_makespan1, mean_makespan1 = evaluation(act_model, baseline_model, p, eval_number, device,
                                                            upperbound=min_makespan_list)
 
-                eval_number = 10
+                eval_number = 5
                 min_makespan_list = [min_makespan] * eval_number
                 min_makespan2, mean_makespan2 = evaluation(act_model, baseline_model, p, eval_number, device,
                                                            upperbound=min_makespan_list)
 
-                eval_number = 10
+                eval_number = 5
                 min_makespan_list = [min_makespan] * eval_number
                 min_makespan3, mean_makespan3 = evaluation(act_model, baseline_model, p, eval_number, device,
                                                            upperbound=min_makespan_list)
 
-                min_makespan = np.min([min_makespan1, min_makespan2, min_makespan3])
-                mean_makespan = (mean_makespan1 + mean_makespan2 + mean_makespan3) / 3
+                eval_number = 5
+                min_makespan_list = [min_makespan] * eval_number
+                min_makespan4, mean_makespan4 = evaluation(act_model, baseline_model, p, eval_number, device,
+                                                           upperbound=min_makespan_list)
+
+                eval_number = 5
+                min_makespan_list = [min_makespan] * eval_number
+                min_makespan5, mean_makespan5 = evaluation(act_model, baseline_model, p, eval_number, device,
+                                                           upperbound=min_makespan_list)
+
+                eval_number = 5
+                min_makespan_list = [min_makespan] * eval_number
+                min_makespan6, mean_makespan6 = evaluation(act_model, baseline_model, p, eval_number, device,
+                                                           upperbound=min_makespan_list)
+
+                min_makespan = np.min([min_makespan1, min_makespan2, min_makespan3,min_makespan4,min_makespan5,min_makespan6])
+                mean_makespan = (mean_makespan1 + mean_makespan2 + mean_makespan3+ mean_makespan4+ mean_makespan5+ mean_makespan6) / 6
 
                 print("TA{}".format(problem_list[p - 1]), min_makespan, mean_makespan)
                 if cfg.vessl == True:
@@ -350,10 +365,10 @@ if __name__ == '__main__':
         "lr_decay_step": cfg.lr_decay_step,
         "lr_decay_step_critic": cfg.lr_decay_step_critic,
         "load_model": load_model,
-        "layers": eval(str(os.environ.get("layers", '[512, 256, 128]'))),
+        "layers": eval(str(os.environ.get("layers", '[128, 64]'))),
         "lr_critic": cfg.lr_critic,
-        "n_embedding": int(os.environ.get("n_embedding", 48)),
-        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 96)),
+        "n_embedding": int(os.environ.get("n_embedding", 32)),
+        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 64)),
         "reward_scaler": cfg.reward_scaler,
         "n_multi_head": int(os.environ.get("n_multi_head", 3)),
         "entropy_weight": cfg.entropy_weight,
