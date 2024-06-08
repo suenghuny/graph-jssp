@@ -273,23 +273,26 @@ def train_model(params, log_path=None):
         """
         vanila actor critic
         """
+        beta = params['beta']
         if baseline_reset == False:
             if s == 1:
                 be = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)  # baseline을 구하는 부분
             else:
-                be = cfg.beta * be + (1 - cfg.beta) * torch.tensor(real_makespan).to(device)
+                be = beta * be + (1 - beta) * torch.tensor(real_makespan).to(device)
         else:
             if s % cfg.gen_step == 1:
                 be = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)  # baseline을 구하는 부분
             else:
-                be = cfg.beta * be + (1 - cfg.beta) * torch.tensor(real_makespan).to(device)
+                be = beta * be + (1 - beta) * torch.tensor(real_makespan).to(device)
         ####
         act_optim.zero_grad()
         adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - be  # baseline(advantage) 구하는 부분
         """
+        
         1. Loss 구하기
         2. Gradient 구하기 (loss.backward)
         3. Update 하기(act_optim.step)
+        
         """
 
         act_loss = -(ll_old * adv).mean()  # loss 구하는 부분 /  ll_old의 의미 log_theta (pi | s)
@@ -346,6 +349,7 @@ if __name__ == '__main__':
 
     params = {
         "num_of_process": 6,
+        "beta": 0.85,
         "step": cfg.step,
         "log_step": cfg.log_step,
         "log_dir": log_dir,
