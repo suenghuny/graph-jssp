@@ -17,11 +17,11 @@ class Categorical(nn.Module):
 
 
 class ExEmbedding(nn.Module):
-    def __init__(self):
+    def __init__(self, feature_size):
         super().__init__()
         self.fcn1 = nn.Linear(4, 64)
         self.fcn2 = nn.Linear(64, 48)
-        self.fcn3 = nn.Linear(48, 32)
+        self.fcn3 = nn.Linear(48, feature_size)
     def forward(self, x):
         x = F.elu(self.fcn1(x))
         x = F.elu(self.fcn2(x))
@@ -49,37 +49,37 @@ class PtrNet1(nn.Module):
                                    embedding_size =  params["n_hidden"],
                                     layers =  params["layers"],
                                     num_edge_cat = num_edge_cat).to(device)
-        self.GraphEmbedding2 = GCRN(feature_size= params["n_hidden"],
-                                    graph_embedding_size=params["graph_embedding_size"],
-                                    embedding_size=params["n_hidden"],
-                                    layers=params["layers"],
-                                    num_edge_cat=num_edge_cat).to(device)
+        # self.GraphEmbedding2 = GCRN(feature_size= params["n_hidden"],
+        #                             graph_embedding_size=params["graph_embedding_size"],
+        #                             embedding_size=params["n_hidden"],
+        #                             layers=params["layers"],
+        #                             num_edge_cat=num_edge_cat).to(device)
 
-        self.GraphEmbedding3 = GCRN(feature_size= params["n_hidden"],
-                                    graph_embedding_size=params["graph_embedding_size"],
-                                    embedding_size=params["n_hidden"],
-                                    layers=params["layers"],
-                                    num_edge_cat=num_edge_cat).to(device)
-        self.GraphEmbedding4 = GCRN(feature_size= params["n_hidden"],
-                                    graph_embedding_size=params["graph_embedding_size"],
-                                    embedding_size=params["n_hidden"],
-                                    layers=params["layers"],
-                                    num_edge_cat=num_edge_cat).to(device)
-        self.GraphEmbedding5 = GCRN(feature_size=params["n_hidden"],
-                                    graph_embedding_size=params["graph_embedding_size"],
-                                    embedding_size=params["n_hidden"],
-                                    layers=params["layers"],
-                                    num_edge_cat=num_edge_cat).to(device)
-        self.GraphEmbedding6 = GCRN(feature_size=params["n_hidden"],
-                                    graph_embedding_size=params["graph_embedding_size"],
-                                    embedding_size=params["n_hidden"],
-                                    layers=params["layers"],
-                                    num_edge_cat=num_edge_cat).to(device)
-        self.GraphEmbedding7 = GCRN(feature_size=params["n_hidden"],
-                                    graph_embedding_size=params["graph_embedding_size"],
-                                    embedding_size=params["n_hidden"],
-                                    layers=params["layers"],
-                                    num_edge_cat=num_edge_cat).to(device)
+        # self.GraphEmbedding3 = GCRN(feature_size= params["n_hidden"],
+        #                             graph_embedding_size=params["graph_embedding_size"],
+        #                             embedding_size=params["n_hidden"],
+        #                             layers=params["layers"],
+        #                             num_edge_cat=num_edge_cat).to(device)
+        # self.GraphEmbedding4 = GCRN(feature_size= params["n_hidden"],
+        #                             graph_embedding_size=params["graph_embedding_size"],
+        #                             embedding_size=params["n_hidden"],
+        #                             layers=params["layers"],
+        #                             num_edge_cat=num_edge_cat).to(device)
+        # self.GraphEmbedding5 = GCRN(feature_size=params["n_hidden"],
+        #                             graph_embedding_size=params["graph_embedding_size"],
+        #                             embedding_size=params["n_hidden"],
+        #                             layers=params["layers"],
+        #                             num_edge_cat=num_edge_cat).to(device)
+        # self.GraphEmbedding6 = GCRN(feature_size=params["n_hidden"],
+        #                             graph_embedding_size=params["graph_embedding_size"],
+        #                             embedding_size=params["n_hidden"],
+        #                             layers=params["layers"],
+        #                             num_edge_cat=num_edge_cat).to(device)
+        # self.GraphEmbedding7 = GCRN(feature_size=params["n_hidden"],
+        #                             graph_embedding_size=params["graph_embedding_size"],
+        #                             embedding_size=params["n_hidden"],
+        #                             layers=params["layers"],
+        #                             num_edge_cat=num_edge_cat).to(device)
 
 
 
@@ -87,7 +87,7 @@ class PtrNet1(nn.Module):
 
         if self.params['third_feature'] == True:
             if self.params['ex_embedding'] == True:
-                extended_dimension = 32
+                extended_dimension = params["ex_embedding_size"]
             else:
                 extended_dimension = 4
         else:
@@ -133,7 +133,7 @@ class PtrNet1(nn.Module):
         self.n_glimpse = params["n_glimpse"]
         self.job_selecter = Categorical()
 
-        self.ex_embedding = ExEmbedding()
+        self.ex_embedding = ExEmbedding(params["ex_embedding_size"])
 
 
 
@@ -206,37 +206,37 @@ class PtrNet1(nn.Module):
         if cfg.k_hop == 2:
             enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
             enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True, final = True)
-        if cfg.k_hop == 3:
-            enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
-            enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
-            enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True, final = True)
-        if cfg.k_hop == 4:
-            enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
-            enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
-            enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
-            enc_h = self.GraphEmbedding3(heterogeneous_edges, enc_h, mini_batch=True, final = True)
-        if cfg.k_hop == 5:
-            enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
-            enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
-            enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
-            enc_h = self.GraphEmbedding3(heterogeneous_edges, enc_h, mini_batch=True)
-            enc_h = self.GraphEmbedding4(heterogeneous_edges, enc_h, mini_batch=True, final = True)
-        if cfg.k_hop == 6:
-            enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
-            enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
-            enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
-            enc_h = self.GraphEmbedding3(heterogeneous_edges, enc_h, mini_batch=True)
-            enc_h = self.GraphEmbedding4(heterogeneous_edges, enc_h, mini_batch=True)
-            enc_h = self.GraphEmbedding5(heterogeneous_edges, enc_h, mini_batch=True, final = True)
-
-        if cfg.k_hop == 7:
-            enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
-            enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
-            enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
-            enc_h = self.GraphEmbedding3(heterogeneous_edges, enc_h, mini_batch=True)
-            enc_h = self.GraphEmbedding4(heterogeneous_edges, enc_h, mini_batch=True)
-            enc_h = self.GraphEmbedding5(heterogeneous_edges, enc_h, mini_batch=True)
-            enc_h = self.GraphEmbedding6(heterogeneous_edges, enc_h, mini_batch=True, final = True)
+        # if cfg.k_hop == 3:
+        #     enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
+        #     enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
+        #     enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True, final = True)
+        # if cfg.k_hop == 4:
+        #     enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
+        #     enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
+        #     enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
+        #     enc_h = self.GraphEmbedding3(heterogeneous_edges, enc_h, mini_batch=True, final = True)
+        # if cfg.k_hop == 5:
+        #     enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
+        #     enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
+        #     enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
+        #     enc_h = self.GraphEmbedding3(heterogeneous_edges, enc_h, mini_batch=True)
+        #     enc_h = self.GraphEmbedding4(heterogeneous_edges, enc_h, mini_batch=True, final = True)
+        # if cfg.k_hop == 6:
+        #     enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
+        #     enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
+        #     enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
+        #     enc_h = self.GraphEmbedding3(heterogeneous_edges, enc_h, mini_batch=True)
+        #     enc_h = self.GraphEmbedding4(heterogeneous_edges, enc_h, mini_batch=True)
+        #     enc_h = self.GraphEmbedding5(heterogeneous_edges, enc_h, mini_batch=True, final = True)
+        #
+        # if cfg.k_hop == 7:
+        #     enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
+        #     enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
+        #     enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
+        #     enc_h = self.GraphEmbedding3(heterogeneous_edges, enc_h, mini_batch=True)
+        #     enc_h = self.GraphEmbedding4(heterogeneous_edges, enc_h, mini_batch=True)
+        #     enc_h = self.GraphEmbedding5(heterogeneous_edges, enc_h, mini_batch=True)
+        #     enc_h = self.GraphEmbedding6(heterogeneous_edges, enc_h, mini_batch=True, final = True)
 
         embed = enc_h.size(2)
         h = enc_h.mean(dim = 1).unsqueeze(0) # 모든 node embedding에 대해서(element wise) 평균을 낸다.
