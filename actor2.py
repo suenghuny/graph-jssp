@@ -26,7 +26,6 @@ class ExEmbedding(nn.Module):
         self.fcn3 = nn.Linear(48, feature_size)
     def forward(self, x):
         x = F.elu(self.bn1(self.fcn1(x)))
-
         x = F.elu(self.bn2(self.fcn2(x)))
         x = self.fcn3(x)
         return x
