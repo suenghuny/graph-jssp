@@ -254,8 +254,11 @@ def train_model(params, log_path=None):
             heterogeneous_edges.append(heterogeneous_edge)
         input_data = (node_features, heterogeneous_edges)
         act_model.train()
-        pred_seq, ll_old, _ = act_model(input_data, device, scheduler_list=scheduler_list,
-                                        num_machine=num_machine, num_job=num_job,
+        pred_seq, ll_old, _ = act_model(input_data,
+                                        device,
+                                        scheduler_list=scheduler_list,
+                                        num_machine=num_machine,
+                                        num_job=num_job,
                                         upperbound=makespan_list_for_upperbound
                                         )
 
@@ -292,7 +295,8 @@ def train_model(params, log_path=None):
         act_loss = -(ll_old * adv).mean()  # loss 구하는 부분 /  ll_old의 의미 log_theta (pi | s)
         act_loss.backward()
         act_optim.step()
-        nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=10.0, norm_type=2)
+
+        nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 10)), norm_type=2)
         if act_lr_scheduler.get_last_lr()[0] >= 1e-4:
             if params["is_lr_decay"]:
                 act_lr_scheduler.step()
@@ -359,10 +363,10 @@ if __name__ == '__main__':
         "optimizer": "Adam",
         "n_glimpse": cfg.n_glimpse,
         "n_process": cfg.n_process,
-        "lr": float(os.environ.get("lr", 1e-3)),
+        "lr": cfg.lr,
         "is_lr_decay": cfg.is_lr_decay,
-        "lr_decay": float(os.environ.get("lr_decay",0.995)),
-        "lr_decay_step": int(os.environ.get("lr_decay_step", 1000)),
+        "lr_decay": cfg.lr_decay,
+        "lr_decay_step": cfg.lr_decay_step,
         "lr_decay_step_critic": cfg.lr_decay_step_critic,
         "load_model": load_model,
         "layers": eval(str(os.environ.get("layers", '[256, 128]'))),
@@ -375,7 +379,7 @@ if __name__ == '__main__':
         "dot_product": cfg.dot_product,
         "third_feature": True,
         "baseline_reset": cfg.baseline_reset,
-        "ex_embedding": True
+        "ex_embedding": cfg.ex_embedding,
+        "ex_embedding_size": int(os.environ.get("ex_embedding_size", 32)),
     }
-
     train_model(params)
