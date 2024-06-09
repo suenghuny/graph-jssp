@@ -142,17 +142,17 @@ class GCRN(nn.Module):
         if final == False:
             H = torch.concat(placeholder_for_multi_head, dim = 2)
             H = H.reshape(batch_size*num_nodes, -1)
-            H = F.relu(self.Embedding1(H))
-            X = X.reshape(batch_size*num_nodes, -1)
-            H = self.BN1((1 - cfg.alpha)*H + cfg.alpha*X)
+            H = self.Embedding1(H)
+            # X = X.reshape(batch_size*num_nodes, -1)
+            # H = self.BN1((1 - cfg.alpha)*H + cfg.alpha*X)
         else:
             H = empty.reshape(batch_size, num_nodes, self.num_edge_cat * self.graph_embedding_size)
             H = H.reshape(batch_size * num_nodes, -1)
-            H = F.relu(self.Embedding1_mean(H))
-            X = X.reshape(batch_size * num_nodes, -1)
-            H = self.BN1((1 - cfg.alpha)*H + cfg.alpha*X)
+            H = self.Embedding1_mean(H)
+            # X = X.reshape(batch_size * num_nodes, -1)
+            # H = self.BN1((1 - cfg.alpha)*H + cfg.alpha*X)
 
         Z = self.Embedding2(H)
-        Z = self.BN2(H + Z)
+        #Z = self.BN2(H + Z)
         Z = Z.reshape(batch_size, num_nodes, -1)
         return Z
