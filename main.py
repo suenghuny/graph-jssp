@@ -383,6 +383,7 @@ if __name__ == '__main__':
         "graph_embedding_size": int(os.environ.get("graph_embedding_size", 128)),
         "n_multi_head": int(os.environ.get("n_multi_head", 2)),
         "ex_embedding_size": int(os.environ.get("ex_embedding_size", 32)),
+        "k_hop": int(os.environ.get("k_hop", 2)),
         "is_lr_decay": True,
         "third_feature": True,
         "baseline_reset": True,

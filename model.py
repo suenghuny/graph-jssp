@@ -98,8 +98,6 @@ class GCRN(nn.Module):
         batch_size = X.shape[0]
         num_nodes = X.shape[1]
         placeholder_for_multi_head = torch.zeros(batch_size, num_nodes, self.n_multi_head, self.num_edge_cat *self.graph_embedding_size).to(device)
-
-
         if final == False:
             pass
         else:

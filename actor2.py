@@ -38,7 +38,7 @@ class PtrNet1(nn.Module):
         self.n_multi_head = params["n_multi_head"]
         self.Embedding = nn.Linear(params["num_of_process"],params["n_hidden"], bias=False).to(device)  # 그림 상에서 Encoder에 FF(feedforward)라고 써져있는 부분
         self.params = params
-
+        self.k_hop = params["k_hop"]
 
         num_edge_cat = 3
         self.GraphEmbedding = GCRN(feature_size =  params["n_hidden"],
@@ -207,9 +207,10 @@ class PtrNet1(nn.Module):
         node_reshaped_features = node_features.reshape(batch * node_num, -1)
         node_embedding = self.Embedding(node_reshaped_features)
         node_embedding = node_embedding.reshape(batch, node_num, -1)
-        if cfg.k_hop == 1:
+
+        if self.k_hop == 1:
             enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
-        if cfg.k_hop == 2:
+        if self.k_hop == 2:
             enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
             enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True, final = True)
         # if cfg.k_hop == 3:
