@@ -20,7 +20,6 @@ class ExEmbedding(nn.Module):
     def __init__(self, feature_size):
         super().__init__()
         self.fcn1 = nn.Linear(4, 84)
-        #self.bn1 = nn.BatchNorm1d(64)
         self.fcn2 = nn.Linear(84, 64)
         self.fcn3 = nn.Linear(64, feature_size)
     def forward(self, x):
@@ -54,6 +53,7 @@ class PtrNet1(nn.Module):
                                     layers =  params["layers"],
                                     alpha=params["alpha"],
                                     num_edge_cat = num_edge_cat).to(device)
+        #print(self.k_hop, self.n_multi_head)
         # self.GraphEmbedding2 = GCRN(feature_size= params["n_hidden"],
         #                             graph_embedding_size=params["graph_embedding_size"],
         #                             embedding_size=params["n_hidden"],

@@ -374,7 +374,7 @@ if __name__ == '__main__':
 
         "reward_scaler": cfg.reward_scaler,
         "beta": float(os.environ.get("beta", 0.85)),
-        "alpha": float(os.environ.get("alpha", 0.2)),
+        "alpha": float(os.environ.get("alpha", 0.1)),
         "lr": float(os.environ.get("lr", 1.0e-3)),
         "lr_decay": float(os.environ.get("lr_decay", 0.995)),
         "lr_decay_step": int(os.environ.get("lr_decay_step", 1000)),
@@ -384,7 +384,7 @@ if __name__ == '__main__':
         "graph_embedding_size": int(os.environ.get("graph_embedding_size", 64)),
         "n_multi_head": int(os.environ.get("n_multi_head", 4)),
         "ex_embedding_size": int(os.environ.get("ex_embedding_size", 32)),
-        "k_hop": int(os.environ.get("k_hop", 2)),
+        "k_hop": int(os.environ.get("k_hop", 1)),
         "is_lr_decay": True,
         "third_feature": True,
         "baseline_reset": True,

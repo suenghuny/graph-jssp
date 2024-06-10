@@ -161,23 +161,41 @@ def train_model(params, log_path=None):
         if s % 100 == 1:  # Evaluation 수행
             for p in problem_list:
                 min_makespan = heuristic_eval(p)
-                eval_number = 10
-                min_makespan_list = [min_makespan] * eval_number
-                min_makespan1, mean_makespan1 = evaluation(act_model, baseline_model, p, eval_number, device,
-                                                           upperbound=min_makespan_list)
+                eval_number = 5
+                with torch.no_grad():
+                    min_makespan_list = [min_makespan] * eval_number
+                    min_makespan1, mean_makespan1 = evaluation(act_model, baseline_model, p, eval_number, device,
+                                                               upperbound=min_makespan_list)
 
-                eval_number = 10
-                min_makespan_list = [min_makespan] * eval_number
-                min_makespan2, mean_makespan2 = evaluation(act_model, baseline_model, p, eval_number, device,
-                                                           upperbound=min_makespan_list)
+                    eval_number = 5
+                    min_makespan_list = [min_makespan] * eval_number
+                    min_makespan2, mean_makespan2 = evaluation(act_model, baseline_model, p, eval_number, device,
+                                                               upperbound=min_makespan_list)
 
-                eval_number = 10
-                min_makespan_list = [min_makespan] * eval_number
-                min_makespan3, mean_makespan3 = evaluation(act_model, baseline_model, p, eval_number, device,
-                                                           upperbound=min_makespan_list)
+                    eval_number = 5
+                    min_makespan_list = [min_makespan] * eval_number
+                    min_makespan3, mean_makespan3 = evaluation(act_model, baseline_model, p, eval_number, device,
+                                                               upperbound=min_makespan_list)
 
-                min_makespan = np.min([min_makespan1, min_makespan2, min_makespan3])
-                mean_makespan = (mean_makespan1 + mean_makespan2 + mean_makespan3) / 3
+                    eval_number = 5
+                    min_makespan_list = [min_makespan] * eval_number
+                    min_makespan4, mean_makespan4 = evaluation(act_model, baseline_model, p, eval_number, device,
+                                                               upperbound=min_makespan_list)
+
+                    eval_number = 5
+                    min_makespan_list = [min_makespan] * eval_number
+                    min_makespan5, mean_makespan5 = evaluation(act_model, baseline_model, p, eval_number, device,
+                                                               upperbound=min_makespan_list)
+
+                    eval_number = 5
+                    min_makespan_list = [min_makespan] * eval_number
+                    min_makespan6, mean_makespan6 = evaluation(act_model, baseline_model, p, eval_number, device,
+                                                               upperbound=min_makespan_list)
+
+                min_makespan = np.min(
+                    [min_makespan1, min_makespan2, min_makespan3, min_makespan4, min_makespan5, min_makespan6])
+                mean_makespan = (
+                                            mean_makespan1 + mean_makespan2 + mean_makespan3 + mean_makespan4 + mean_makespan5 + mean_makespan6) / 6
 
                 print("TA{}".format(problem_list[p - 1]), min_makespan, mean_makespan)
                 if cfg.vessl == True:
@@ -192,8 +210,8 @@ def train_model(params, log_path=None):
                     mean_m = mean_m.transpose()
                     min_m.columns = problem_list
                     mean_m.columns = problem_list
-                    min_m.to_csv('min_makespan_w_third_feature.csv')
-                    mean_m.to_csv('mean_makespan_w_third_feature.csv')
+                    min_m.to_csv('min_makespan_w_third_feature2.csv')
+                    mean_m.to_csv('mean_makespan_w_third_feature2.csv')
 
         act_model.block_indices = []
         baseline_model.block_indices = []
@@ -239,8 +257,11 @@ def train_model(params, log_path=None):
             heterogeneous_edges.append(heterogeneous_edge)
         input_data = (node_features, heterogeneous_edges)
         act_model.train()
-        pred_seq, ll_old, _ = act_model(input_data, device, scheduler_list=scheduler_list,
-                                        num_machine=num_machine, num_job=num_job,
+        pred_seq, ll_old, _ = act_model(input_data,
+                                        device,
+                                        scheduler_list=scheduler_list,
+                                        num_machine=num_machine,
+                                        num_job=num_job,
                                         upperbound=makespan_list_for_upperbound
                                         )
 
@@ -255,29 +276,33 @@ def train_model(params, log_path=None):
         """
         vanila actor critic
         """
+        beta = params['beta']
         if baseline_reset == False:
             if s == 1:
                 be = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)  # baseline을 구하는 부분
             else:
-                be = cfg.beta * be + (1 - cfg.beta) * torch.tensor(real_makespan).to(device)
+                be = beta * be + (1 - beta) * torch.tensor(real_makespan).to(device)
         else:
             if s % cfg.gen_step == 1:
                 be = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)  # baseline을 구하는 부분
             else:
-                be = cfg.beta * be + (1 - cfg.beta) * torch.tensor(real_makespan).to(device)
+                be = beta * be + (1 - beta) * torch.tensor(real_makespan).to(device)
         ####
         act_optim.zero_grad()
         adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - be  # baseline(advantage) 구하는 부분
         """
+
         1. Loss 구하기
         2. Gradient 구하기 (loss.backward)
         3. Update 하기(act_optim.step)
+
         """
 
         act_loss = -(ll_old * adv).mean()  # loss 구하는 부분 /  ll_old의 의미 log_theta (pi | s)
         act_loss.backward()
         act_optim.step()
-        nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=10.0, norm_type=2)
+
+        nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 10)), norm_type=2)
         if act_lr_scheduler.get_last_lr()[0] >= 1e-4:
             if params["is_lr_decay"]:
                 act_lr_scheduler.step()
@@ -333,7 +358,6 @@ if __name__ == '__main__':
         "save_step": cfg.save_step,
         "model_dir": model_dir,
         "batch_size": cfg.batch_size,
-        "n_hidden": cfg.n_hidden,
         "init_min": -0.08,
         "init_max": 0.08,
         "use_logit_clipping": True,
@@ -344,22 +368,29 @@ if __name__ == '__main__':
         "optimizer": "Adam",
         "n_glimpse": cfg.n_glimpse,
         "n_process": cfg.n_process,
-        "lr": cfg.lr,
-        "is_lr_decay": cfg.is_lr_decay,
-        "lr_decay": cfg.lr_decay,
-        "lr_decay_step": cfg.lr_decay_step,
         "lr_decay_step_critic": cfg.lr_decay_step_critic,
         "load_model": load_model,
-        "layers": eval(str(os.environ.get("layers", '[128, 64]'))),
-        "lr_critic": cfg.lr_critic,
-        "n_embedding": int(os.environ.get("n_embedding", 32)),
-        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 64)),
-        "reward_scaler": cfg.reward_scaler,
-        "n_multi_head": int(os.environ.get("n_multi_head", 4)),
         "entropy_weight": cfg.entropy_weight,
         "dot_product": cfg.dot_product,
-        "third_feature": True,
-        "baseline_reset": cfg.baseline_reset
-    }
+        "lr_critic": cfg.lr_critic,
 
+        "reward_scaler": cfg.reward_scaler,
+        "beta": float(os.environ.get("beta", 0.85)),
+        "alpha": float(os.environ.get("alpha", 0.2)),
+        "lr": float(os.environ.get("lr", 1.0e-3)),
+        "lr_decay": float(os.environ.get("lr_decay", 0.995)),
+        "lr_decay_step": int(os.environ.get("lr_decay_step", 1000)),
+        "layers": eval(str(os.environ.get("layers", '[128, 64]'))),
+        "n_embedding": int(os.environ.get("n_embedding", 32)),
+        "n_hidden": int(os.environ.get("n_hidden", 64)),
+        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 64)),
+        "n_multi_head": int(os.environ.get("n_multi_head", 3)),
+        "ex_embedding_size": int(os.environ.get("ex_embedding_size", 32)),
+        "k_hop": int(os.environ.get("k_hop", 2)),
+        "is_lr_decay": True,
+        "third_feature": True,
+        "baseline_reset": True,
+        "ex_embedding": True,
+
+    }
     train_model(params)

@@ -62,6 +62,7 @@ class GCRN(nn.Module):
         self.attention = attention
         self.Ws = []
         self.n_multi_head = n_multi_head
+        #print(self.n_multi_head)
         for i in range(num_edge_cat):
             self.Ws.append(nn.Parameter(torch.Tensor(self.n_multi_head*feature_size, graph_embedding_size)))
         self.Ws = nn.ParameterList(self.Ws)
