@@ -45,11 +45,15 @@ class PtrNet1(nn.Module):
                                    graph_embedding_size= params["graph_embedding_size"],
                                    embedding_size =  params["n_hidden"],
                                    layers =  params["layers"],
+                                   alpha =  params["alpha"],
+                                   n_multi_head = params["n_multi_head"],
                                    num_edge_cat = num_edge_cat).to(device)
         self.GraphEmbedding1 = GCRN(feature_size =  params["n_hidden"],
                                    graph_embedding_size= params["graph_embedding_size"],
                                    embedding_size =  params["n_hidden"],
+                                    n_multi_head=params["n_multi_head"],
                                     layers =  params["layers"],
+                                    alpha=params["alpha"],
                                     num_edge_cat = num_edge_cat).to(device)
         # self.GraphEmbedding2 = GCRN(feature_size= params["n_hidden"],
         #                             graph_embedding_size=params["graph_embedding_size"],
