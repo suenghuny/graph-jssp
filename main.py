@@ -162,34 +162,35 @@ def train_model(params, log_path=None):
             for p in problem_list:
                 min_makespan = heuristic_eval(p)
                 eval_number = 5
-                min_makespan_list = [min_makespan] * eval_number
-                min_makespan1, mean_makespan1 = evaluation(act_model, baseline_model, p, eval_number, device,
-                                                           upperbound=min_makespan_list)
+                with torch.no_grad():
+                    min_makespan_list = [min_makespan] * eval_number
+                    min_makespan1, mean_makespan1 = evaluation(act_model, baseline_model, p, eval_number, device,
+                                                               upperbound=min_makespan_list)
 
-                eval_number = 5
-                min_makespan_list = [min_makespan] * eval_number
-                min_makespan2, mean_makespan2 = evaluation(act_model, baseline_model, p, eval_number, device,
-                                                           upperbound=min_makespan_list)
+                    eval_number = 5
+                    min_makespan_list = [min_makespan] * eval_number
+                    min_makespan2, mean_makespan2 = evaluation(act_model, baseline_model, p, eval_number, device,
+                                                               upperbound=min_makespan_list)
 
-                eval_number = 5
-                min_makespan_list = [min_makespan] * eval_number
-                min_makespan3, mean_makespan3 = evaluation(act_model, baseline_model, p, eval_number, device,
-                                                           upperbound=min_makespan_list)
+                    eval_number = 5
+                    min_makespan_list = [min_makespan] * eval_number
+                    min_makespan3, mean_makespan3 = evaluation(act_model, baseline_model, p, eval_number, device,
+                                                               upperbound=min_makespan_list)
 
-                eval_number = 5
-                min_makespan_list = [min_makespan] * eval_number
-                min_makespan4, mean_makespan4 = evaluation(act_model, baseline_model, p, eval_number, device,
-                                                           upperbound=min_makespan_list)
+                    eval_number = 5
+                    min_makespan_list = [min_makespan] * eval_number
+                    min_makespan4, mean_makespan4 = evaluation(act_model, baseline_model, p, eval_number, device,
+                                                               upperbound=min_makespan_list)
 
-                eval_number = 5
-                min_makespan_list = [min_makespan] * eval_number
-                min_makespan5, mean_makespan5 = evaluation(act_model, baseline_model, p, eval_number, device,
-                                                           upperbound=min_makespan_list)
+                    eval_number = 5
+                    min_makespan_list = [min_makespan] * eval_number
+                    min_makespan5, mean_makespan5 = evaluation(act_model, baseline_model, p, eval_number, device,
+                                                               upperbound=min_makespan_list)
 
-                eval_number = 5
-                min_makespan_list = [min_makespan] * eval_number
-                min_makespan6, mean_makespan6 = evaluation(act_model, baseline_model, p, eval_number, device,
-                                                           upperbound=min_makespan_list)
+                    eval_number = 5
+                    min_makespan_list = [min_makespan] * eval_number
+                    min_makespan6, mean_makespan6 = evaluation(act_model, baseline_model, p, eval_number, device,
+                                                               upperbound=min_makespan_list)
 
                 min_makespan = np.min([min_makespan1, min_makespan2, min_makespan3,min_makespan4,min_makespan5,min_makespan6])
                 mean_makespan = (mean_makespan1 + mean_makespan2 + mean_makespan3+ mean_makespan4+ mean_makespan5+ mean_makespan6) / 6
