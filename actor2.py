@@ -19,14 +19,13 @@ class Categorical(nn.Module):
 class ExEmbedding(nn.Module):
     def __init__(self, feature_size):
         super().__init__()
-        self.fcn1 = nn.Linear(4, 64, bias = False)
-        self.bn1 = nn.BatchNorm1d(64)
-        self.fcn2 = nn.Linear(64, 48, bias = False)
-        self.bn2 = nn.BatchNorm1d(48)
-        self.fcn3 = nn.Linear(48, feature_size)
+        self.fcn1 = nn.Linear(4, 84)
+        #self.bn1 = nn.BatchNorm1d(64)
+        self.fcn2 = nn.Linear(84, 64)
+        self.fcn3 = nn.Linear(64, feature_size)
     def forward(self, x):
-        x = F.elu(self.bn1(self.fcn1(x)))
-        x = F.elu(self.bn2(self.fcn2(x)))
+        x = F.elu(self.fcn1(x))
+        x = F.elu(self.fcn2(x))
         x = self.fcn3(x)
         return x
 
