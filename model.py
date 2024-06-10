@@ -52,7 +52,7 @@ class NodeEmbedding(nn.Module):
         return node_representation
 
 class GCRN(nn.Module):
-    def __init__(self, feature_size, embedding_size, graph_embedding_size, layers, n_multi_head, num_edge_cat, attention = False):
+    def __init__(self, feature_size, embedding_size, graph_embedding_size, layers, n_multi_head, num_edge_cat, alpha,  attention = False):
         super(GCRN, self).__init__()
         #device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.num_edge_cat = num_edge_cat
@@ -66,6 +66,7 @@ class GCRN(nn.Module):
             self.Ws.append(nn.Parameter(torch.Tensor(self.n_multi_head*feature_size, graph_embedding_size)))
         self.Ws = nn.ParameterList(self.Ws)
         [glorot(W) for W in self.Ws]
+        self.alpha = alpha
 
 
         self.a1 = [nn.Parameter(torch.Tensor(size=(self.n_multi_head * graph_embedding_size, 1))) for _ in range(self.num_edge_cat)]
@@ -91,15 +92,11 @@ class GCRN(nn.Module):
         Wh1 = torch.matmul(Wh1, self.a1[e][m*self.graph_embedding_size:(m+1)*self.graph_embedding_size, :])
         Wh2 = Wv
         Wh2 = torch.matmul(Wh2, self.a2[e][m*self.graph_embedding_size:(m+1)*self.graph_embedding_size, :])
-        #print(Wh1.shape, Wh2.shape)
-        a = Wh1 - Wh2.T
+        a = Wh1 + Wh2.T
         return F.leaky_relu(a)
     def forward(self, A, X, mini_batch, layer = 0, final = False):
         batch_size = X.shape[0]
         num_nodes = X.shape[1]
-        #placeholder_for_multi_head = []
-
-        #print(H.shape, batch_size, num_nodes, self.num_edge_cat, self.n_multi_head, self.graph_embedding_size)
         placeholder_for_multi_head = torch.zeros(batch_size, num_nodes, self.n_multi_head, self.num_edge_cat *self.graph_embedding_size).to(device)
 
 
@@ -131,25 +128,21 @@ class GCRN(nn.Module):
             if final == False:
                 H = empty.reshape(batch_size, num_nodes, self.num_edge_cat*self.graph_embedding_size)
                 placeholder_for_multi_head[:, :, m, :] = H
-                #placeholder_for_multi_head.append(H)
             else:
                 pass
 ###
         if final == False:
             H = placeholder_for_multi_head.reshape(batch_size, num_nodes, self.n_multi_head * self.num_edge_cat * self.graph_embedding_size)
-            #H = torch.concat(placeholder_for_multi_head, dim = 2)
-
-
             H = H.reshape(batch_size*num_nodes, -1)
             H = self.Embedding1(H)
             X = X.reshape(batch_size*num_nodes, -1)
-            H = self.BN1((1 - cfg.alpha)*H + cfg.alpha*X)
+            H = self.BN1((1 - self.alpha)*H + self.alpha*X)
         else:
             H = empty.reshape(batch_size, num_nodes, self.num_edge_cat * self.graph_embedding_size)
             H = H.reshape(batch_size * num_nodes, -1)
             H = self.Embedding1_mean(H)
             X = X.reshape(batch_size * num_nodes, -1)
-            H = self.BN1((1 - cfg.alpha)*H + cfg.alpha*X)
+            H = self.BN1((1 - self.alpha)*H + self.alpha*X)
 
         Z = self.Embedding2(H)
         Z = self.BN2(H + Z)

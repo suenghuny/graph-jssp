@@ -369,7 +369,6 @@ if __name__ == '__main__':
         "load_model": load_model,
         "entropy_weight": cfg.entropy_weight,
         "dot_product": cfg.dot_product,
-
         "lr_critic": cfg.lr_critic,
 
         "reward_scaler": cfg.reward_scaler,
@@ -384,7 +383,6 @@ if __name__ == '__main__':
         "graph_embedding_size": int(os.environ.get("graph_embedding_size", 128)),
         "n_multi_head": int(os.environ.get("n_multi_head", 2)),
         "ex_embedding_size": int(os.environ.get("ex_embedding_size", 32)),
-
         "is_lr_decay": True,
         "third_feature": True,
         "baseline_reset": True,
