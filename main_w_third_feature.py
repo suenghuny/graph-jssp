@@ -300,9 +300,9 @@ def train_model(params, log_path=None):
 
         act_loss = -(ll_old * adv).mean()  # loss 구하는 부분 /  ll_old의 의미 log_theta (pi | s)
         act_loss.backward()
+        nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 10)), norm_type=2)
         act_optim.step()
 
-        nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 10)), norm_type=2)
         if act_lr_scheduler.get_last_lr()[0] >= 1e-4:
             if params["is_lr_decay"]:
                 act_lr_scheduler.step()
@@ -375,7 +375,7 @@ if __name__ == '__main__':
         "lr_critic": cfg.lr_critic,
 
         "reward_scaler": cfg.reward_scaler,
-        "beta": float(os.environ.get("beta", 0.85)),
+        "beta": float(os.environ.get("beta", 0.95)),
         "alpha": float(os.environ.get("alpha", 0.2)),
         "lr": float(os.environ.get("lr", 1.0e-3)),
         "lr_decay": float(os.environ.get("lr_decay", 0.995)),
@@ -384,9 +384,9 @@ if __name__ == '__main__':
         "n_embedding": int(os.environ.get("n_embedding", 32)),
         "n_hidden": int(os.environ.get("n_hidden", 64)),
         "graph_embedding_size": int(os.environ.get("graph_embedding_size", 64)),
-        "n_multi_head": int(os.environ.get("n_multi_head", 3)),
-        "ex_embedding_size": int(os.environ.get("ex_embedding_size", 32)),
-        "k_hop": int(os.environ.get("k_hop", 2)),
+        "n_multi_head": int(os.environ.get("n_multi_head", 5)),
+        "ex_embedding_size": int(os.environ.get("ex_embedding_size", 54)),
+        "k_hop": int(os.environ.get("k_hop", 1)),
         "is_lr_decay": True,
         "third_feature": True,
         "baseline_reset": True,
