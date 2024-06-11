@@ -202,7 +202,7 @@ def train_model(params, log_path=None):
                 if len(empty_records)>4 and np.mean(empty_records[:4])>=3000:
                     sys.exit()
 
-
+###
 
                 if cfg.vessl == True:
                     vessl.log(step=s, payload={'minmakespan{}'.format(str(problem_list[p - 1])): min_makespan})
