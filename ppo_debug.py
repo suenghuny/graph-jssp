@@ -294,7 +294,7 @@ def train_model(params, log_path=None):
                 if s % cfg.gen_step == 1:
                     be = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)  # baseline을 구하는 부분
                 else:
-                    be = beta * be + (1 - beta) * torch.tensor(real_makespan).to(device)
+                    be = beta * be + (1 - beta) * torch.tensor(real_makespan).unsqueeze(1).to(device)
             ####
             act_optim.zero_grad()
             adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - be  # baseline(advantage) 구하는 부분
@@ -341,7 +341,7 @@ def train_model(params, log_path=None):
                 if s % cfg.gen_step == 1:
                     be = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)  # baseline을 구하는 부분
                 else:
-                    be = beta * be + (1 - beta) * torch.tensor(real_makespan).to(device)
+                    be = beta * be + (1 - beta) * torch.tensor(real_makespan).unsqueeze(1).to(device)
             ####
             for i in range(params['k_epoch']):
                 for scheduler in scheduler_list:
