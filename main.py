@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import os
+import sys
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 from time import time
@@ -147,6 +148,7 @@ def train_model(params, log_path=None):
     problem_list = [1, 2]
     validation_records_min = [[] for _ in problem_list]
     validation_records_mean = [[] for _ in problem_list]
+    empty_records = list()
     for s in range(epoch + 1, params["step"]):
 
         """
@@ -159,6 +161,7 @@ def train_model(params, log_path=None):
         b += 1
 
         if s % 100 == 1:  # Evaluation 수행
+
             for p in problem_list:
                 min_makespan = heuristic_eval(p)
                 eval_number = 5
@@ -192,10 +195,15 @@ def train_model(params, log_path=None):
                     min_makespan6, mean_makespan6 = evaluation(act_model, baseline_model, p, eval_number, device,
                                                                upperbound=min_makespan_list)
 
-                min_makespan = np.min([min_makespan1, min_makespan2, min_makespan3,min_makespan4,min_makespan5,min_makespan6])
-                mean_makespan = (mean_makespan1 + mean_makespan2 + mean_makespan3+ mean_makespan4+ mean_makespan5+ mean_makespan6) / 6
-
+                min_makespan = np.min([min_makespan1, min_makespan2, min_makespan3, min_makespan4, min_makespan5, min_makespan6])
+                mean_makespan = (mean_makespan1 + mean_makespan2 + mean_makespan3 + mean_makespan4 + mean_makespan5 + mean_makespan6) / 6
                 print("TA{}".format(problem_list[p - 1]), min_makespan, mean_makespan)
+                empty_records.append(mean_makespan)
+                if len(empty_records)>4 and np.mean(empty_records[:4])>=3000:
+                    sys.exit()
+
+
+
                 if cfg.vessl == True:
                     vessl.log(step=s, payload={'minmakespan{}'.format(str(problem_list[p - 1])): min_makespan})
                     vessl.log(step=s, payload={'meanmakespan{}'.format(str(problem_list[p - 1])): mean_makespan})
@@ -289,18 +297,18 @@ def train_model(params, log_path=None):
         act_optim.zero_grad()
         adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - be  # baseline(advantage) 구하는 부분
         """
-        
+
         1. Loss 구하기
         2. Gradient 구하기 (loss.backward)
         3. Update 하기(act_optim.step)
-        
+
         """
 
         act_loss = -(ll_old * adv).mean()  # loss 구하는 부분 /  ll_old의 의미 log_theta (pi | s)
         act_loss.backward()
+        nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 10)), norm_type=2)
         act_optim.step()
 
-        nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 10)), norm_type=2)
         if act_lr_scheduler.get_last_lr()[0] >= 1e-4:
             if params["is_lr_decay"]:
                 act_lr_scheduler.step()
@@ -373,8 +381,8 @@ if __name__ == '__main__':
         "lr_critic": cfg.lr_critic,
 
         "reward_scaler": cfg.reward_scaler,
-        "beta": float(os.environ.get("beta", 0.85)),
-        "alpha": float(os.environ.get("alpha", 0.1)),
+        "beta": float(os.environ.get("beta", 0.95)),
+        "alpha": float(os.environ.get("alpha", 0.2)),
         "lr": float(os.environ.get("lr", 1.0e-3)),
         "lr_decay": float(os.environ.get("lr_decay", 0.995)),
         "lr_decay_step": int(os.environ.get("lr_decay_step", 1000)),
@@ -382,8 +390,8 @@ if __name__ == '__main__':
         "n_embedding": int(os.environ.get("n_embedding", 32)),
         "n_hidden": int(os.environ.get("n_hidden", 64)),
         "graph_embedding_size": int(os.environ.get("graph_embedding_size", 64)),
-        "n_multi_head": int(os.environ.get("n_multi_head", 4)),
-        "ex_embedding_size": int(os.environ.get("ex_embedding_size", 32)),
+        "n_multi_head": int(os.environ.get("n_multi_head", 5)),
+        "ex_embedding_size": int(os.environ.get("ex_embedding_size", 54)),
         "k_hop": int(os.environ.get("k_hop", 1)),
         "is_lr_decay": True,
         "third_feature": True,
@@ -391,4 +399,4 @@ if __name__ == '__main__':
         "ex_embedding": True,
 
     }
-    train_model(params)
+    train_model(params)#
