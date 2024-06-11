@@ -324,7 +324,7 @@ def train_model(params, log_path=None):
             for n in range(pred_seq.shape[0]):  # act_model(agent)가 산출한 해를 평가하는 부분
                 sequence = pred_seq[n]
                 scheduler = AdaptiveScheduler(jobs_datas[n])
-                makespan = scheduler.run(sequence.tolist()) / params['reward_scaler']
+                makespan = -scheduler.run(sequence.tolist()) / params['reward_scaler']
                 real_makespan.append(makespan)
                 c_max.append(makespan)
             ave_makespan += sum(real_makespan) / (params["batch_size"] * params["log_step"])
@@ -357,10 +357,11 @@ def train_model(params, log_path=None):
 
                 act_optim.zero_grad()
                 ratio = torch.exp(ll_new-ll_old.detach()).unsqueeze(-1)
-                adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - be # baseline(advantage) 구하는 부분
+                adv = be-torch.tensor(real_makespan).detach().unsqueeze(1).to(device)  # baseline(advantage) 구하는 부분
+                # print(ratio.shape, adv.shape)
                 surr1 = ratio * adv
                 surr2 = torch.clamp(ratio, 1 - params["epsilon"], 1 + params["epsilon"]) * adv
-                act_loss = torch.max(surr1, surr2).mean()
+                act_loss = -torch.min(surr1, surr2).mean()
                 act_optim.zero_grad()
                 act_loss.backward()
                 act_optim.step()
