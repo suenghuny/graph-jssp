@@ -148,7 +148,7 @@ def train_model(params, log_path=None):
     problem_list = [1, 2]
     validation_records_min = [[] for _ in problem_list]
     validation_records_mean = [[] for _ in problem_list]
-    empty_records = list()
+    empty_records = [[],[]]
     for s in range(epoch + 1, params["step"]):
 
         """
@@ -198,8 +198,8 @@ def train_model(params, log_path=None):
                 min_makespan = np.min([min_makespan1, min_makespan2, min_makespan3, min_makespan4, min_makespan5, min_makespan6])
                 mean_makespan = (mean_makespan1 + mean_makespan2 + mean_makespan3 + mean_makespan4 + mean_makespan5 + mean_makespan6) / 6
                 print("TA{}".format(problem_list[p - 1]), min_makespan, mean_makespan)
-                empty_records.append(mean_makespan)
-                if len(empty_records)>4 and np.mean(empty_records[:4])>=3000:
+                empty_records[p].append(mean_makespan)
+                if len(empty_records[1])>10 and np.mean(empty_records[p][-8:])>=3000:
                     sys.exit()
 
 ###
