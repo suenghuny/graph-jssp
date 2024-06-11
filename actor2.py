@@ -273,7 +273,7 @@ class PtrNet1(nn.Module):
         return mask, copied_mask, copied_mask2
 
 ####
-    def forward(self, x, device, scheduler_list, num_job, num_machine, upperbound= None):
+    def forward(self, x, device, scheduler_list, num_job, num_machine, upperbound= None, old_sequence = None):
         node_features, heterogeneous_edges = x
         node_features = torch.tensor(node_features).to(device).float()
         pi_list, log_ps = [], []
@@ -297,8 +297,9 @@ class PtrNet1(nn.Module):
         mask1_debug, mask2_debug = self.init_mask()
         batch_size = h_pi_t_minus_one.shape[1]
 
-
-
+        if old_sequence != None:
+            old_sequence = torch.tensor(old_sequence).long().to(device)
+        next_operation_indices = list()
         for i in range(num_operations):
             est_placeholder = mask1_debug.clone().to(device)
             fin_placeholder = mask2_debug.clone().to(device)
@@ -383,37 +384,32 @@ class PtrNet1(nn.Module):
             query = h_c.squeeze(0)
             """
             Query를 만들때에는 이전 단계의 query와 extended node embedding을 가지고 만든다
-            
+
             """
-
-
-
             query = self.glimpse(query, ref, mask2_debug)  # 보는 부분 /  multi-head attention 부분 (mask2는 보는 masking)
             logits = self.pointer(query, ref, mask1_debug) # 선택하는 부분 / logit 구하는 부분 (#mask1은 선택하는 masking)
-
-
             log_p = torch.log_softmax(logits / self.T, dim=-1) # log_softmax로 구하는 부분
-            next_operation_index = self.job_selecter(log_p)
+            if old_sequence == None:
+                next_operation_index = self.job_selecter(log_p)
+            else:
+
+                next_operation_index = old_sequence[i, :]
+
             log_probabilities.append(log_p.gather(1, next_operation_index.unsqueeze(1)))
             sample_space = sample_space.to(device)
             next_job = sample_space[next_operation_index].to(device)
             mask1_debug, mask2_debug = self.update_mask(next_job.tolist()) # update masking을 수행해주는
-
-
-
             h_pi_t_minus_one = torch.gather(input=h_bar, dim=1, index=next_operation_index.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, embed)).squeeze(1).unsqueeze(0)  # 다음 sequence의 input은 encoder의 output 중에서 현재 sequence에 해당하는 embedding이 된다.
+            next_operation_indices.append(next_operation_index.tolist())
             pi_list.append(next_job)
 
 
 
         pi = torch.stack(pi_list, dim=1)
-
         log_probabilities = torch.stack(log_probabilities, dim=1)
         ll = log_probabilities.sum(dim=1)    # 각 solution element의 log probability를 더하는 방식
 
-
-        _ = 1
-        return pi, ll, _
+        return pi, ll, next_operation_indices
 
     def glimpse(self, query, ref, mask0):
         """
