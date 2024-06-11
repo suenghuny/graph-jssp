@@ -201,7 +201,7 @@ def train_model(params, log_path=None):
                 print("TA{}".format(problem_list[p - 1]), min_makespan, mean_makespan)
                 empty_records[p - 1].append(mean_makespan)
 
-                if len(empty_records[1]) > 10 and np.mean(empty_records[p][-8:]) >= 3000:
+                if len(empty_records[1]) > 15 and np.mean(empty_records[1][-8:]) >= 3000:
                     sys.exit()
 
                 if cfg.vessl == True:
@@ -296,6 +296,7 @@ def train_model(params, log_path=None):
                 else:
                     be = beta * be + (1 - beta) * torch.tensor(real_makespan).unsqueeze(1).to(device)
             ####
+
             act_optim.zero_grad()
             adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - be  # baseline(advantage) 구하는 부분
             """
@@ -305,7 +306,6 @@ def train_model(params, log_path=None):
             3. Update 하기(act_optim.step)
 
             """
-
             act_loss = -(ll_old * adv).mean()  # loss 구하는 부분 /  ll_old의 의미 log_theta (pi | s)
             act_loss.backward()
             nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 10)),
