@@ -216,8 +216,8 @@ def train_model(params, log_path=None):
                     mean_m = mean_m.transpose()
                     min_m.columns = problem_list
                     mean_m.columns = problem_list
-                    min_m.to_csv('min_makespan_w_third_feature2.csv')
-                    mean_m.to_csv('mean_makespan_w_third_feature2.csv')
+                    min_m.to_csv('min_makespan_w_third_feature_ppo.csv')
+                    mean_m.to_csv('mean_makespan_w_third_feature_ppo.csv')
 
         act_model.block_indices = []
         baseline_model.block_indices = []
@@ -357,7 +357,7 @@ def train_model(params, log_path=None):
 
                 act_optim.zero_grad()
                 ratio = torch.exp(ll_new-ll_old.detach()).unsqueeze(-1)
-                adv = be-torch.tensor(real_makespan).detach().unsqueeze(1).to(device)  # baseline(advantage) 구하는 부분
+                adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)-be  # baseline(advantage) 구하는 부분
                 # print(ratio.shape, adv.shape)
                 surr1 = ratio * adv
                 surr2 = torch.clamp(ratio, 1 - params["epsilon"], 1 + params["epsilon"]) * adv
