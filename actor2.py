@@ -100,12 +100,15 @@ class PtrNet1(nn.Module):
 
         self.Vec = [nn.Parameter(torch.FloatTensor(augmented_hidden_size+extended_dimension, augmented_hidden_size)) for _ in range(self.n_multi_head)]
         self.Vec = nn.ParameterList(self.Vec)
+
         self.W_q = [nn.Linear(2*augmented_hidden_size, augmented_hidden_size, bias=False).to(device)  for _ in range(self.n_multi_head)]
         self.W_q_weights = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_q])
         self.W_q_biases = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_q])
+
         self.W_ref =[nn.Linear(augmented_hidden_size+extended_dimension,augmented_hidden_size, bias=False).to(device) for _ in range(self.n_multi_head)]
         self.W_ref_weights = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_ref])
         self.W_ref_biases = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_ref])
+
         self.Vec3 = [nn.Parameter(torch.FloatTensor(augmented_hidden_size+extended_dimension, augmented_hidden_size)) for _ in range(self.n_multi_head)]
         self.Vec3 = nn.ParameterList(self.Vec3)
         self.W_q3 = [nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False).to(device)  for _ in range(self.n_multi_head)]

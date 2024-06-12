@@ -20,8 +20,11 @@ baseline_reset = cfg.baseline_reset
 
 if cfg.vessl == True:
     import vessl
-
+    import os
     vessl.init()
+    output_dir = "/output/"
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
 
 def set_seed(seed):
@@ -196,7 +199,8 @@ def train_model(params, log_path=None):
 
                 min_makespan = np.min(
                     [min_makespan1, min_makespan2, min_makespan3, min_makespan4, min_makespan5, min_makespan6])
-                mean_makespan = (mean_makespan1 + mean_makespan2 + mean_makespan3 + mean_makespan4 + mean_makespan5 + mean_makespan6) / 6
+                mean_makespan = (
+                                            mean_makespan1 + mean_makespan2 + mean_makespan3 + mean_makespan4 + mean_makespan5 + mean_makespan6) / 6
 
                 print("TA{}".format(problem_list[p - 1]), min_makespan, mean_makespan)
                 empty_records[p - 1].append(mean_makespan)
@@ -216,15 +220,14 @@ def train_model(params, log_path=None):
                     mean_m = mean_m.transpose()
                     min_m.columns = problem_list
                     mean_m.columns = problem_list
-                    min_m.to_csv('min_makespan_w_third_feature_ppo.csv')
-                    mean_m.to_csv('mean_makespan_w_third_feature_ppo.csv')
+                    min_m.to_csv('min_makespan_w_third_feature2.csv')
+                    mean_m.to_csv('mean_makespan_w_third_feature2.csv')
 
         act_model.block_indices = []
         baseline_model.block_indices = []
 
         if s % cfg.gen_step == 1:  # 훈련용 Data Instance 새롭게 생성 (gen_step 마다 생성)
             """
-
             훈련용 데이터셋 생성하는 코드
             """
             num_job = np.random.randint(5, 10)
@@ -251,7 +254,7 @@ def train_model(params, log_path=None):
             Instance를 명세하는 부분
             - Node feature: Operation의 다섯개 feature
             - Edge: 
-             
+
             """
 
             scheduler = AdaptiveScheduler(jobs_datas[n])
@@ -313,12 +316,12 @@ def train_model(params, log_path=None):
             act_optim.step()
         if cfg.algo == 'ppo':
             pred_seq, ll_old, old_sequence = act_model(input_data,
-                                            device,
-                                            scheduler_list=scheduler_list,
-                                            num_machine=num_machine,
-                                            num_job=num_job,
-                                            upperbound=makespan_list_for_upperbound
-                                            )
+                                                       device,
+                                                       scheduler_list=scheduler_list,
+                                                       num_machine=num_machine,
+                                                       num_job=num_job,
+                                                       upperbound=makespan_list_for_upperbound
+                                                       )
 
             real_makespan = list()
             for n in range(pred_seq.shape[0]):  # act_model(agent)가 산출한 해를 평가하는 부분
@@ -329,7 +332,9 @@ def train_model(params, log_path=None):
                 c_max.append(makespan)
             ave_makespan += sum(real_makespan) / (params["batch_size"] * params["log_step"])
             """
+            
             vanila actor critic
+            
             """
             beta = params['beta']
             if baseline_reset == False:
@@ -355,18 +360,19 @@ def train_model(params, log_path=None):
                                          old_sequence=old_sequence
                                          )
 
-                act_optim.zero_grad()
+
                 ratio = torch.exp(ll_new-ll_old.detach()).unsqueeze(-1)
                 adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)-be  # baseline(advantage) 구하는 부분
-                # print(ratio.shape, adv.shape)
+
                 surr1 = ratio * adv
                 surr2 = torch.clamp(ratio, 1 - params["epsilon"], 1 + params["epsilon"]) * adv
                 act_loss = -torch.min(surr1, surr2).mean()
                 act_optim.zero_grad()
                 act_loss.backward()
-                act_optim.step()
                 nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 10)),
                                          norm_type=2)
+                act_optim.step()
+
 
         if act_lr_scheduler.get_last_lr()[0] >= 1e-4:
             if params["is_lr_decay"]:
@@ -393,13 +399,23 @@ def train_model(params, log_path=None):
             t1 = time()
 
         if s % params["save_step"] == 1:
-            torch.save({'epoch': s,
-                        'model_state_dict_actor': act_model.state_dict(),
-                        'optimizer_state_dict_actor': act_optim.state_dict(),
-                        'ave_act_loss': ave_act_loss,
-                        'ave_cri_loss': 0,
-                        'ave_makespan': ave_makespan},
-                       params["model_dir"] + '/ppo_w_third_feature' + '/%s_step%d_act.pt' % (date, s))
+            if vessl == False:
+                torch.save({'epoch': s,
+                            'model_state_dict_actor': act_model.state_dict(),
+                            'optimizer_state_dict_actor': act_optim.state_dict(),
+                            'ave_act_loss': ave_act_loss,
+                            'ave_cri_loss': 0,
+                            'ave_makespan': ave_makespan},
+                           params["model_dir"] + '/ppo_w_third_feature' + '/%s_step%d_act.pt' % (date, s))
+            else:
+                torch.save({'epoch': s,
+                            'model_state_dict_actor': act_model.state_dict(),
+                            'optimizer_state_dict_actor': act_optim.state_dict(),
+                            'ave_act_loss': ave_act_loss,
+                            'ave_cri_loss': 0,
+                            'ave_makespan': ave_makespan},
+                           output_dir + '/%s_step%d_act.pt' % (date, s))
+
         #     print('save model...')
 
 
@@ -440,17 +456,17 @@ if __name__ == '__main__':
         "lr_critic": cfg.lr_critic,
 
         "reward_scaler": cfg.reward_scaler,
-        "beta": float(os.environ.get("beta", 0.95)),
-        "alpha": float(os.environ.get("alpha", 0.2)),
+        "beta": float(os.environ.get("beta", 0.65)),
+        "alpha": float(os.environ.get("alpha", 0.1)),
         "lr": float(os.environ.get("lr", 1.0e-3)),
         "lr_decay": float(os.environ.get("lr_decay", 0.995)),
         "lr_decay_step": int(os.environ.get("lr_decay_step", 1000)),
-        "layers": eval(str(os.environ.get("layers", '[128, 64]'))),
-        "n_embedding": int(os.environ.get("n_embedding", 32)),
+        "layers": eval(str(os.environ.get("layers", '[256, 128]'))),
+        "n_embedding": int(os.environ.get("n_embedding", 36)),
         "n_hidden": int(os.environ.get("n_hidden", 64)),
-        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 64)),
-        "n_multi_head": int(os.environ.get("n_multi_head", 5)),
-        "ex_embedding_size": int(os.environ.get("ex_embedding_size", 54)),
+        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 96)),
+        "n_multi_head": int(os.environ.get("n_multi_head", 3)),
+        "ex_embedding_size": int(os.environ.get("ex_embedding_size", 40)),
         "k_hop": int(os.environ.get("k_hop", 1)),
         "is_lr_decay": True,
         "third_feature": True,
