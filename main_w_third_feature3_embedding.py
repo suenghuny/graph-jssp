@@ -20,8 +20,12 @@ baseline_reset = cfg.baseline_reset
 
 if cfg.vessl == True:
     import vessl
+    import os
 
     vessl.init()
+    output_dir = "/output/"
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
 
 def set_seed(seed):
@@ -168,40 +172,41 @@ def train_model(params, log_path=None):
                     min_makespan_list = [min_makespan] * eval_number
                     min_makespan1, mean_makespan1 = evaluation(act_model, baseline_model, p, eval_number, device,
                                                                upperbound=min_makespan_list)
-                    #
-                    # eval_number = 5
-                    # min_makespan_list = [min_makespan] * eval_number
-                    # min_makespan2, mean_makespan2 = evaluation(act_model, baseline_model, p, eval_number, device,
-                    #                                            upperbound=min_makespan_list)
-                    #
-                    # eval_number = 5
-                    # min_makespan_list = [min_makespan] * eval_number
-                    # min_makespan3, mean_makespan3 = evaluation(act_model, baseline_model, p, eval_number, device,
-                    #                                            upperbound=min_makespan_list)
-                    #
-                    # eval_number = 5
-                    # min_makespan_list = [min_makespan] * eval_number
-                    # min_makespan4, mean_makespan4 = evaluation(act_model, baseline_model, p, eval_number, device,
-                    #                                            upperbound=min_makespan_list)
-                    #
-                    # eval_number = 5
-                    # min_makespan_list = [min_makespan] * eval_number
-                    # min_makespan5, mean_makespan5 = evaluation(act_model, baseline_model, p, eval_number, device,
-                    #                                            upperbound=min_makespan_list)
-                    #
-                    # eval_number = 5
-                    # min_makespan_list = [min_makespan] * eval_number
-                    # min_makespan6, mean_makespan6 = evaluation(act_model, baseline_model, p, eval_number, device,
-                    #                                            upperbound=min_makespan_list)
+
+                    eval_number = 5
+                    min_makespan_list = [min_makespan] * eval_number
+                    min_makespan2, mean_makespan2 = evaluation(act_model, baseline_model, p, eval_number, device,
+                                                               upperbound=min_makespan_list)
+
+                    eval_number = 5
+                    min_makespan_list = [min_makespan] * eval_number
+                    min_makespan3, mean_makespan3 = evaluation(act_model, baseline_model, p, eval_number, device,
+                                                               upperbound=min_makespan_list)
+
+                    eval_number = 5
+                    min_makespan_list = [min_makespan] * eval_number
+                    min_makespan4, mean_makespan4 = evaluation(act_model, baseline_model, p, eval_number, device,
+                                                               upperbound=min_makespan_list)
+
+                    eval_number = 5
+                    min_makespan_list = [min_makespan] * eval_number
+                    min_makespan5, mean_makespan5 = evaluation(act_model, baseline_model, p, eval_number, device,
+                                                               upperbound=min_makespan_list)
+
+                    eval_number = 5
+                    min_makespan_list = [min_makespan] * eval_number
+                    min_makespan6, mean_makespan6 = evaluation(act_model, baseline_model, p, eval_number, device,
+                                                               upperbound=min_makespan_list)
 
                 min_makespan = np.min(
-                    [min_makespan1])
-                mean_makespan =           mean_makespan1
+                    [min_makespan1, min_makespan2, min_makespan3, min_makespan4, min_makespan5, min_makespan6])
+                mean_makespan = (
+                                        mean_makespan1 + mean_makespan2 + mean_makespan3 + mean_makespan4 + mean_makespan5 + mean_makespan6) / 6
 
                 print("TA{}".format(problem_list[p - 1]), min_makespan, mean_makespan)
                 empty_records[p - 1].append(mean_makespan)
 
-                if len(empty_records[1]) > 10 and np.mean(empty_records[p][-8:]) >= 3000:
+                if len(empty_records[1]) > 15 and np.mean(empty_records[1][-8:]) >= 3000:
                     sys.exit()
 
                 if cfg.vessl == True:
@@ -224,7 +229,6 @@ def train_model(params, log_path=None):
 
         if s % cfg.gen_step == 1:  # 훈련용 Data Instance 새롭게 생성 (gen_step 마다 생성)
             """
-
             훈련용 데이터셋 생성하는 코드
             """
             num_job = np.random.randint(5, 10)
@@ -296,6 +300,7 @@ def train_model(params, log_path=None):
                 else:
                     be = beta * be + (1 - beta) * torch.tensor(real_makespan).unsqueeze(1).to(device)
             ####
+
             act_optim.zero_grad()
             adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - be  # baseline(advantage) 구하는 부분
             """
@@ -305,7 +310,6 @@ def train_model(params, log_path=None):
             3. Update 하기(act_optim.step)
 
             """
-            #print(ll_old.shape, adv.shape)
             act_loss = -(ll_old * adv).mean()  # loss 구하는 부분 /  ll_old의 의미 log_theta (pi | s)
             act_loss.backward()
             nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 10)),
@@ -329,7 +333,9 @@ def train_model(params, log_path=None):
                 c_max.append(makespan)
             ave_makespan += sum(real_makespan) / (params["batch_size"] * params["log_step"])
             """
+
             vanila actor critic
+
             """
             beta = params['beta']
             if baseline_reset == False:
@@ -341,7 +347,7 @@ def train_model(params, log_path=None):
                 if s % cfg.gen_step == 1:
                     be = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)  # baseline을 구하는 부분
                 else:
-                    be = beta * be + (1 - beta) * torch.tensor(real_makespan).to(device)
+                    be = beta * be + (1 - beta) * torch.tensor(real_makespan).unsqueeze(1).to(device)
             ####
             for i in range(params['k_epoch']):
                 for scheduler in scheduler_list:
@@ -355,18 +361,17 @@ def train_model(params, log_path=None):
                                          old_sequence=old_sequence
                                          )
 
-                act_optim.zero_grad()
                 ratio = torch.exp(ll_new - ll_old.detach()).unsqueeze(-1)
-                adv = be - torch.tensor(real_makespan).detach().unsqueeze(1).to(device)  # baseline(advantage) 구하는 부분
-                print(ratio.shape,be.shape, torch.tensor(real_makespan).detach().unsqueeze(1).shape)
+                adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - be  # baseline(advantage) 구하는 부분
+
                 surr1 = ratio * adv
                 surr2 = torch.clamp(ratio, 1 - params["epsilon"], 1 + params["epsilon"]) * adv
                 act_loss = -torch.min(surr1, surr2).mean()
                 act_optim.zero_grad()
                 act_loss.backward()
-                act_optim.step()
                 nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 10)),
                                          norm_type=2)
+                act_optim.step()
 
         if act_lr_scheduler.get_last_lr()[0] >= 1e-4:
             if params["is_lr_decay"]:
@@ -393,13 +398,23 @@ def train_model(params, log_path=None):
             t1 = time()
 
         if s % params["save_step"] == 1:
-            torch.save({'epoch': s,
-                        'model_state_dict_actor': act_model.state_dict(),
-                        'optimizer_state_dict_actor': act_optim.state_dict(),
-                        'ave_act_loss': ave_act_loss,
-                        'ave_cri_loss': 0,
-                        'ave_makespan': ave_makespan},
-                       params["model_dir"] + '/ppo_w_third_feature' + '/%s_step%d_act.pt' % (date, s))
+            if vessl == False:
+                torch.save({'epoch': s,
+                            'model_state_dict_actor': act_model.state_dict(),
+                            'optimizer_state_dict_actor': act_optim.state_dict(),
+                            'ave_act_loss': ave_act_loss,
+                            'ave_cri_loss': 0,
+                            'ave_makespan': ave_makespan},
+                           params["model_dir"] + '/ppo_w_third_feature' + '/%s_step%d_act.pt' % (date, s))
+            else:
+                torch.save({'epoch': s,
+                            'model_state_dict_actor': act_model.state_dict(),
+                            'optimizer_state_dict_actor': act_optim.state_dict(),
+                            'ave_act_loss': ave_act_loss,
+                            'ave_cri_loss': 0,
+                            'ave_makespan': ave_makespan},
+                           output_dir + '/%s_step%d_act.pt' % (date, s))
+
         #     print('save model...')
 
 
@@ -440,17 +455,17 @@ if __name__ == '__main__':
         "lr_critic": cfg.lr_critic,
 
         "reward_scaler": cfg.reward_scaler,
-        "beta": float(os.environ.get("beta", 0.95)),
-        "alpha": float(os.environ.get("alpha", 0.2)),
+        "beta": float(os.environ.get("beta", 0.65)),
+        "alpha": float(os.environ.get("alpha", 0.1)),
         "lr": float(os.environ.get("lr", 1.0e-3)),
         "lr_decay": float(os.environ.get("lr_decay", 0.995)),
         "lr_decay_step": int(os.environ.get("lr_decay_step", 1000)),
-        "layers": eval(str(os.environ.get("layers", '[128, 64]'))),
-        "n_embedding": int(os.environ.get("n_embedding", 32)),
+        "layers": eval(str(os.environ.get("layers", '[256, 128]'))),
+        "n_embedding": int(os.environ.get("n_embedding", 36)),
         "n_hidden": int(os.environ.get("n_hidden", 64)),
-        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 64)),
-        "n_multi_head": int(os.environ.get("n_multi_head", 5)),
-        "ex_embedding_size": int(os.environ.get("ex_embedding_size", 54)),
+        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 96)),
+        "n_multi_head": int(os.environ.get("n_multi_head", 3)),
+        "ex_embedding_size": int(os.environ.get("ex_embedding_size", 40)),
         "k_hop": int(os.environ.get("k_hop", 1)),
         "is_lr_decay": True,
         "third_feature": True,
@@ -459,4 +474,5 @@ if __name__ == '__main__':
         "k_epoch": int(os.environ.get("k_epoch", 2)),
 
     }
+    print(params['ex_embedding_size'])
     train_model(params)  #
