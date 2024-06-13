@@ -166,7 +166,7 @@ def train_model(params, log_path=None):
         if s % 100 == 1:  # Evaluation 수행
             for p in problem_list:
                 min_makespan = heuristic_eval(p)
-                eval_number = 2
+                eval_number = 5
                 with torch.no_grad():
                     min_makespan_list = [min_makespan] * eval_number
                     min_makespan1, mean_makespan1 = evaluation(act_model, baseline_model, p, eval_number, device,
@@ -205,7 +205,7 @@ def train_model(params, log_path=None):
                 print("TA{}".format(problem_list[p - 1]), min_makespan, mean_makespan)
                 empty_records[p - 1].append(mean_makespan)
 
-                if len(empty_records[1]) > 15 and np.mean(empty_records[1][-8:]) >= 3000:
+                if len(empty_records[1]) > 35 and np.mean(empty_records[1][-30:]) >= 3300:
                     sys.exit()
 
                 if cfg.vessl == True:
@@ -292,7 +292,7 @@ def train_model(params, log_path=None):
                 if s == 1:
                     be = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)  # baseline을 구하는 부분
                 else:
-                    be = beta * be + (1 - beta) * torch.tensor(real_makespan).to(device)
+                    be = beta * be + (1 - beta) * torch.tensor(real_makespan).unsqueeze(1).to(device)
             else:
                 if s % cfg.gen_step == 1:
                     be = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)  # baseline을 구하는 부분
@@ -399,7 +399,7 @@ def train_model(params, log_path=None):
             t1 = time()
 
         if s % params["save_step"] == 1:
-            if vessl == False:
+            if cfg.vessl == False:
                 torch.save({'epoch': s,
                             'model_state_dict_actor': act_model.state_dict(),
                             'optimizer_state_dict_actor': act_optim.state_dict(),

@@ -79,11 +79,8 @@ def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=Non
     val_makespan = list()
     act_model.get_jssp_instance(scheduler_list_val)
     baseline_model.get_jssp_instance(scheduler_list_val)
-
     act_model.eval()
-
     scheduler = AdaptiveScheduler(orb_list[p - 1])  # scheduler는 validation(ORB set)에 대해 수행
-
     num_job = scheduler.num_job
     num_machine = scheduler.num_mc
     # print(num_job, num_machine)
