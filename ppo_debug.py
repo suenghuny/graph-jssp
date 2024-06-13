@@ -334,20 +334,23 @@ def train_model(params, log_path=None):
             """
             
             vanila actor critic
-            
+        
             """
             beta = params['beta']
             if baseline_reset == False:
                 if s == 1:
                     be = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)  # baseline을 구하는 부분
                 else:
-                    be = beta * be + (1 - beta) * torch.tensor(real_makespan).to(device)
+                    be = beta * be + (1 - beta) * torch.tensor(real_makespan).unsqueeze(1).to(device)
             else:
                 if s % cfg.gen_step == 1:
                     be = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)  # baseline을 구하는 부분
                 else:
                     be = beta * be + (1 - beta) * torch.tensor(real_makespan).unsqueeze(1).to(device)
             ####
+            adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - be  # baseline(advantage) 구하는 부분
+            #print("뭐요", torch.tensor(real_makespan).detach().unsqueeze(1).to(device).shape, be.shape)
+
             for i in range(params['k_epoch']):
                 for scheduler in scheduler_list:
                     scheduler.reset()
@@ -360,16 +363,19 @@ def train_model(params, log_path=None):
                                          old_sequence=old_sequence
                                          )
 
+                ratio = torch.exp(ll_new - ll_old.detach())
 
-                ratio = torch.exp(ll_new-ll_old.detach()).unsqueeze(-1)
-                adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)-be  # baseline(advantage) 구하는 부분
-
+                print(ratio)
+                #print(ratio.shape, adv.shape)
                 surr1 = ratio * adv
                 surr2 = torch.clamp(ratio, 1 - params["epsilon"], 1 + params["epsilon"]) * adv
+
                 act_loss = -torch.min(surr1, surr2).mean()
+
                 act_optim.zero_grad()
                 act_loss.backward()
-                nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 10)),
+                nn.utils.clip_grad_norm_(act_model.parameters(),
+                                         max_norm=float(os.environ.get("grad_clip", 10)),
                                          norm_type=2)
                 act_optim.step()
 
