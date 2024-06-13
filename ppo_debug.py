@@ -445,7 +445,7 @@ if __name__ == '__main__':
         "C": cfg.C,
         "T": cfg.T,
         "iteration": cfg.iteration,
-        "epsilon": int(os.environ.get("epsilon", 0.2)),
+        "epsilon": float(os.environ.get("epsilon", 0.2)),
         "optimizer": "Adam",
         "n_glimpse": cfg.n_glimpse,
         "n_process": cfg.n_process,
@@ -475,5 +475,5 @@ if __name__ == '__main__':
         "k_epoch": int(os.environ.get("k_epoch", 2)),
 
     }
-    print(params['ex_embedding_size'])
+
     train_model(params)  #
