@@ -365,7 +365,7 @@ def train_model(params, log_path=None):
 
                 ratio = torch.exp(ll_new - ll_old.detach())
 
-                print(ratio)
+                #print(ratio)
                 #print(ratio.shape, adv.shape)
                 surr1 = ratio * adv
                 surr2 = torch.clamp(ratio, 1 - params["epsilon"], 1 + params["epsilon"]) * adv
