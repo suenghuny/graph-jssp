@@ -39,7 +39,7 @@ def set_seed(seed):
 
 
 # Example usage:
-set_seed(20)  # 30 했었음
+set_seed(50)  # 30 했었음
 opt_list = [1059, 888, 1005, 1005, 887, 1010, 397, 899, 934, 944]
 orb_list = []
 for i in ["21", "22"]:
@@ -220,8 +220,8 @@ def train_model(params, log_path=None):
                     mean_m = mean_m.transpose()
                     min_m.columns = problem_list
                     mean_m.columns = problem_list
-                    min_m.to_csv('min_makespan_w_third_feature2.csv')
-                    mean_m.to_csv('mean_makespan_w_third_feature2.csv')
+                    min_m.to_csv('min_makespan_w_third_feature53.csv')
+                    mean_m.to_csv('mean_makespan_w_third_feature53.csv')
 
         act_model.block_indices = []
         baseline_model.block_indices = []
