@@ -311,8 +311,7 @@ def train_model(params, log_path=None):
             """
             act_loss = -(ll_old * adv).mean()  # loss 구하는 부분 /  ll_old의 의미 log_theta (pi | s)
             act_loss.backward()
-            nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 1)),
-                                     norm_type=2)
+            nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 1)),norm_type=2)
             act_optim.step()
         if cfg.algo == 'ppo':
             pred_seq, ll_old, old_sequence = act_model(input_data,
@@ -375,12 +374,13 @@ def train_model(params, log_path=None):
                 act_optim.zero_grad()
                 act_loss.backward()
                 nn.utils.clip_grad_norm_(act_model.parameters(),
-                                         max_norm=float(os.environ.get("grad_clip", 10)),
+                                         max_norm=float(os.environ.get("grad_clip", 5)),
                                          norm_type=2)
                 act_optim.step()
 
 
-        if act_lr_scheduler.get_last_lr()[0] >= float(os.environ.get("lr_decay_min", 1.0e-4)):
+        if act_lr_scheduler.get_last_lr()[0] >= \
+                float(os.environ.get("lr_decay_min", 5.0e-4)):
             if params["is_lr_decay"]:
                 act_lr_scheduler.step()
         ave_act_loss += act_loss.item()

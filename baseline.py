@@ -40,7 +40,7 @@ def set_seed(seed):
 
 
 # Example usage:
-set_seed(20)  # 30 했었음
+set_seed(50)  # 30 했었음
 opt_list = [1059, 888, 1005, 1005, 887, 1010, 397, 899, 934, 944]
 orb_list = []
 for i in ["21", "22"]:
@@ -141,8 +141,7 @@ def train_model(params, log_path=None):
     elif params["optimizer"] == "RMSProp":
         act_optim = optim.RMSprop(act_model.parameters(), lr=params["lr"])
     if params["is_lr_decay"]:
-        act_lr_scheduler = optim.lr_scheduler.StepLR(act_optim,
-                                                     step_size=params["lr_decay_step"],
+        act_lr_scheduler = optim.lr_scheduler.StepLR(act_optim, step_size=params["lr_decay_step"],
                                                      gamma=params["lr_decay"])
 
     t1 = time()
@@ -222,8 +221,8 @@ def train_model(params, log_path=None):
                     mean_m = mean_m.transpose()
                     min_m.columns = problem_list
                     mean_m.columns = problem_list
-                    min_m.to_csv('min_makespan_w_third_feature_baseline.csv')
-                    mean_m.to_csv('mean_makespan_w_third_feature_baseline.csv')
+                    min_m.to_csv('min_makespan_w_third_feature53.csv')
+                    mean_m.to_csv('mean_makespan_w_third_feature53.csv')
 
         act_model.block_indices = []
         baseline_model.block_indices = []
@@ -313,7 +312,7 @@ def train_model(params, log_path=None):
             """
             act_loss = -(ll_old * adv).mean()  # loss 구하는 부분 /  ll_old의 의미 log_theta (pi | s)
             act_loss.backward()
-            nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 10)),
+            nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 1)),
                                      norm_type=2)
             act_optim.step()
         if cfg.algo == 'ppo':
@@ -377,11 +376,12 @@ def train_model(params, log_path=None):
                 act_optim.zero_grad()
                 act_loss.backward()
                 nn.utils.clip_grad_norm_(act_model.parameters(),
-                                         max_norm=float(os.environ.get("grad_clip", 10)),
+                                         max_norm=float(os.environ.get("grad_clip", 5)),
                                          norm_type=2)
                 act_optim.step()
 
-        if act_lr_scheduler.get_last_lr()[0] >= 1e-4:
+        if act_lr_scheduler.get_last_lr()[0] >= \
+                float(os.environ.get("lr_decay_min", 5.0e-4)):
             if params["is_lr_decay"]:
                 act_lr_scheduler.step()
         ave_act_loss += act_loss.item()
@@ -466,8 +466,8 @@ if __name__ == '__main__':
         "beta": float(os.environ.get("beta", 0.65)),
         "alpha": float(os.environ.get("alpha", 0.1)),
         "lr": float(os.environ.get("lr", 1.0e-3)),
-        "lr_decay": float(os.environ.get("lr_decay", 0.995)),
-        "lr_decay_step": int(os.environ.get("lr_decay_step", 1000)),
+        "lr_decay": float(os.environ.get("lr_decay", 0.85)),
+        "lr_decay_step": int(os.environ.get("lr_decay_step", 100)),
         "layers": eval(str(os.environ.get("layers", '[256, 128]'))),
         "n_embedding": int(os.environ.get("n_embedding", 36)),
         "n_hidden": int(os.environ.get("n_hidden", 64)),

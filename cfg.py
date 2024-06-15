@@ -3,7 +3,7 @@ import argparse
 def get_cfg():
     parser = argparse.ArgumentParser(description="")
     parser.add_argument("--vessl", type=bool, default=False, help="vessl AI 사용여부")
-    parser.add_argument("--step", type=int, default=10001, help="")
+    parser.add_argument("--step", type=int, default=50001, help="")
     parser.add_argument("--log_step", type=int, default=10, help="")
     parser.add_argument("--save_step", type=int, default=50, help="")
     parser.add_argument("--batch_size", type=int, default=8, help="")
