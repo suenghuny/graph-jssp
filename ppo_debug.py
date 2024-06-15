@@ -311,7 +311,7 @@ def train_model(params, log_path=None):
             """
             act_loss = -(ll_old * adv).mean()  # loss 구하는 부분 /  ll_old의 의미 log_theta (pi | s)
             act_loss.backward()
-            nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 10)),
+            nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 1)),
                                      norm_type=2)
             act_optim.step()
         if cfg.algo == 'ppo':
@@ -380,7 +380,7 @@ def train_model(params, log_path=None):
                 act_optim.step()
 
 
-        if act_lr_scheduler.get_last_lr()[0] >= 1e-4:
+        if act_lr_scheduler.get_last_lr()[0] >= float(os.environ.get("lr_decay_min", 1.0e-4)):
             if params["is_lr_decay"]:
                 act_lr_scheduler.step()
         ave_act_loss += act_loss.item()
@@ -465,8 +465,8 @@ if __name__ == '__main__':
         "beta": float(os.environ.get("beta", 0.65)),
         "alpha": float(os.environ.get("alpha", 0.1)),
         "lr": float(os.environ.get("lr", 1.0e-3)),
-        "lr_decay": float(os.environ.get("lr_decay", 0.995)),
-        "lr_decay_step": int(os.environ.get("lr_decay_step", 1000)),
+        "lr_decay": float(os.environ.get("lr_decay", 0.85)),
+        "lr_decay_step": int(os.environ.get("lr_decay_step", 100)),
         "layers": eval(str(os.environ.get("layers", '[256, 128]'))),
         "n_embedding": int(os.environ.get("n_embedding", 36)),
         "n_hidden": int(os.environ.get("n_hidden", 64)),
