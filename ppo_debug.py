@@ -39,7 +39,7 @@ def set_seed(seed):
 
 
 # Example usage:
-set_seed(50)  # 30 했었음
+set_seed(int(os.environ.get("seed", 30)))  # 30 했었음
 opt_list = [1059, 888, 1005, 1005, 887, 1010, 397, 899, 934, 944]
 orb_list = []
 for i in ["21", "22"]:
