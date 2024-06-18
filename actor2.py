@@ -90,13 +90,14 @@ class PtrNet1(nn.Module):
 
         augmented_hidden_size = params["n_hidden"]
 
-        if self.params['third_feature'] == True:
+        if self.params['third_feature'] == "first_and_second":
             if self.params['ex_embedding'] == True:
                 extended_dimension = params["ex_embedding_size"]
                 self.ex_embedding = ExEmbedding(raw_feature_size=4, feature_size = params["ex_embedding_size"])
             else:
                 extended_dimension = 4
-        else:
+        if (self.params['third_feature'] == "first_only") or \
+           (self.params['third_feature'] == "second_only"):
             if self.params['ex_embedding'] == True:
                 extended_dimension = params["ex_embedding_size"]
                 self.ex_embedding = ExEmbedding(raw_feature_size=2, feature_size=params["ex_embedding_size"])
@@ -324,12 +325,15 @@ class PtrNet1(nn.Module):
                 """
                 for nb in range(batch_size):
                     scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb])
+
                     #self.get_critical_check(scheduler_list[nb],  mask1_debug[nb,:].cpu().numpy())
-                    if self.params['third_feature'] == True:
+                    if (self.params['third_feature'] == "first_and_second") or\
+                            (self.params['third_feature'] == "second_only"):
                         ub = upperbound[nb]
                         """
                         Branch and Cut 로직에 따라 masking을 수행함
                         모두 다 masking 처리할 수도 있으므로, 모두다 masking 할 경우에는 mask로 복원 (if 1 not in mask)
+
                         """
                         mask, critical_path, critical_path2 = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub) # 안중요
 
@@ -353,7 +357,8 @@ class PtrNet1(nn.Module):
                     scheduler_list[nb].add_selected_operation(k) # 그림으로 설명 예정# 안중요
                     next_b = next_job[nb].item()
                     scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb], i = next_b) # next_b는 이전 스텝에서 선택된 Job이고, Adaptive Run이라는 것은 선택된 Job에 따라 update한 다음에 EST, EFIN을 구하라는 의미
-                    if self.params['third_feature'] == True:
+                    if (self.params['third_feature'] == "first_and_second") or\
+                        (self.params['third_feature'] == "second_only"):
                         ub = upperbound[nb]
                         mask, critical_path, critical_path2 = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub)
                         empty_zero[nb, :]  = torch.tensor(critical_path).to(device)
@@ -366,22 +371,20 @@ class PtrNet1(nn.Module):
                         # else:
 
 
-
             est_placeholder = est_placeholder.reshape(batch_size, -1).unsqueeze(2)
             fin_placeholder = fin_placeholder.reshape(batch_size, -1).unsqueeze(2)
             empty_zero = empty_zero.unsqueeze(2)
             empty_zero2 = empty_zero2.unsqueeze(2)
-            #print(empty_zero2.shape, est_placeholder.shape, fin_placeholder.shape)
-            if self.params['third_feature'] == True:
+            if self.params['third_feature'] == "first_and_second":
                 if self.params['ex_embedding'] == True:
-                    r_temp = torch.concat([est_placeholder, fin_placeholder, empty_zero, empty_zero2], dim=2)  # extended node embedding을 만드는 부분(z_t_i에 해당)
+                    r_temp = torch.concat([est_placeholder, fin_placeholder,empty_zero, empty_zero2], dim=2)  # extended node embedding을 만드는 부분(z_t_i에 해당)
                     r_temp = r_temp.reshape(batch_size*num_operations, -1)
                     ex_embedding = self.ex_embedding(r_temp)
                     ex_embedding = ex_embedding.reshape(batch_size, num_operations, -1)
                     ref = torch.concat([h_bar, ex_embedding],dim = 2)
                 else:
                     ref = torch.concat([h_bar, est_placeholder, fin_placeholder, empty_zero, empty_zero2],dim = 2) # extended node embedding을 만드는 부분(z_t_i에 해당)
-            else:
+            if self.params['third_feature'] == "first_only":
                 if self.params['ex_embedding'] == True:
                     r_temp = torch.concat([est_placeholder, fin_placeholder], dim=2)  # extended node embedding을 만드는 부분(z_t_i에 해당)
                     r_temp = r_temp.reshape(batch_size*num_operations, -1)
@@ -390,6 +393,17 @@ class PtrNet1(nn.Module):
                     ref = torch.concat([h_bar, ex_embedding],dim = 2)
                 else:
                     ref = torch.concat([h_bar, est_placeholder, fin_placeholder],dim=2)  # extended node embedding을 만드는 부분(z_t_i에 해당)
+            if self.params['third_feature'] == "second_only":
+                if self.params['ex_embedding'] == True:
+                    r_temp = torch.concat([empty_zero, empty_zero2], dim=2)  # extended node embedding을 만드는 부분(z_t_i에 해당)
+                    r_temp = r_temp.reshape(batch_size*num_operations, -1)
+                    ex_embedding = self.ex_embedding(r_temp)
+                    ex_embedding = ex_embedding.reshape(batch_size, num_operations, -1)
+                    ref = torch.concat([h_bar, ex_embedding],dim = 2)
+                else:
+                    ref = torch.concat([h_bar, empty_zero, empty_zero2],dim=2)  # extended node embedding을 만드는 부분(z_t_i에 해당)
+
+
             h_c = self.decoder(h_emb, h_pi_t_minus_one) # decoding 만드는 부분
             query = h_c.squeeze(0)
             """

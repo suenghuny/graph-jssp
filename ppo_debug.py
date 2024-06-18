@@ -220,8 +220,8 @@ def train_model(params, log_path=None):
                     mean_m = mean_m.transpose()
                     min_m.columns = problem_list
                     mean_m.columns = problem_list
-                    min_m.to_csv('min_makespan_w_third_feature53.csv')
-                    mean_m.to_csv('mean_makespan_w_third_feature53.csv')
+                    min_m.to_csv('min_makespan_w_third_feature222.csv')
+                    mean_m.to_csv('mean_makespan_w_third_feature222.csv')
 
         act_model.block_indices = []
         baseline_model.block_indices = []
@@ -234,6 +234,8 @@ def train_model(params, log_path=None):
             num_machine = np.random.randint(num_job, 10)
             jobs_datas, scheduler_list = generate_jssp_instance(num_jobs=num_job, num_machine=num_machine,
                                                                 batch_size=params['batch_size'])
+            # print(jobs_datas)
+            # print("======================")
             makespan_list_for_upperbound = list()
             for scheduler in scheduler_list:
                 c_max_heu = scheduler.heuristic_run()
@@ -475,7 +477,7 @@ if __name__ == '__main__':
         "ex_embedding_size": int(os.environ.get("ex_embedding_size", 40)),
         "k_hop": int(os.environ.get("k_hop", 1)),
         "is_lr_decay": True,
-        "third_feature": True,
+        "third_feature": 'first_and_second', # first_and_second, first_only, second_only
         "baseline_reset": True,
         "ex_embedding": True,
         "k_epoch": int(os.environ.get("k_epoch", 2)),

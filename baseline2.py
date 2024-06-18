@@ -478,7 +478,7 @@ if __name__ == '__main__':
         "ex_embedding_size": int(os.environ.get("ex_embedding_size", 40)),
         "k_hop": int(os.environ.get("k_hop", 1)),
         "is_lr_decay": True,
-        "third_feature": 'first_only',
+        "third_feature": 'second_only',
         "baseline_reset": True,
         "ex_embedding": True,
         "k_epoch": int(os.environ.get("k_epoch", 2)),
