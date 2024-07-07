@@ -176,15 +176,43 @@ class AdaptiveScheduler:
 
     def adaptive_run(self, est_holder, fin_holder, i= None):
         if i != None:
+            """
+            if j is determines, i is determined following the j:
+                p_ij 
+            p-prime_j^{t}=p_j^{t}+p_ij
+            p-prime_i^{t}=p_i^{t}+p_ij
+            p-prime_i^{t}=max(p_j^{t}+p_ij, p_i^{t}+p_ij)
+            p-prime_j^{t}=max(p_j^{t}+p_ij, p_i^{t}+p_ij)
+            
+            Earliest Processing Time
+            e_ij^{t} = max(p-prime_i^{t}, p-prime_j^{t})
+                     = max(p_i^{t-1}+p_ik, p_j^{t-1}+p_lj)
+            
+            Earliest Finish Time
+            f^{t} = max(p_i^{t}, p_j^{t})+p_ij
+                  = max(p_i^{t-1}+p_ik, p_j^{t-1}+p_il)+p_ij
+            
+            LB
+            l^{t} = e^{t}+r^{t}
+            
+            
+            """
+
+
             gen_t = int(self.pt[i][self.key_count[i]])        # 선택된 operation에 대한 processing time 선택
             gen_m = int(self.ms[i][self.key_count[i]])        # 선택된 operation에 대한 machine_sequence 선택
-            self.j_count[i] = self.j_count[i] + gen_t          # Job i에 대한 누적 작업 완료시간 업데이트
+            self.j_count[i]     = self.j_count[i] + gen_t          # Job i에 대한 누적 작업 완료시간 업데이트
             self.m_count[gen_m] = self.m_count[gen_m] + gen_t  # Machine gen_m에 대한 누적 작업 완료시간 업데이트
+            # p_j^{t+1}=p_j^{t}+p_ij
+            # p_i^{t+1}=p_i^{t}+p_ij
+
             self.total_processing_time_by_machine[gen_m - 1]-=gen_t
             if self.m_count[gen_m] < self.j_count[i]:
                 self.m_count[gen_m] = self.j_count[i]
             elif self.m_count[gen_m] > self.j_count[i]:
                 self.j_count[i] = self.m_count[gen_m]          # if 및 elif 문은 각각의 누적 작업 완료시간을 큰 녀석으로 업데이트 한다는 의미
+            # p_i^{t+1}=max(p_j^{t}+p_ij, p_i^{t}+p_ij)
+            # p_j^{t+1}=max(p_j^{t}+p_ij, p_i^{t}+p_ij)
             self.key_count[i] = self.key_count[i] + 1          # 해당 Job이 몇번 선택되었는지 count하는 것 업데이트
         makespan = max(self.j_count.values())
 
@@ -231,38 +259,35 @@ class AdaptiveScheduler:
                 j_count = deepcopy(self.j_count)
                 m_count = deepcopy(self.m_count)
                 total_processing_time_by_machine = deepcopy(self.total_processing_time_by_machine)
+
+                gen_t = int(self.pt[j_prime][key_count[j_prime]])    # 선택된 operation에 대한 processing time 선택
+                gen_m = int(self.ms[j_prime][key_count[j_prime]])    # 선택된 operation에 대한 machine_sequence 선택
+                j_count[j_prime] = j_count[j_prime] + gen_t          # Job i에 대한 누적 작업 완료시간 업데이트
+                m_count[gen_m]   = m_count[gen_m]   + gen_t          # Machine gen_m에 대한 누적 작업 완료시간 업데이트
+
+                if m_count[gen_m] < j_count[j_prime]:
+                    m_count[gen_m] = j_count[j_prime]
+                elif m_count[gen_m] > j_count[j_prime]:
+                    j_count[j_prime] = m_count[gen_m]                # if 및 elif 문은 각각의 누적 작업 완료시간을 큰 녀석으로 업데이트 한다는 의미
+                total_processing_time_by_machine[gen_m - 1] -= gen_t
+                gen_t_cum = j_count[j_prime] + np.sum(self.pt[j_prime][key_count[j_prime] + 1:])
                 try:
-                    gen_t = int(self.pt[j_prime][key_count[j_prime]])    # 선택된 operation에 대한 processing time 선택
-                    gen_m = int(self.ms[j_prime][key_count[j_prime]])    # 선택된 operation에 대한 machine_sequence 선택
-                    j_count[j_prime] = j_count[j_prime] + gen_t          # Job i에 대한 누적 작업 완료시간 업데이트
-                    m_count[gen_m]   = m_count[gen_m]   + gen_t          # Machine gen_m에 대한 누적 작업 완료시간 업데이트
-
-                    if m_count[gen_m] < j_count[j_prime]:
-                        m_count[gen_m] = j_count[j_prime]
-                    elif m_count[gen_m] > j_count[j_prime]:
-                        j_count[j_prime] = m_count[gen_m]                # if 및 elif 문은 각각의 누적 작업 완료시간을 큰 녀석으로 업데이트 한다는 의미
-
-                    total_processing_time_by_machine[gen_m - 1] -= gen_t
-
-                    gen_t_cum = j_count[j_prime] + np.sum(self.pt[j_prime][key_count[j_prime]+1:])
-
                     gen_m_prime = int(self.ms[j_prime][key_count[j_prime]+1])
                     gen_m_cum = m_count[gen_m_prime]   + total_processing_time_by_machine[gen_m_prime - 1]
                     critical_path_ij_list.append(np.max([gen_t_cum, gen_m_cum]))
                 except IndexError as IE:
-                    critical_path_ij_list.append(0)
+                    # 남아있는 operation이 없음
+                    critical_path_ij_list.append(gen_t_cum)
                 key_count[j_prime] = key_count[j_prime] + 1
                 longest_path_list = list()
                 for j, i in key_count.items():
                     if i != self.num_mc:
                         gen_m_prime = self.ms[j][key_count[j]]  # remain processing time (해당 machine의 남은 operation에 대한 processing time의 합)
-
-
-
                         longest_path_list.append(np.max([m_count[gen_m_prime] + total_processing_time_by_machine[gen_m_prime-1],
-                                                         j_count[j]     + np.sum(self.pt[j][key_count[j]:])
+                                                        j_count[j]     + np.sum(self.pt[j][key_count[j]:])
                                                         ]))
-                    else:pass
+                    else:
+                        longest_path_list.append(j_count[j]     + np.sum(self.pt[j][key_count[j]:]))
                 if len(longest_path_list)>0:
                     critical_path_list.append(np.max(longest_path_list))
                 else:

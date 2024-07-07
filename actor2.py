@@ -268,9 +268,13 @@ class PtrNet1(nn.Module):
         available_operations = mask
         copied_mask = deepcopy(mask)
         copied_mask2 = deepcopy(mask)
+        copied_mask3 = deepcopy(mask)
+        copied_mask4 = deepcopy(mask)
         avail_nodes = np.array(available_operations)
         avail_nodes_indices = np.where(avail_nodes == 1)[0].tolist() # 현재 시점에 가능한 operation들의 모임이다.
+        #print(avail_nodes_indices)
         critical_path_list, critical_path_ij_list = scheduler.get_critical_path()
+
         if np.max(critical_path_list)>0:
             copied_mask[avail_nodes_indices] = critical_path_list
             copied_mask = copied_mask/np.max(critical_path_list)
@@ -278,7 +282,11 @@ class PtrNet1(nn.Module):
         if np.max(critical_path_ij_list) > 0:
             copied_mask2[avail_nodes_indices] = critical_path_ij_list
             copied_mask2 = copied_mask2 / np.max(critical_path_ij_list)
-        return mask, copied_mask, copied_mask2
+
+        copied_mask3[avail_nodes_indices] = critical_path_list
+        copied_mask4[avail_nodes_indices] = critical_path_ij_list
+
+        return mask, copied_mask, copied_mask2, copied_mask3, copied_mask4
 
 ####
     def forward(self, x, device, scheduler_list, num_job, num_machine, upperbound= None, old_sequence = None):
@@ -308,6 +316,7 @@ class PtrNet1(nn.Module):
         if old_sequence != None:
             old_sequence = torch.tensor(old_sequence).long().to(device)
         next_operation_indices = list()
+        lowerbound_records = [[],[]]
         for i in range(num_operations):
             est_placeholder = mask1_debug.clone().to(device)
             fin_placeholder = mask2_debug.clone().to(device)
@@ -315,6 +324,7 @@ class PtrNet1(nn.Module):
             mask2_debug = mask2_debug.reshape(batch_size, -1)
             empty_zero = torch.zeros(batch_size, num_operations).to(device)
             empty_zero2 = torch.zeros(batch_size, num_operations).to(device)
+
             if i == 0:
                 """
                 Earliest Start Time (est_placeholder)
@@ -323,6 +333,7 @@ class PtrNet1(nn.Module):
                 adaptive_run에 선택된 변수(i)에 대한 정보가 없음
                 
                 """
+                cp_list = []
                 for nb in range(batch_size):
                     scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb])
 
@@ -335,10 +346,11 @@ class PtrNet1(nn.Module):
                         모두 다 masking 처리할 수도 있으므로, 모두다 masking 할 경우에는 mask로 복원 (if 1 not in mask)
 
                         """
-                        mask, critical_path, critical_path2 = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub) # 안중요
+                        mask, critical_path, critical_path2, cp, cp2 = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub) # 안중요
 
                         empty_zero[nb, :] = torch.tensor(critical_path).to(device)# 안중요
                         empty_zero2[nb, :] = torch.tensor(critical_path2).to(device)  # 안중요
+                        #cp_list.append(cp)
                         # if 1 not in mask:
                         #     pass
                         # else:
@@ -352,6 +364,7 @@ class PtrNet1(nn.Module):
                 adaptive_run에 선택된 변수(i)에 대한 정보는 이전에 선택된 index(next_operation_index)에서 추출
 
                 """
+                cp_list = []
                 for nb in range(batch_size):
                     k = next_operation_index[nb].item()
                     scheduler_list[nb].add_selected_operation(k) # 그림으로 설명 예정# 안중요
@@ -360,13 +373,15 @@ class PtrNet1(nn.Module):
                     if (self.params['third_feature'] == "first_and_second") or\
                         (self.params['third_feature'] == "second_only"):
                         ub = upperbound[nb]
-                        mask, critical_path, critical_path2 = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub)
+                        mask, critical_path, critical_path2, cp, cp2 = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub)
                         empty_zero[nb, :]  = torch.tensor(critical_path).to(device)
                         empty_zero2[nb, :] = torch.tensor(critical_path2).to(device)  # 안중요
                         """
                         Branch and Cut 로직에 따라 masking을 수행함
                         모두 다 masking 처리할 수도 있으므로, 모두다 masking할 경우에는 mask로 복원 (if 1 not in mask)
                         """
+                        #cp_list.append(cp)
+
                         # if 1 not in mask:pass
                         # else:
 
@@ -412,12 +427,29 @@ class PtrNet1(nn.Module):
             """
             query = self.glimpse(query, ref, mask2_debug)  # 보는 부분 /  multi-head attention 부분 (mask2는 보는 masking)
             logits = self.pointer(query, ref, mask1_debug) # 선택하는 부분 / logit 구하는 부분 (#mask1은 선택하는 masking)
+
+            cp_list = torch.tensor(cp_list)
+            #print(cp_list.shape)
+
             log_p = torch.log_softmax(logits / self.T, dim=-1) # log_softmax로 구하는 부분
+
             if old_sequence == None:
                 next_operation_index = self.job_selecter(log_p)
             else:
-
                 next_operation_index = old_sequence[i, :]
+            #print(log_p.gather(1, next_operation_index.unsqueeze(1)).shape)
+            #print(log_p.shape, next_operation_index.unsqueeze(1).shape)
+
+            #print(empty_zero.squeeze(2).gather(1, next_operation_index.unsqueeze(1)).shape)
+            #print(i, cp_list.to(device).gather(1, next_operation_index.unsqueeze(1)))
+            #print(cp_list.shape, log_p.shape)
+            #print(cp_list.to(device).gather(1, next_operation_index.unsqueeze(1)).shape)
+            #lowerbound_records[0] = lowerbound_records[0] + cp_list.to(device).gather(1, next_operation_index.unsqueeze(1))[0,:].reshape(-1).tolist()
+            #lowerbound_records[1] = lowerbound_records[1] + log_p.gather(1, next_operation_index.unsqueeze(1)).exp()[0,:].reshape(-1).tolist()
+            #print()
+            #lowerbound_records[0] = lowerbound_records[0] + cp_list[0,:].reshape(-1).tolist()
+            #lowerbound_records[1] = lowerbound_records[1] + log_p[0,:].exp().reshape(-1).tolist()
+
 
             log_probabilities.append(log_p.gather(1, next_operation_index.unsqueeze(1)))
             sample_space = sample_space.to(device)
@@ -433,7 +465,7 @@ class PtrNet1(nn.Module):
         log_probabilities = torch.stack(log_probabilities, dim=1)
         ll = log_probabilities.sum(dim=1)    # 각 solution element의 log probability를 더하는 방식
 
-        return pi, ll, next_operation_indices
+        return pi, ll, next_operation_indices#, lowerbound_records
 
     def glimpse(self, query, ref, mask0):
         """
