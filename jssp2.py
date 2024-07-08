@@ -150,29 +150,10 @@ class AdaptiveScheduler:
         self.mask1 =  [[0 for _ in range(self.num_mc)] for _ in range(self.num_job)]
         self.mask2 =  [[1 for _ in range(self.num_mc)] for _ in range(self.num_job)]
         data = self.pt
-        self.graph = GraphVisualizer((data, self.ms))
-
-    def add_selected_operation(self, k):
-        self.graph.add_selected_operation(k)
-
-    def get_longest_path(self):
-        longest_path_length = self.graph.get_longest_path(fm = 'Start', to='End')
-        return longest_path_length
-
-    def show(self):
-        self.graph.show()
 
 
-    def get_earliest_start_and_finish_time(self, available_operations):
-        earliest_start_time, earliest_finish_time = self.graph.get_earliest_start_and_finish_time(available_operations)
-        return earliest_start_time, earliest_finish_time
 
-    def get_lower_bound(self, avail_nodes_indices):
-        lower_bound_list = list()
-        for k_prime in avail_nodes_indices:
-            lower_bound = self.graph.get_lower_bound(k_prime)
-            lower_bound_list.append(lower_bound)
-        return lower_bound_list
+
 
     def adaptive_run(self, est_holder, fin_holder, i= None):
         if i != None:
@@ -247,7 +228,6 @@ class AdaptiveScheduler:
         empty2 = list()
         for j_prime, i_prime in self.key_count.items():
             empty2.append(j_prime)
-
     def get_critical_path(self):
         critical_path_list    = list()
         critical_path_ij_list = list()
@@ -259,45 +239,100 @@ class AdaptiveScheduler:
                 j_count = deepcopy(self.j_count)
                 m_count = deepcopy(self.m_count)
                 total_processing_time_by_machine = deepcopy(self.total_processing_time_by_machine)
-
-                gen_t = int(self.pt[j_prime][key_count[j_prime]])    # 선택된 operation에 대한 processing time 선택
-                gen_m = int(self.ms[j_prime][key_count[j_prime]])    # 선택된 operation에 대한 machine_sequence 선택
-                j_count[j_prime] = j_count[j_prime] + gen_t          # Job i에 대한 누적 작업 완료시간 업데이트
-                m_count[gen_m]   = m_count[gen_m]   + gen_t          # Machine gen_m에 대한 누적 작업 완료시간 업데이트
-
-                if m_count[gen_m] < j_count[j_prime]:
-                    m_count[gen_m] = j_count[j_prime]
-                elif m_count[gen_m] > j_count[j_prime]:
-                    j_count[j_prime] = m_count[gen_m]                # if 및 elif 문은 각각의 누적 작업 완료시간을 큰 녀석으로 업데이트 한다는 의미
-                total_processing_time_by_machine[gen_m - 1] -= gen_t
-                gen_t_cum = j_count[j_prime] + np.sum(self.pt[j_prime][key_count[j_prime] + 1:])
                 try:
+                    gen_t = int(self.pt[j_prime][key_count[j_prime]])    # 선택된 operation에 대한 processing time 선택
+                    gen_m = int(self.ms[j_prime][key_count[j_prime]])    # 선택된 operation에 대한 machine_sequence 선택
+                    j_count[j_prime] = j_count[j_prime] + gen_t          # Job i에 대한 누적 작업 완료시간 업데이트
+                    m_count[gen_m]   = m_count[gen_m]   + gen_t          # Machine gen_m에 대한 누적 작업 완료시간 업데이트
+
+                    if m_count[gen_m] < j_count[j_prime]:
+                        m_count[gen_m] = j_count[j_prime]
+                    elif m_count[gen_m] > j_count[j_prime]:
+                        j_count[j_prime] = m_count[gen_m]                # if 및 elif 문은 각각의 누적 작업 완료시간을 큰 녀석으로 업데이트 한다는 의미
+
+                    total_processing_time_by_machine[gen_m - 1] -= gen_t
+
+                    gen_t_cum = j_count[j_prime] + np.sum(self.pt[j_prime][key_count[j_prime]+1:])
+
                     gen_m_prime = int(self.ms[j_prime][key_count[j_prime]+1])
                     gen_m_cum = m_count[gen_m_prime]   + total_processing_time_by_machine[gen_m_prime - 1]
                     critical_path_ij_list.append(np.max([gen_t_cum, gen_m_cum]))
                 except IndexError as IE:
-                    # 남아있는 operation이 없음
-                    critical_path_ij_list.append(gen_t_cum)
+                    critical_path_ij_list.append(0)
                 key_count[j_prime] = key_count[j_prime] + 1
                 longest_path_list = list()
                 for j, i in key_count.items():
                     if i != self.num_mc:
                         gen_m_prime = self.ms[j][key_count[j]]  # remain processing time (해당 machine의 남은 operation에 대한 processing time의 합)
+
+
+
                         longest_path_list.append(np.max([m_count[gen_m_prime] + total_processing_time_by_machine[gen_m_prime-1],
-                                                        j_count[j]     + np.sum(self.pt[j][key_count[j]:])
+                                                         j_count[j]     + np.sum(self.pt[j][key_count[j]:])
                                                         ]))
                     else:
-                        longest_path_list.append(j_count[j]     + np.sum(self.pt[j][key_count[j]:]))
+                        longest_path_list.append(j_count[j]+ np.sum(self.pt[j][key_count[j]:]))
+                        #longest_path_list.append(0)
                 if len(longest_path_list)>0:
                     critical_path_list.append(np.max(longest_path_list))
                 else:
                     critical_path_list.append(0)
+                    print("sparking")
                     #print(critical_path_ij_list)
 
 
 
 
         return critical_path_list, critical_path_ij_list
+
+    # def get_critical_path(self):
+    #     critical_path_list    = list()
+    #     critical_path_ij_list = list()
+    #     for j_prime, i_prime in self.key_count.items():
+    #         # key는 job_id
+    #         # value는 이번에 해야할 operation에 index가 됨 (index error가 난다는 것은 완료된 job임을 의미한다)
+    #         if i_prime != self.num_mc:
+    #             key_count = deepcopy(self.key_count)
+    #             j_count = deepcopy(self.j_count)
+    #             m_count = deepcopy(self.m_count)
+    #             total_processing_time_by_machine = deepcopy(self.total_processing_time_by_machine)
+    #
+    #             gen_t = int(self.pt[j_prime][key_count[j_prime]])    # 선택된 operation에 대한 processing time 선택
+    #             gen_m = int(self.ms[j_prime][key_count[j_prime]])    # 선택된 operation에 대한 machine_sequence 선택
+    #             j_count[j_prime] = j_count[j_prime] + gen_t          # Job i에 대한 누적 작업 완료시간 업데이트
+    #             m_count[gen_m]   = m_count[gen_m]   + gen_t          # Machine gen_m에 대한 누적 작업 완료시간 업데이트
+    #
+    #             if m_count[gen_m] < j_count[j_prime]:
+    #                 m_count[gen_m] = j_count[j_prime]
+    #             elif m_count[gen_m] > j_count[j_prime]:
+    #                 j_count[j_prime] = m_count[gen_m]                # if 및 elif 문은 각각의 누적 작업 완료시간을 큰 녀석으로 업데이트 한다는 의미
+    #             total_processing_time_by_machine[gen_m - 1] -= gen_t
+    #             gen_t_cum = j_count[j_prime] + np.sum(self.pt[j_prime][key_count[j_prime] + 1:])
+    #             try:
+    #                 gen_m_prime = int(self.ms[j_prime][key_count[j_prime]+1])
+    #                 gen_m_cum = m_count[gen_m_prime]   + total_processing_time_by_machine[gen_m_prime - 1]
+    #                 critical_path_ij_list.append(np.max([gen_t_cum, gen_m_cum]))
+    #             except IndexError as IE:
+    #                 # 남아있는 operation이 없음
+    #                 critical_path_ij_list.append(gen_t_cum)
+    #             key_count[j_prime] = key_count[j_prime] + 1
+    #             longest_path_list = list()
+    #             for j, i in key_count.items():
+    #                 if i != self.num_mc:
+    #                     gen_m_prime = self.ms[j][key_count[j]]  # remain processing time (해당 machine의 남은 operation에 대한 processing time의 합)
+    #                     longest_path_list.append(np.max([m_count[gen_m_prime] + total_processing_time_by_machine[gen_m_prime-1],
+    #                                                     j_count[j]     + np.sum(self.pt[j][key_count[j]:])
+    #                                                     ]))
+    #                 else:
+    #                     longest_path_list.append(j_count[j]     + np.sum(self.pt[j][key_count[j]:]))
+    #             if len(longest_path_list)>0:
+    #                 critical_path_list.append(np.max(longest_path_list))
+    #             else:
+    #                 critical_path_list.append(0)
+    #
+    #
+    #
+    #     return critical_path_list, critical_path_ij_list
 
 
 
@@ -365,7 +400,6 @@ class AdaptiveScheduler:
         self.mask1 =  [[0 for _ in range(self.num_mc)] for _ in range(self.num_job)]
         self.mask2 =  [[1 for _ in range(self.num_mc)] for _ in range(self.num_job)]
         data = self.pt
-        self.graph = GraphVisualizer((data, self.ms))
 
 
     def get_node_feature(self):

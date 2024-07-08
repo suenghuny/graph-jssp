@@ -367,13 +367,14 @@ class PtrNet1(nn.Module):
                 cp_list = []
                 for nb in range(batch_size):
                     k = next_operation_index[nb].item()
-                    scheduler_list[nb].add_selected_operation(k) # 그림으로 설명 예정# 안중요
+                    #scheduler_list[nb].add_selected_operation(k) # 그림으로 설명 예정# 안중요
                     next_b = next_job[nb].item()
                     scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb], i = next_b) # next_b는 이전 스텝에서 선택된 Job이고, Adaptive Run이라는 것은 선택된 Job에 따라 update한 다음에 EST, EFIN을 구하라는 의미
                     if (self.params['third_feature'] == "first_and_second") or\
                         (self.params['third_feature'] == "second_only"):
                         ub = upperbound[nb]
                         mask, critical_path, critical_path2, cp, cp2 = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub)
+                        #print("---------------------------------------------------")
                         empty_zero[nb, :]  = torch.tensor(critical_path).to(device)
                         empty_zero2[nb, :] = torch.tensor(critical_path2).to(device)  # 안중요
                         """
