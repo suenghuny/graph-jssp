@@ -233,7 +233,7 @@ def train_model(params, log_path=None):
             num_job = np.random.randint(5, 10)
             num_machine = np.random.randint(num_job, 10)
             jobs_datas, scheduler_list = generate_jssp_instance(num_jobs=num_job, num_machine=num_machine,
-                                                                batch_size=params['batch_size'])
+                                                 batch_size=params['batch_size'])
             # print(jobs_datas)
             # print("======================")
             makespan_list_for_upperbound = list()
@@ -270,6 +270,7 @@ def train_model(params, log_path=None):
         input_data = (node_features, heterogeneous_edges)
         act_model.train()
         if cfg.algo == 'reinforce':
+
             pred_seq, ll_old, _ = act_model(input_data,
                                             device,
                                             scheduler_list=scheduler_list,
@@ -467,8 +468,8 @@ if __name__ == '__main__':
         "beta": float(os.environ.get("beta", 0.65)),
         "alpha": float(os.environ.get("alpha", 0.1)),
         "lr": float(os.environ.get("lr", 1.0e-3)),
-        "lr_decay": float(os.environ.get("lr_decay", 0.995)),
-        "lr_decay_step": int(os.environ.get("lr_decay_step", 1000)),
+        "lr_decay": float(os.environ.get("lr_decay", 0.9)),
+        "lr_decay_step": int(os.environ.get("lr_decay_step", 100)),
         "layers": eval(str(os.environ.get("layers", '[256, 128]'))),
         "n_embedding": int(os.environ.get("n_embedding", 36)),
         "n_hidden": int(os.environ.get("n_hidden", 64)),
@@ -477,7 +478,7 @@ if __name__ == '__main__':
         "ex_embedding_size": int(os.environ.get("ex_embedding_size", 40)),
         "k_hop": int(os.environ.get("k_hop", 1)),
         "is_lr_decay": True,
-        "third_feature": 'first_and_second', # first_and_second, first_only, second_only
+        "third_feature": 'first_and_second',  # first_and_second, first_only, second_only
         "baseline_reset": True,
         "ex_embedding": True,
         "k_epoch": int(os.environ.get("k_epoch", 2)),

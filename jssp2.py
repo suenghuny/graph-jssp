@@ -271,13 +271,15 @@ class AdaptiveScheduler:
                                                          j_count[j]     + np.sum(self.pt[j][key_count[j]:])
                                                         ]))
                     else:
-                        longest_path_list.append(j_count[j]+ np.sum(self.pt[j][key_count[j]:]))
-                        #longest_path_list.append(0)
+                        #longest_path_list.append(j_count[j]+ np.sum(self.pt[j][key_count[j]:]))
+                        longest_path_list.append(0)
+                        #print("sparking")
+                #print(longest_path_list)
                 if len(longest_path_list)>0:
                     critical_path_list.append(np.max(longest_path_list))
                 else:
                     critical_path_list.append(0)
-                    print("sparking")
+                    #print("sparking")
                     #print(critical_path_ij_list)
 
 

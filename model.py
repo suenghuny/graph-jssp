@@ -133,9 +133,13 @@ class GCRN(nn.Module):
         if final == False:
             H = placeholder_for_multi_head.reshape(batch_size, num_nodes, self.n_multi_head * self.num_edge_cat * self.graph_embedding_size)
             H = H.reshape(batch_size*num_nodes, -1)
+            #print("1", H.shape, self.graph_embedding_size, self.feature_size)
             H = self.Embedding1(H)
+            #print("2", H.shape)
             X = X.reshape(batch_size*num_nodes, -1)
+            #print("3", X.shape)
             H = self.BN1((1 - self.alpha)*H + self.alpha*X)
+            #print("4", X.shape)
         else:
             H = empty.reshape(batch_size, num_nodes, self.num_edge_cat * self.graph_embedding_size)
             H = H.reshape(batch_size * num_nodes, -1)
@@ -144,6 +148,7 @@ class GCRN(nn.Module):
             H = self.BN1((1 - self.alpha)*H + self.alpha*X)
 
         Z = self.Embedding2(H)
+        #print("5", Z.shape)
         Z = self.BN2(H + Z)
         Z = Z.reshape(batch_size, num_nodes, -1)
         return Z

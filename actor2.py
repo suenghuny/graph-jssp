@@ -94,6 +94,7 @@ class PtrNet1(nn.Module):
             if self.params['ex_embedding'] == True:
                 extended_dimension = params["ex_embedding_size"]
                 self.ex_embedding = ExEmbedding(raw_feature_size=4, feature_size = params["ex_embedding_size"])
+
             else:
                 extended_dimension = 4
         if (self.params['third_feature'] == "first_only") or \
@@ -374,7 +375,7 @@ class PtrNet1(nn.Module):
                         (self.params['third_feature'] == "second_only"):
                         ub = upperbound[nb]
                         mask, critical_path, critical_path2, cp, cp2 = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub)
-                        #print("---------------------------------------------------")
+                        #print(num_operations, i, "--------------------------------------------------")
                         empty_zero[nb, :]  = torch.tensor(critical_path).to(device)
                         empty_zero2[nb, :] = torch.tensor(critical_path2).to(device)  # 안중요
                         """
@@ -407,6 +408,7 @@ class PtrNet1(nn.Module):
                     ex_embedding = self.ex_embedding(r_temp)
                     ex_embedding = ex_embedding.reshape(batch_size, num_operations, -1)
                     ref = torch.concat([h_bar, ex_embedding],dim = 2)
+
                 else:
                     ref = torch.concat([h_bar, est_placeholder, fin_placeholder],dim=2)  # extended node embedding을 만드는 부분(z_t_i에 해당)
             if self.params['third_feature'] == "second_only":
@@ -478,15 +480,21 @@ class PtrNet1(nn.Module):
             u1 = self.W_q[m](query).unsqueeze(1)
             u2 = self.W_ref[m](ref.reshape(ref.shape[0]*ref.shape[1],-1))                             # u2: (batch, 128, block_num)
             u2 = u2.reshape(ref.shape[0], ref.shape[1],-1)
+            #print(u2.shape)
             u2 = u2.permute(0, 2, 1)
             u = torch.bmm(u1, u2)/dk**0.5
             v = ref@self.Vec[m]
             u = u.squeeze(1).masked_fill(mask0 == 0, -1e8)
+
+
             a = F.softmax(u, dim=1)
+
             if m == 0:
                 g = torch.bmm(a.unsqueeze(1), v).squeeze(1)
             else:
                 g += torch.bmm(a.unsqueeze(1), v).squeeze(1)
+
+           # print(u1.shape, u2.shape, a.unsqueeze(1).shape, v.shape, g.shape)
         query = g
         for m in range(self.n_multi_head):
             u1 = self.W_q3[m](query).unsqueeze(1)
