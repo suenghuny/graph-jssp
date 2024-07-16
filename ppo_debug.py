@@ -39,7 +39,7 @@ def set_seed(seed):
 
 
 # Example usage:
-set_seed(int(os.environ.get("seed", 40)))  # 30 했었음
+set_seed(int(os.environ.get("seed", 30)))  # 30 했었음
 opt_list = [1059, 888, 1005, 1005, 887, 1010, 397, 899, 934, 944]
 orb_list = []
 for i in ["21", "22"]:
@@ -465,19 +465,19 @@ if __name__ == '__main__':
         "lr_critic": cfg.lr_critic,
 
         "reward_scaler": cfg.reward_scaler,
-        "beta": float(os.environ.get("beta", 0.6)),
+        "beta": float(os.environ.get("beta", 0.7)),
         "alpha": float(os.environ.get("alpha", 0.1)),
         "lr": float(os.environ.get("lr", 1.0e-3)),
-        "lr_decay": float(os.environ.get("lr_decay", 0.95)),
+        "lr_decay": float(os.environ.get("lr_decay", 0.85)),
         "lr_decay_step":
-            int(os.environ.get("lr_decay_step", 700)),
-        "layers": eval(str(os.environ.get("layers", '[196, 96]'))),
+            int(os.environ.get("lr_decay_step", 500)),
+        "layers": eval(str(os.environ.get("layers", '[196, 108]'))),
         "n_embedding":
-            int(os.environ.get("n_embedding", 48)),
-        "n_hidden": int(os.environ.get("n_hidden", 84)),
-        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 100)),
-        "n_multi_head": int(os.environ.get("n_multi_head", 2)),
-        "ex_embedding_size": int(os.environ.get("ex_embedding_size", 40)),
+            int(os.environ.get("n_embedding", 42)),
+        "n_hidden": int(os.environ.get("n_hidden", 96)),
+        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 92)),
+        "n_multi_head": int(os.environ.get("n_multi_head", 3)),
+        "ex_embedding_size": int(os.environ.get("ex_embedding_size", 42)),
         "k_hop": int(os.environ.get("k_hop", 1)),
         "is_lr_decay": True,
         "third_feature": 'first_and_second',  # first_and_second, first_only, second_only
