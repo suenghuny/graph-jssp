@@ -21,7 +21,6 @@ baseline_reset = cfg.baseline_reset
 if cfg.vessl == True:
     import vessl
     import os
-
     vessl.init()
     output_dir = "/output/"
     if not os.path.exists(output_dir):
@@ -38,21 +37,17 @@ def set_seed(seed):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
+
 # Example usage:
-set_seed(30)  # 30 했었음
+set_seed(int(os.environ.get("seed", 30)))  # 30 했었음
 opt_list = [1059, 888, 1005, 1005, 887, 1010, 397, 899, 934, 944]
 orb_list = []
-problem_number =  ['71','72',
-                   '61','62',
-                   '51','52','41','42','31'
-    ,'32','21','22']
-for i in problem_number:
-    df = pd.read_excel("dmu.xlsx", sheet_name=i, engine='openpyxl')
+for i in ["71", "72"]:
+    df = pd.read_excel("ta.xlsx", sheet_name=i, engine='openpyxl')
     orb_data = list()  #
     for row, column in df.iterrows():
         job = []
         for j in range(0, len(column.tolist()), 2):
-            #print((column.tolist()[j], column.tolist()[j + 1]))
             element = (column.tolist()[j], column.tolist()[j + 1])
             job.append(element)
         orb_data.append(job)
@@ -111,17 +106,12 @@ def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=Non
                                     num_machine=num_machine,
                                     num_job=num_job,
                                     upperbound=upperbound)
-    makespan_list = list()
-    j = 0
     for sequence in pred_seq:
         scheduler = AdaptiveScheduler(orb_list[p - 1])
         makespan = scheduler.run(sequence.tolist())
         val_makespan.append(makespan)
-        makespan_list.append(makespan)
-        print(j, makespan)
-        j+=1
     # print("크크크", val_makespan)
-    return np.min(val_makespan), np.mean(val_makespan), makespan_list
+    return np.min(val_makespan), np.mean(val_makespan)
 
 
 def train_model(params, log_path=None):
@@ -137,53 +127,6 @@ def train_model(params, log_path=None):
     ave_cri_loss = 0.0
 
     act_model = PtrNet1(params).to(device)
-
-    checkpoint = torch.load(params["model_dir"] +
-                            '/ppo_w_third_feature/' +
-                            '0710_22_54_step49201_act.pt')
-
-    # 33401 별로임
-    # 41601이 그나마 ㅈ좀더 나음
-    # 18901 별로
-    # 48801 괜찮음 / 벗 모자름
-    # 49201 현재까지 최고(BEST)
-
-
-    # 26901 <
-    # 21901 현재까지 베스트
-
-
-    # 0713_20_37 new 17101 O
-    # 17201 <
-    # 16901 X
-    # 16801 X
-    # 23101 X
-    # 26501 O 31501
-    # 29501 괜찮음
-    # 29201 O
-    # 40401 ㅒ
-    # 39501 X
-    # 42401 <
-    # 48401 <
-
-
-    # New27801 O
-    # 42301 X
-    # 42201 >
-    # 48201 >
-    # 48101 X
-    # 48401 X
-    # 49401 >
-    # 49701 >
-    # 49201 >
-
-    #checkpoint = torch.load(params["model_dir"] + '/ppo_w_third_feature/' + '0613_19_18_step20801_act.pt')
-    #20001도 괘아늠
-    #20751도 괘아늠
-    #20251 괘아늠
-    #20651 별로
-
-    act_model.load_state_dict(checkpoint['model_state_dict_actor'])
 
     baseline_model = PtrNet1(params).to(device)  # baseline_model 불필요
     baseline_model.load_state_dict(act_model.state_dict())  # baseline_model 불필요
@@ -205,10 +148,10 @@ def train_model(params, log_path=None):
 
     c_max = list()
     b = 0
-    problem_list = [1, 2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18]
+    problem_list = [1, 2]
     validation_records_min = [[] for _ in problem_list]
     validation_records_mean = [[] for _ in problem_list]
-
+    empty_records = [[], []]
     for s in range(epoch + 1, params["step"]):
 
         """
@@ -221,56 +164,23 @@ def train_model(params, log_path=None):
         b += 1
 
         if s % 100 == 1:  # Evaluation 수행
-            makespan_records = dict()
             for p in problem_list:
                 min_makespan = heuristic_eval(p)
                 eval_number = 2
                 with torch.no_grad():
                     min_makespan_list = [min_makespan] * eval_number
-                    min_makespan1, mean_makespan1, makespan_list1 = evaluation(act_model, baseline_model, p, eval_number, device, upperbound=min_makespan_list)
-                    min_makespan2, mean_makespan2, makespan_list2 = evaluation(act_model, baseline_model, p, eval_number, device, upperbound=min_makespan_list)
-                    min_makespan3, mean_makespan3, makespan_list3 = evaluation(act_model, baseline_model, p, eval_number, device, upperbound=min_makespan_list)
-                    min_makespan4, mean_makespan4, makespan_list4 = evaluation(act_model, baseline_model, p, eval_number, device, upperbound=min_makespan_list)
-                    min_makespan5, mean_makespan5, makespan_list5 = evaluation(act_model, baseline_model, p, eval_number, device, upperbound=min_makespan_list)
-                    min_makespan6, mean_makespan6, makespan_list6 = evaluation(act_model, baseline_model, p, eval_number, device, upperbound=min_makespan_list)
-                    min_makespan7, mean_makespan7, makespan_list7 = evaluation(act_model, baseline_model, p, eval_number, device, upperbound=min_makespan_list)
-                    min_makespan8, mean_makespan8, makespan_list8 = evaluation(act_model, baseline_model, p, eval_number, device, upperbound=min_makespan_list)
-                    min_makespan9, mean_makespan9, makespan_list9 = evaluation(act_model, baseline_model, p, eval_number, device, upperbound=min_makespan_list)
-                    min_makespan10, mean_makespan10, makespan_list10 = evaluation(act_model, baseline_model, p, eval_number, device, upperbound=min_makespan_list)
-                    min_makespan11, mean_makespan11, makespan_list11 = evaluation(act_model, baseline_model, p, eval_number, device, upperbound=min_makespan_list)
-                    min_makespan12, mean_makespan12, makespan_list12 = evaluation(act_model, baseline_model, p, eval_number, device, upperbound=min_makespan_list)
-                    min_makespan13, mean_makespan13, makespan_list13 = evaluation(act_model, baseline_model, p, eval_number, device, upperbound=min_makespan_list)
-                    min_makespan14, mean_makespan14, makespan_list14 = evaluation(act_model, baseline_model, p, eval_number, device, upperbound=min_makespan_list)
-                    min_makespan15, mean_makespan15, makespan_list15 = evaluation(act_model, baseline_model, p, eval_number, device, upperbound=min_makespan_list)
-                min_makespan = np.min([min_makespan1, min_makespan2, min_makespan3, min_makespan4, min_makespan5, min_makespan6, min_makespan7,
-                                       min_makespan8, min_makespan9, min_makespan10, min_makespan11, min_makespan12, min_makespan13, min_makespan14, min_makespan15])
-                mean_makespan = (mean_makespan1 + mean_makespan2 + mean_makespan3 + mean_makespan4 + mean_makespan5 + mean_makespan6+ mean_makespan7+ mean_makespan8+ mean_makespan9+ mean_makespan10+ mean_makespan11+ mean_makespan12+ mean_makespan13+ mean_makespan14+ mean_makespan15) / 15
-                makespan_list = [makespan for makespan in makespan_list1]+\
-                                [makespan for makespan in makespan_list2]+ \
-                                [makespan for makespan in makespan_list3] + \
-                                [makespan for makespan in makespan_list4] + \
-                                [makespan for makespan in makespan_list5] + \
-                                [makespan for makespan in makespan_list6] + \
-                                [makespan for makespan in makespan_list7]+ \
-                                [makespan for makespan in makespan_list8] + \
-                                [makespan for makespan in makespan_list9] + \
-                                [makespan for makespan in makespan_list10] + \
-                                [makespan for makespan in makespan_list11] + \
-                                [makespan for makespan in makespan_list12] + \
-                                [makespan for makespan in makespan_list13] + \
-                                [makespan for makespan in makespan_list14] + \
-                                [makespan for makespan in makespan_list15]
-                name = problem_number[p-1]
-                j = 0
-                for makespan in makespan_list:
-                    makespan_records[name+str(j)] = makespan
-                    j+=1
-                print(makespan_records)
-                df = pd.DataFrame(list(makespan_records.items()), columns=['Key', 'Value'])
-                df.to_csv("makespan_records.csv")
+                    min_makespan1, mean_makespan1 = evaluation(act_model, baseline_model, p, eval_number, device,
+                                                               upperbound=min_makespan_list)
+
+                min_makespan = np.min(
+                    [min_makespan1])
+                mean_makespan = mean_makespan1
 
                 print("TA{}".format(problem_list[p - 1]), min_makespan, mean_makespan)
+                empty_records[p - 1].append(mean_makespan)
 
+                if len(empty_records[1]) > 35 and np.mean(empty_records[1][-30:]) >= 3300:
+                    sys.exit()
 
                 if cfg.vessl == True:
                     vessl.log(step=s, payload={'minmakespan{}'.format(str(problem_list[p - 1])): min_makespan})
@@ -284,8 +194,8 @@ def train_model(params, log_path=None):
                     mean_m = mean_m.transpose()
                     min_m.columns = problem_list
                     mean_m.columns = problem_list
-                    #min_m.to_csv('min_makespan_w_third_feature2.csv')
-                    #mean_m.to_csv('mean_makespan_w_third_feature2.csv')
+                    min_m.to_csv('min_makespan_w_third_feature333.csv')
+                    mean_m.to_csv('mean_makespan_w_third_feature333.csv')
 
         act_model.block_indices = []
         baseline_model.block_indices = []
@@ -294,10 +204,12 @@ def train_model(params, log_path=None):
             """
             훈련용 데이터셋 생성하는 코드
             """
-            num_job = np.random.randint(5, 10)
-            num_machine = np.random.randint(num_job, 10)
+            num_job = np.random.randint(5, 15)
+            num_machine = np.random.randint(num_job, 15)
             jobs_datas, scheduler_list = generate_jssp_instance(num_jobs=num_job, num_machine=num_machine,
-                                                                batch_size=params['batch_size'])
+                                                 batch_size=params['batch_size'])
+            # print(jobs_datas)
+            # print("======================")
             makespan_list_for_upperbound = list()
             for scheduler in scheduler_list:
                 c_max_heu = scheduler.heuristic_run()
@@ -332,6 +244,7 @@ def train_model(params, log_path=None):
         input_data = (node_features, heterogeneous_edges)
         act_model.train()
         if cfg.algo == 'reinforce':
+
             pred_seq, ll_old, _ = act_model(input_data,
                                             device,
                                             scheduler_list=scheduler_list,
@@ -356,7 +269,7 @@ def train_model(params, log_path=None):
                 if s == 1:
                     be = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)  # baseline을 구하는 부분
                 else:
-                    be = beta * be + (1 - beta) * torch.tensor(real_makespan).to(device)
+                    be = beta * be + (1 - beta) * torch.tensor(real_makespan).unsqueeze(1).to(device)
             else:
                 if s % cfg.gen_step == 1:
                     be = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)  # baseline을 구하는 부분
@@ -375,8 +288,7 @@ def train_model(params, log_path=None):
             """
             act_loss = -(ll_old * adv).mean()  # loss 구하는 부분 /  ll_old의 의미 log_theta (pi | s)
             act_loss.backward()
-            nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 10)),
-                                     norm_type=2)
+            nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 1)),norm_type=2)
             act_optim.step()
         if cfg.algo == 'ppo':
             pred_seq, ll_old, old_sequence = act_model(input_data,
@@ -396,22 +308,25 @@ def train_model(params, log_path=None):
                 c_max.append(makespan)
             ave_makespan += sum(real_makespan) / (params["batch_size"] * params["log_step"])
             """
-
+            
             vanila actor critic
-
+        
             """
             beta = params['beta']
             if baseline_reset == False:
                 if s == 1:
                     be = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)  # baseline을 구하는 부분
                 else:
-                    be = beta * be + (1 - beta) * torch.tensor(real_makespan).to(device)
+                    be = beta * be + (1 - beta) * torch.tensor(real_makespan).unsqueeze(1).to(device)
             else:
                 if s % cfg.gen_step == 1:
                     be = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)  # baseline을 구하는 부분
                 else:
                     be = beta * be + (1 - beta) * torch.tensor(real_makespan).unsqueeze(1).to(device)
             ####
+            adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - be  # baseline(advantage) 구하는 부분
+            #print("뭐요", torch.tensor(real_makespan).detach().unsqueeze(1).to(device).shape, be.shape)
+
             for i in range(params['k_epoch']):
                 for scheduler in scheduler_list:
                     scheduler.reset()
@@ -424,19 +339,25 @@ def train_model(params, log_path=None):
                                          old_sequence=old_sequence
                                          )
 
-                ratio = torch.exp(ll_new - ll_old.detach()).unsqueeze(-1)
-                adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - be  # baseline(advantage) 구하는 부분
+                ratio = torch.exp(ll_new - ll_old.detach())
 
+                #print(ratio)
+                #print(ratio.shape, adv.shape)
                 surr1 = ratio * adv
                 surr2 = torch.clamp(ratio, 1 - params["epsilon"], 1 + params["epsilon"]) * adv
+
                 act_loss = -torch.min(surr1, surr2).mean()
+
                 act_optim.zero_grad()
                 act_loss.backward()
-                nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 10)),
+                nn.utils.clip_grad_norm_(act_model.parameters(),
+                                         max_norm=float(os.environ.get("grad_clip", 5)),
                                          norm_type=2)
                 act_optim.step()
 
-        if act_lr_scheduler.get_last_lr()[0] >= 1e-4:
+
+        if act_lr_scheduler.get_last_lr()[0] >= \
+                float(os.environ.get("lr_decay_min", 5.0e-4)):
             if params["is_lr_decay"]:
                 act_lr_scheduler.step()
         ave_act_loss += act_loss.item()
@@ -461,7 +382,7 @@ def train_model(params, log_path=None):
             t1 = time()
 
         if s % params["save_step"] == 1:
-            if vessl == False:
+            if cfg.vessl == False:
                 torch.save({'epoch': s,
                             'model_state_dict_actor': act_model.state_dict(),
                             'optimizer_state_dict_actor': act_optim.state_dict(),
@@ -526,11 +447,11 @@ if __name__ == '__main__':
             int(os.environ.get("lr_decay_step", 500)),
         "layers": eval(str(os.environ.get("layers", '[196, 108]'))),
         "n_embedding":
-            int(os.environ.get("n_embedding", 40)),
+            int(os.environ.get("n_embedding", 42)),
         "n_hidden": int(os.environ.get("n_hidden", 96)),
-        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 108)),
+        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 92)),
         "n_multi_head": int(os.environ.get("n_multi_head", 3)),
-        "ex_embedding_size": int(os.environ.get("ex_embedding_size", 38)),
+        "ex_embedding_size": int(os.environ.get("ex_embedding_size", 42)),
         "k_hop": int(os.environ.get("k_hop", 1)),
         "is_lr_decay": True,
         "third_feature": 'first_and_second',  # first_and_second, first_only, second_only
