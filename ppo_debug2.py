@@ -153,7 +153,7 @@ def train_model(params, log_path=None):
     validation_records_mean = [[] for _ in problem_list]
     empty_records = [[], []]
     for s in range(epoch + 1, params["step"]):
-
+####
         """
 
         변수별 shape 
