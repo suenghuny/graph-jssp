@@ -210,7 +210,7 @@ def train_model(params, log_path=None):
             jobs_datas, scheduler_list = generate_jssp_instance(num_jobs=num_job, num_machine=num_machine,
                                                  batch_size=params['batch_size'])
             # print(jobs_datas)
-            # print("======================")
+            # print("===============hhhhhh=======")
             makespan_list_for_upperbound = list()
             for scheduler in scheduler_list:
                 c_max_heu = scheduler.heuristic_run()
