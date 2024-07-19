@@ -204,6 +204,7 @@ def train_model(params, log_path=None):
             """
             훈련용 데이터셋 생성하는 코드
             """
+            ####
             num_job = np.random.randint(5, 20)
             num_machine = np.random.randint(num_job, 20)
             jobs_datas, scheduler_list = generate_jssp_instance(num_jobs=num_job, num_machine=num_machine,
