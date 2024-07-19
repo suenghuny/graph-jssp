@@ -209,7 +209,7 @@ def train_model(params, log_path=None):
             num_machine = np.random.randint(num_job, 20)
             jobs_datas, scheduler_list = generate_jssp_instance(num_jobs=num_job, num_machine=num_machine,
                                                  batch_size=params['batch_size'])
-            # print(jobs_datas)
+            # print(jobs_dathhghjas)
             # print("===============hhhhhh=======")
             makespan_list_for_upperbound = list()
             for scheduler in scheduler_list:
