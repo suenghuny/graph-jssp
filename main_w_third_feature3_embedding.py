@@ -149,7 +149,7 @@ def train_model(params, log_path=None):
 
     c_max = list()
     b = 0
-    problem_list = [1, 2]
+    problem_list = [2]
     validation_records_min = [[] for _ in problem_list]
     validation_records_mean = [[] for _ in problem_list]
     empty_records = [[], []]
@@ -205,9 +205,9 @@ def train_model(params, log_path=None):
 
                 print("TA{}".format(problem_list[p - 1]), min_makespan, mean_makespan)
                 empty_records[p - 1].append(mean_makespan)
-
-                if len(empty_records[1]) > 15 and np.mean(empty_records[1][-8:]) >= 3000:
-                    sys.exit()
+                #
+                # if len(empty_records[1]) > 15 and np.mean(empty_records[1][-8:]) >= 3000:
+                #     sys.exit()
 
                 if cfg.vessl == True:
                     vessl.log(step=s, payload={'minmakespan{}'.format(str(problem_list[p - 1])): min_makespan})
