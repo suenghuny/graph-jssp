@@ -21,6 +21,7 @@ baseline_reset = cfg.baseline_reset
 if cfg.vessl == True:
     import vessl
     import os
+
     vessl.init()
     output_dir = "/output/"
     if not os.path.exists(output_dir):
@@ -42,7 +43,7 @@ def set_seed(seed):
 set_seed(int(os.environ.get("seed", 30)))  # 30 했었음
 opt_list = [1059, 888, 1005, 1005, 887, 1010, 397, 899, 934, 944]
 orb_list = []
-for i in ["71", "72"]:
+for i in ["21", "22"]:
     df = pd.read_excel("ta.xlsx", sheet_name=i, engine='openpyxl')
     orb_data = list()  #
     for row, column in df.iterrows():
@@ -153,7 +154,7 @@ def train_model(params, log_path=None):
     validation_records_mean = [[] for _ in problem_list]
     empty_records = [[], []]
     for s in range(epoch + 1, params["step"]):
-####
+
         """
 
         변수별 shape 
@@ -166,21 +167,47 @@ def train_model(params, log_path=None):
         if s % 100 == 1:  # Evaluation 수행
             for p in problem_list:
                 min_makespan = heuristic_eval(p)
-                eval_number = 2
+                eval_number = 5
                 with torch.no_grad():
                     min_makespan_list = [min_makespan] * eval_number
                     min_makespan1, mean_makespan1 = evaluation(act_model, baseline_model, p, eval_number, device,
                                                                upperbound=min_makespan_list)
 
+                    eval_number = 5
+                    min_makespan_list = [min_makespan] * eval_number
+                    min_makespan2, mean_makespan2 = evaluation(act_model, baseline_model, p, eval_number, device,
+                                                               upperbound=min_makespan_list)
+
+                    eval_number = 5
+                    min_makespan_list = [min_makespan] * eval_number
+                    min_makespan3, mean_makespan3 = evaluation(act_model, baseline_model, p, eval_number, device,
+                                                               upperbound=min_makespan_list)
+
+                    eval_number = 5
+                    min_makespan_list = [min_makespan] * eval_number
+                    min_makespan4, mean_makespan4 = evaluation(act_model, baseline_model, p, eval_number, device,
+                                                               upperbound=min_makespan_list)
+
+                    eval_number = 5
+                    min_makespan_list = [min_makespan] * eval_number
+                    min_makespan5, mean_makespan5 = evaluation(act_model, baseline_model, p, eval_number, device,
+                                                               upperbound=min_makespan_list)
+
+                    eval_number = 5
+                    min_makespan_list = [min_makespan] * eval_number
+                    min_makespan6, mean_makespan6 = evaluation(act_model, baseline_model, p, eval_number, device,
+                                                               upperbound=min_makespan_list)
+
                 min_makespan = np.min(
-                    [min_makespan1])
-                mean_makespan = mean_makespan1
+                    [min_makespan1, min_makespan2, min_makespan3, min_makespan4, min_makespan5, min_makespan6])
+                mean_makespan = (
+                                        mean_makespan1 + mean_makespan2 + mean_makespan3 + mean_makespan4 + mean_makespan5 + mean_makespan6) / 6
 
                 print("TA{}".format(problem_list[p - 1]), min_makespan, mean_makespan)
                 empty_records[p - 1].append(mean_makespan)
-                #
-                # if len(empty_records[1]) > 35 and np.mean(empty_records[1][-30:]) >= 3300:
-                #     sys.exit()
+
+                if len(empty_records[1]) > 35 and np.mean(empty_records[1][-30:]) >= 3300:
+                    sys.exit()
 
                 if cfg.vessl == True:
                     vessl.log(step=s, payload={'minmakespan{}'.format(str(problem_list[p - 1])): min_makespan})
@@ -194,8 +221,8 @@ def train_model(params, log_path=None):
                     mean_m = mean_m.transpose()
                     min_m.columns = problem_list
                     mean_m.columns = problem_list
-                    min_m.to_csv('min_makespan_w_third_feature333.csv')
-                    mean_m.to_csv('mean_makespan_w_third_feature333.csv')
+                    min_m.to_csv('min_makespan_w_third_feature222.csv')
+                    mean_m.to_csv('mean_makespan_w_third_feature222.csv')
 
         act_model.block_indices = []
         baseline_model.block_indices = []
@@ -204,13 +231,13 @@ def train_model(params, log_path=None):
             """
             훈련용 데이터셋 생성하는 코드
             """
-            ####
             num_machine = np.random.randint(5, 10)
             num_job = np.random.randint(num_machine, 10)
+
             jobs_datas, scheduler_list = generate_jssp_instance(num_jobs=num_job, num_machine=num_machine,
-                                                 batch_size=params['batch_size'])
-            # print(jobs_dathhghjas)
-            # print("===============hhhhhh=======")
+                                                                batch_size=params['batch_size'])
+            # print(jobs_datas)
+            # print("======================")
             makespan_list_for_upperbound = list()
             for scheduler in scheduler_list:
                 c_max_heu = scheduler.heuristic_run()
@@ -289,7 +316,8 @@ def train_model(params, log_path=None):
             """
             act_loss = -(ll_old * adv).mean()  # loss 구하는 부분 /  ll_old의 의미 log_theta (pi | s)
             act_loss.backward()
-            nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 1)),norm_type=2)
+            nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 1)),
+                                     norm_type=2)
             act_optim.step()
         if cfg.algo == 'ppo':
             pred_seq, ll_old, old_sequence = act_model(input_data,
@@ -309,9 +337,9 @@ def train_model(params, log_path=None):
                 c_max.append(makespan)
             ave_makespan += sum(real_makespan) / (params["batch_size"] * params["log_step"])
             """
-            
+
             vanila actor critic
-        
+
             """
             beta = params['beta']
             if baseline_reset == False:
@@ -326,7 +354,7 @@ def train_model(params, log_path=None):
                     be = beta * be + (1 - beta) * torch.tensor(real_makespan).unsqueeze(1).to(device)
             ####
             adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - be  # baseline(advantage) 구하는 부분
-            #print("뭐요", torch.tensor(real_makespan).detach().unsqueeze(1).to(device).shape, be.shape)
+            # print("뭐요", torch.tensor(real_makespan).detach().unsqueeze(1).to(device).shape, be.shape)
 
             for i in range(params['k_epoch']):
                 for scheduler in scheduler_list:
@@ -342,8 +370,8 @@ def train_model(params, log_path=None):
 
                 ratio = torch.exp(ll_new - ll_old.detach())
 
-                #print(ratio)
-                #print(ratio.shape, adv.shape)
+                # print(ratio)
+                # print(ratio.shape, adv.shape)
                 surr1 = ratio * adv
                 surr2 = torch.clamp(ratio, 1 - params["epsilon"], 1 + params["epsilon"]) * adv
 
@@ -355,7 +383,6 @@ def train_model(params, log_path=None):
                                          max_norm=float(os.environ.get("grad_clip", 5)),
                                          norm_type=2)
                 act_optim.step()
-
 
         if act_lr_scheduler.get_last_lr()[0] >= \
                 float(os.environ.get("lr_decay_min", 5.0e-4)):
