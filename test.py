@@ -135,15 +135,16 @@ def train_model(params, log_path=None):
 
     act_model = PtrNet1(params).to(device)
 
-    checkpoint = torch.load(params["model_dir"] +
-                            '/ppo_w_third_feature/' +
-                            '0710_22_54_step49201_act.pt')
+    checkpoint = torch.load('temp/' +
+                            '0720_02_10_step48501_act.pt')
 
     # 33401 별로임
     # 41601이 그나마 ㅈ좀더 나음
     # 18901 별로
     # 48801 괜찮음 / 벗 모자름
-    # 49201 현재까지 최고(BEST)
+    # 49201 현재까지 최고(BEST) / 실험 177 # 경로 : params["model_dir"] +
+    #                             '/ppo_w_third_feature/' +
+    #                             '0710_22_54_step49201_act.pt'
 
 
     # 26901 <
@@ -222,7 +223,7 @@ def train_model(params, log_path=None):
             for p in problem_list:
                 min_makespan = heuristic_eval(p)
                 eval_number = 2
-                set_seed(10)  # 30 했었음
+                set_seed(50)  # 30 했었음
                 with torch.no_grad():
                     min_makespan_list = [min_makespan] * eval_number
                     min_makespan1, mean_makespan1, makespan_list1 = evaluation(act_model, baseline_model, p, eval_number, device, upperbound=min_makespan_list)
@@ -235,7 +236,7 @@ def train_model(params, log_path=None):
                 makespan_records[p] = makespan_list[0]
                 #print(makespan_records)
                 df = pd.DataFrame(list(makespan_records.items()), columns=['Key', 'Value'])
-                df.to_csv("makespan_records_ta4.csv")
+                df.to_csv("makespan_records_ta195.csv")
 
                 print("DMU{}".format(problem_list[p - 1]), makespan_list[0], min_makespan, mean_makespan)
 
@@ -494,11 +495,11 @@ if __name__ == '__main__':
             int(os.environ.get("lr_decay_step", 500)),
         "layers": eval(str(os.environ.get("layers", '[196, 108]'))),
         "n_embedding":
-            int(os.environ.get("n_embedding", 40)),
+            int(os.environ.get("n_embedding", 42)),
         "n_hidden": int(os.environ.get("n_hidden", 96)),
-        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 108)),
+        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 92)),
         "n_multi_head": int(os.environ.get("n_multi_head", 3)),
-        "ex_embedding_size": int(os.environ.get("ex_embedding_size", 38)),
+        "ex_embedding_size": int(os.environ.get("ex_embedding_size", 42)),
         "k_hop": int(os.environ.get("k_hop", 1)),
         "is_lr_decay": True,
         "third_feature": 'first_and_second',  # first_and_second, first_only, second_only

@@ -42,12 +42,13 @@ def set_seed(seed):
 set_seed(30)  # 30 했었음
 opt_list = [1059, 888, 1005, 1005, 887, 1010, 397, 899, 934, 944]
 orb_list = []
-problem_number =  ['71','72',
-                   '61','62',
-                   '51','52','41','42','31'
-    ,'32','21','22']
+problem_number = ['21']
+# problem_number =  ['71','72',
+#                    '61','62',
+#                    '51','52','41','42','31'
+#     ,'32','21','22']
 for i in problem_number:
-    df = pd.read_excel("dmu.xlsx", sheet_name=i, engine='openpyxl')
+    df = pd.read_excel("ta.xlsx", sheet_name=i, engine='openpyxl')
     orb_data = list()  #
     for row, column in df.iterrows():
         job = []
@@ -137,15 +138,22 @@ def train_model(params, log_path=None):
     ave_cri_loss = 0.0
 
     act_model = PtrNet1(params).to(device)
+    #20801
+    checkpoint = torch.load(params["model_dir"] + '/ppo_w_third_feature/' + '0613_19_18_step20801_act.pt')
+    # checkpoint = torch.load(                            'output/' +
+    #                         '0710_22_54_step48101_act.pt')
+    # checkpoint = torch.load(params["model_dir"] +
+    #                         '/ppo_w_third_feature/' +
+    #                         '0710_22_54_step4701_act.pt')
+    #49201이 최고임
 
-    checkpoint = torch.load(params["model_dir"] +
-                            '/ppo_w_third_feature/' +
-                            '0710_22_54_step49201_act.pt')
 
     # 33401 별로임
     # 41601이 그나마 ㅈ좀더 나음
     # 18901 별로
     # 48801 괜찮음 / 벗 모자름
+    # 48701 괜찮음 / 벗 모자름
+    # 48301 모자름
     # 49201 현재까지 최고(BEST)
 
 
@@ -518,19 +526,17 @@ if __name__ == '__main__':
         "lr_critic": cfg.lr_critic,
 
         "reward_scaler": cfg.reward_scaler,
-        "beta": float(os.environ.get("beta", 0.7)),
+        "beta": float(os.environ.get("beta", 0.65)),
         "alpha": float(os.environ.get("alpha", 0.1)),
         "lr": float(os.environ.get("lr", 1.0e-3)),
-        "lr_decay": float(os.environ.get("lr_decay", 0.85)),
-        "lr_decay_step":
-            int(os.environ.get("lr_decay_step", 500)),
-        "layers": eval(str(os.environ.get("layers", '[196, 108]'))),
-        "n_embedding":
-            int(os.environ.get("n_embedding", 40)),
-        "n_hidden": int(os.environ.get("n_hidden", 96)),
-        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 108)),
+        "lr_decay": float(os.environ.get("lr_decay", 0.995)),
+        "lr_decay_step": int(os.environ.get("lr_decay_step", 1000)),
+        "layers": eval(str(os.environ.get("layers", '[256, 128]'))),
+        "n_embedding": int(os.environ.get("n_embedding", 36)),
+        "n_hidden": int(os.environ.get("n_hidden", 64)),
+        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 96)),
         "n_multi_head": int(os.environ.get("n_multi_head", 3)),
-        "ex_embedding_size": int(os.environ.get("ex_embedding_size", 38)),
+        "ex_embedding_size": int(os.environ.get("ex_embedding_size", 40)),
         "k_hop": int(os.environ.get("k_hop", 1)),
         "is_lr_decay": True,
         "third_feature": 'first_and_second',  # first_and_second, first_only, second_only
