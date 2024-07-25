@@ -135,8 +135,8 @@ def train_model(params, log_path=None):
 
     act_model = PtrNet1(params).to(device)
 
-    checkpoint = torch.load('temp/' +
-                            '0720_02_10_step48501_act.pt')
+    file_name = '0720_02_10_step48401'
+    checkpoint = torch.load('temp/' + '{}_act.pt'.format(file_name))
 
     # 33401 별로임
     # 41601이 그나마 ㅈ좀더 나음
@@ -236,7 +236,7 @@ def train_model(params, log_path=None):
                 makespan_records[p] = makespan_list[0]
                 #print(makespan_records)
                 df = pd.DataFrame(list(makespan_records.items()), columns=['Key', 'Value'])
-                df.to_csv("makespan_records_ta195.csv")
+                df.to_csv("makespan_records_ta25.csv")
 
                 print("DMU{}".format(problem_list[p - 1]), makespan_list[0], min_makespan, mean_makespan)
 
