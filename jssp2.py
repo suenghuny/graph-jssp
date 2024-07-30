@@ -147,6 +147,7 @@ class AdaptiveScheduler:
             k+=1
 
         self.total_processing_time_by_machine = [np.sum(p) for p in self.processing_time_by_machine]
+        # self.total_processing_time_by_job = [np.sum(p) for p in self.processing_time_by_machine]
         self.mask1 =  [[0 for _ in range(self.num_mc)] for _ in range(self.num_job)]
         self.mask2 =  [[1 for _ in range(self.num_mc)] for _ in range(self.num_job)]
         data = self.pt
