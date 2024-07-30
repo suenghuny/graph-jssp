@@ -205,9 +205,9 @@ def train_model(params, log_path=None):
 
                 print("TA{}".format(problem_list[p - 1]), min_makespan, mean_makespan)
                 empty_records[p - 1].append(mean_makespan)
-
-                if len(empty_records[1]) > 35 and np.mean(empty_records[1][-30:]) >= 3300:
-                    sys.exit()
+                #
+                # if len(empty_records[1]) > 35 and np.mean(empty_records[1][-30:]) >= 3300:
+                #     sys.exit()
 
                 if cfg.vessl == True:
                     vessl.log(step=s, payload={'minmakespan{}'.format(str(problem_list[p - 1])): min_makespan})
@@ -231,8 +231,8 @@ def train_model(params, log_path=None):
             """
             훈련용 데이터셋 생성하는 코드
             """
-            num_machine = np.random.randint(5, 11)
-            num_job = np.random.randint(num_machine, 11)
+            num_machine = np.random.randint(5, 10)
+            num_job = np.random.randint(num_machine, 10)
 
 
             jobs_datas, scheduler_list = generate_jssp_instance(num_jobs=num_job, num_machine=num_machine,

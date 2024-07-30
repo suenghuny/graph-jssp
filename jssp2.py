@@ -147,7 +147,8 @@ class AdaptiveScheduler:
             k+=1
 
         self.total_processing_time_by_machine = [np.sum(p) for p in self.processing_time_by_machine]
-        # self.total_processing_time_by_job = [np.sum(p) for p in self.processing_time_by_machine]
+        self.total_processing_time_by_job = [np.sum(p) for p in self.pt]
+        #print(self.total_processing_time_by_job)
         self.mask1 =  [[0 for _ in range(self.num_mc)] for _ in range(self.num_job)]
         self.mask2 =  [[1 for _ in range(self.num_mc)] for _ in range(self.num_job)]
         data = self.pt
@@ -189,6 +190,7 @@ class AdaptiveScheduler:
             # p_i^{t+1}=p_i^{t}+p_ij
 
             self.total_processing_time_by_machine[gen_m - 1]-=gen_t
+            self.total_processing_time_by_job[i] -= gen_t
             if self.m_count[gen_m] < self.j_count[i]:
                 self.m_count[gen_m] = self.j_count[i]
             elif self.m_count[gen_m] > self.j_count[i]:
@@ -240,6 +242,8 @@ class AdaptiveScheduler:
                 j_count = deepcopy(self.j_count)
                 m_count = deepcopy(self.m_count)
                 total_processing_time_by_machine = deepcopy(self.total_processing_time_by_machine)
+                total_processing_time_by_job = deepcopy(self.total_processing_time_by_job)
+
                 try:
                     gen_t = int(self.pt[j_prime][key_count[j_prime]])    # 선택된 operation에 대한 processing time 선택
                     gen_m = int(self.ms[j_prime][key_count[j_prime]])    # 선택된 operation에 대한 machine_sequence 선택
@@ -252,8 +256,10 @@ class AdaptiveScheduler:
                         j_count[j_prime] = m_count[gen_m]                # if 및 elif 문은 각각의 누적 작업 완료시간을 큰 녀석으로 업데이트 한다는 의미
 
                     total_processing_time_by_machine[gen_m - 1] -= gen_t
+                    total_processing_time_by_job[j_prime] -= gen_t
+                    #print(total_processing_time_by_job[j_prime], np.sum(self.pt[j_prime][key_count[j_prime] + 1:]))
 
-                    gen_t_cum = j_count[j_prime] + np.sum(self.pt[j_prime][key_count[j_prime]+1:])
+                    gen_t_cum = j_count[j_prime] + total_processing_time_by_job[j_prime]
 
                     gen_m_prime = int(self.ms[j_prime][key_count[j_prime]+1])
                     gen_m_cum = m_count[gen_m_prime]   + total_processing_time_by_machine[gen_m_prime - 1]
@@ -266,10 +272,14 @@ class AdaptiveScheduler:
                     if i != self.num_mc:
                         gen_m_prime = self.ms[j][key_count[j]]  # remain processing time (해당 machine의 남은 operation에 대한 processing time의 합)
 
-
+                        # if total_processing_time_by_job[j_prime] != np.sum(self.pt[j_prime][key_count[j_prime] :]):
+                        #     print(total_processing_time_by_job)
+                        #     print(gen_t)
+                        #     print(total_processing_time_by_job[j_prime],
+                        #           np.sum(self.pt[j_prime][key_count[j_prime]:]))
 
                         longest_path_list.append(np.max([m_count[gen_m_prime] + total_processing_time_by_machine[gen_m_prime-1],
-                                                         j_count[j]     + np.sum(self.pt[j][key_count[j]:])
+                                                         j_count[j]     + total_processing_time_by_job[j_prime]
                                                         ]))
                     else:
                         #longest_path_list.append(j_count[j]+ np.sum(self.pt[j][key_count[j]:]))
@@ -400,9 +410,14 @@ class AdaptiveScheduler:
             for ops in job:
                 self.job_id_ops.append(j)
             j+=1
+
         self.mask1 =  [[0 for _ in range(self.num_mc)] for _ in range(self.num_job)]
         self.mask2 =  [[1 for _ in range(self.num_mc)] for _ in range(self.num_job)]
-        data = self.pt
+        self.total_processing_time_by_machine = [np.sum(p) for p in self.processing_time_by_machine]
+        self.total_processing_time_by_job = [np.sum(p) for p in self.pt]
+
+
+
 
 
     def get_node_feature(self):
