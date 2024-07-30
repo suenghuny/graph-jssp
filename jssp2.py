@@ -396,7 +396,7 @@ class AdaptiveScheduler:
     def reset(self):
         self.num_mc = len(self.input_data[0])   # number of machines
         self.num_job = len(self.input_data)     # number of jobs
-        self.pt = [[ops[1] for ops in job] for job in self.input_data] # processing_time
+        self.pt = [[ops[1] for ops in job] for job in self.input_data]  # processing_time
         self.ms = [[ops[0]+1 for ops in job] for job in self.input_data] # job 별 machine sequence
         self.j_keys = [j for j in range(self.num_job)]
         self.key_count = {key: 0 for key in self.j_keys}
@@ -404,20 +404,26 @@ class AdaptiveScheduler:
         self.m_keys =  [j + 1 for j in range(self.num_mc)]
         self.m_count = {key: 0 for key in self.m_keys}
         self.num_ops = self.num_job*self.num_mc
-        self.job_id_ops = list()
-        j = 0
-        for job in self.input_data:
-            for ops in job:
-                self.job_id_ops.append(j)
-            j+=1
 
-        self.mask1 =  [[0 for _ in range(self.num_mc)] for _ in range(self.num_job)]
-        self.mask2 =  [[1 for _ in range(self.num_mc)] for _ in range(self.num_job)]
+
+        self.ops_by_job = dict()
+        k = 0
+        self.processing_time_by_machine = [[] for _ in range(len(self.input_data[0]))]
+        for j in range(len(self.input_data)):
+            job = self.input_data[j]
+            for ops in job:
+                machine = ops[0]
+                processing_time = ops[1]
+                self.processing_time_by_machine[machine].append(processing_time)
+                self.ops_by_job[k] = j
+            k+=1
+
         self.total_processing_time_by_machine = [np.sum(p) for p in self.processing_time_by_machine]
         self.total_processing_time_by_job = [np.sum(p) for p in self.pt]
-
-
-
+        #print(self.total_processing_time_by_job)
+        self.mask1 =  [[0 for _ in range(self.num_mc)] for _ in range(self.num_job)]
+        self.mask2 =  [[1 for _ in range(self.num_mc)] for _ in range(self.num_job)]
+        data = self.pt
 
 
     def get_node_feature(self):
