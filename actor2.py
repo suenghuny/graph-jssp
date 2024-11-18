@@ -312,6 +312,7 @@ class PtrNet1(nn.Module):
 
         h_pi_t_minus_one = self.v_1.unsqueeze(0).repeat(batch, 1).unsqueeze(0).to(device) # 이녀석이 s.o.s(start of singal)에 해당
         mask1_debug, mask2_debug = self.init_mask()
+
         batch_size = h_pi_t_minus_one.shape[1]
 
         if old_sequence != None:
@@ -319,6 +320,7 @@ class PtrNet1(nn.Module):
         next_operation_indices = list()
         lowerbound_records = [[],[]]
         for i in range(num_operations):
+            #print(mask2_debug[0][0])
             est_placeholder = mask1_debug.clone().to(device)
             fin_placeholder = mask2_debug.clone().to(device)
             mask1_debug = mask1_debug.reshape(batch_size, -1)
