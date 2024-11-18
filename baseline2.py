@@ -206,8 +206,8 @@ def train_model(params, log_path=None):
                 print("TA{}".format(problem_list[p - 1]), min_makespan, mean_makespan)
                 empty_records[p - 1].append(mean_makespan)
 
-                if len(empty_records[1]) > 35 and np.mean(empty_records[1][-30:]) >= 3300:
-                    sys.exit()
+                # if len(empty_records[1]) > 35 and np.mean(empty_records[1][-30:]) >= 3300:
+                #     sys.exit()
 
                 if cfg.vessl == True:
                     vessl.log(step=s, payload={'minmakespan{}'.format(str(problem_list[p - 1])): min_makespan})
