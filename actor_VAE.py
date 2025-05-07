@@ -10,77 +10,6 @@ from latent import LatentModel
 device = torch.device(cfg.device)
 
 
-def calculate_probabilities(records):
-    # records에서 첫번째 요소만 추출
-    from collections import Counter
-
-    # key값만 추출
-
-
-    keys = np.array(records).reshape(-1).tolist()
-
-    #print(keys)
-    # 각 key의 개수를 세기
-
-    counter = Counter(keys)
-
-    # 전체 데이터 수
-    total = len(keys)
-
-    # 각 key의 확률을 계산하여 딕셔너리로 저장
-    probabilities = {key: count / total for key, count in counter.items()}
-
-    return probabilities
-def calculate_p_v_given_l(lb_records, makespan):
-    """
-    lb_records: shape (100, 32) - 각 배치에 대한 l samples
-    makespan: shape (32,) - 각 배치의 makespan(v) 값
-    """
-    # numpy array로 변환
-    lb_records = np.array(lb_records)
-    makespan = np.array(makespan)
-
-    # 각 l 값에 대해
-    unique_l = np.unique(lb_records)
-
-
-
-    p_v_given_l = {}
-
-    for l in unique_l:
-        # 이 l이 선택된 배치들 찾기
-        l_mask = (lb_records == l)
-        makespan_copied = deepcopy(makespan).reshape(-1)
-        # 해당 배치들의 makespan 값
-
-        l_mask = np.transpose(l_mask, (1,0,2)).reshape(100,-1)
-        v_values = makespan_copied[np.any(l_mask, axis=0)]
-
-        if len(v_values) > 0:
-            # 이 l에서 나온 v들의 분포 계산
-            unique_v, counts = np.unique(v_values, return_counts=True)
-            probs = counts / len(v_values)
-            p_v_given_l[l] = dict(zip(unique_v, probs))
-
-    return p_v_given_l
-def calculate_entropy(sequence):
-    """
-    주어진 숫자 시퀀스의 엔트로피를 계산합니다.
-
-    Parameters:
-    sequence (list/array): 숫자들의 시퀀스
-
-    Returns:
-    float: 계산된 엔트로피 값
-    """
-    # 숫자들의 발생 빈도를 계산
-    values, counts = np.unique(sequence, return_counts=True)
-    probabilities = counts / len(sequence)
-
-    # 엔트로피 계산 (Shannon's entropy formula)
-    entropy = -np.mean(probabilities * np.log2(probabilities))
-
-    return entropy
 
 class Categorical(nn.Module):
     def __init__(self):
@@ -101,6 +30,22 @@ class ExEmbedding(nn.Module):
         x = self.fcn3(x)
         return x
 
+class Critic(nn.Module):
+    def __init__(self, z_size):
+        super().__init__()
+        self.fcn1 = nn.Linear(z_size, 128)
+        self.fcn2 = nn.Linear(128, 64)
+        self.fcn3 = nn.Linear(64, 32)
+        self.fcn4 = nn.Linear(32, 16)
+        self.fcn5 = nn.Linear(16, 1)
+    def forward(self, x):
+        x = F.elu(self.fcn1(x))
+        x = F.elu(self.fcn2(x))
+        x = F.elu(self.fcn3(x))
+        x = F.elu(self.fcn4(x))
+        x = self.fcn5(x)
+        return x
+
 
 class PtrNet1(nn.Module):
     def __init__(self, params):
@@ -112,7 +57,9 @@ class PtrNet1(nn.Module):
         self.k_hop = params["k_hop"]
 
         num_edge_cat = 3
-        self.Latent = LatentModel(params)
+        z_dim = 128
+        self.critic = Critic(128)
+        self.Latent = LatentModel(z_dim=z_dim, params = params).to(device)
         self.GraphEmbedding = GCRN(feature_size =  params["n_hidden"],
                                    graph_embedding_size= params["graph_embedding_size"],
                                    embedding_size =  params["n_hidden"],
@@ -315,7 +262,7 @@ class PtrNet1(nn.Module):
         return mask, copied_mask, copied_mask2
 
 ####
-    def forward(self, x, device, scheduler_list, num_job, num_machine, upperbound= None, old_sequence = None):
+    def forward(self, x, device, scheduler_list, num_job, num_machine, upperbound= None, old_sequence = None, train = True):
 
         node_features, heterogeneous_edges = x
         node_features = torch.tensor(node_features).to(device).float()
@@ -328,8 +275,11 @@ class PtrNet1(nn.Module):
         sample_space = torch.tensor(sample_space).view(-1)
 
 
-        h_bar, h_emb, embed, batch, num_operations = self.encoder(node_features, heterogeneous_edges)
+        edge_loss, node_loss, loss_kld, mean_feature, features, z = self.Latent.calculate_loss(node_features, heterogeneous_edges, train)
+        baselines = self.critic(z)
 
+        batch = features.shape[0]
+        num_operations = features.shape[1]
         """
         이 위에 까지가 Encoder
         이 아래 부터는 Decoder
@@ -368,6 +318,7 @@ class PtrNet1(nn.Module):
 
                 for nb in range(batch_size):
                     c_max, est, fin, critical_path, critical_path2 = scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb])
+                    #print(empty_zero.shape, critical_path.shape)
                     empty_zero[nb, :] = torch.tensor(critical_path.reshape(-1)).to(device)# 안중요
                     empty_zero2[nb, :] = torch.tensor(critical_path2.reshape(-1)).to(device)  # 안중요
                     est_placeholder[nb] = est
@@ -409,10 +360,10 @@ class PtrNet1(nn.Module):
             r_temp = r_temp.reshape(batch_size * num_operations, -1)
             ex_embedding = self.ex_embedding(r_temp)
             ex_embedding = ex_embedding.reshape(batch_size, num_operations, -1)
-            ref = torch.concat([h_bar, ex_embedding], dim=2)
+            ref = torch.concat([features, ex_embedding], dim=2)
 
 
-            h_c = self.decoder(h_emb, h_pi_t_minus_one) # decoding 만드는 부분
+            h_c = self.decoder(mean_feature.reshape(1, batch_size, -1), h_pi_t_minus_one.reshape(1, batch_size, -1)) # decoding 만드는 부분
             query = h_c.squeeze(0)
             """
             Query를 만들때에는 이전 단계의 query와 extended node embedding을 가지고 만든다
@@ -439,7 +390,13 @@ class PtrNet1(nn.Module):
             sample_space = sample_space.to(device)
             next_job = sample_space[next_operation_index].to(device)
             mask1_debug, mask2_debug = self.update_mask(next_job.tolist()) # update masking을 수행해주는
-            h_pi_t_minus_one = torch.gather(input=h_bar, dim=1, index=next_operation_index.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, embed)).squeeze(1).unsqueeze(0)  # 다음 sequence의 input은 encoder의 output 중에서 현재 sequence에 해당하는 embedding이 된다.
+
+            batch_indices = torch.arange(features.size(0))
+            h_pi_t_minus_one = features[batch_indices, next_operation_index]
+
+
+
+            #h_pi_t_minus_one = torch.gather(input=features, dim=1, index=next_operation_index.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, mean_feature.shape[2])).squeeze(1).unsqueeze(0)  # 다음 sequence의 input은 encoder의 output 중에서 현재 sequence에 해당하는 embedding이 된다.
             next_operation_indices.append(next_operation_index.tolist())
             pi_list.append(next_job)
 
@@ -449,7 +406,7 @@ class PtrNet1(nn.Module):
         log_probabilities = torch.stack(log_probabilities, dim=1)
         ll = log_probabilities.sum(dim=1)    # 각 solution element의 log probability를 더하는 방식
 
-        return pi, ll, next_operation_indices#, lowerbound_records
+        return pi, ll, next_operation_indices, edge_loss, node_loss, loss_kld, baselines
 
     def glimpse(self, query, ref, mask0):
         """

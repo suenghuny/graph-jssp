@@ -1,6 +1,8 @@
 import pandas as pd
 import torch
+#torch.autograd.set_detect_anomaly(True)
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
 import os
@@ -9,7 +11,7 @@ import sys
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 from time import time
 from datetime import datetime
-from actor2 import PtrNet1
+from actor_VAE2 import PtrNet1
 from jssp2 import AdaptiveScheduler
 from cfg import get_cfg
 import random
@@ -38,18 +40,17 @@ def set_seed(seed):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-# Example usage:
 
+# Example usage:
+set_seed(int(os.environ.get("seed", 30)))  # 30 했었음
 opt_list = [1059, 888, 1005, 1005, 887, 1010, 397, 899, 934, 944]
 orb_list = []
-problem_number =  [str(i+1) for i in range(80)]
-for i in problem_number:
-    df = pd.read_excel("ta_structured (1).xlsx", sheet_name=i, engine='openpyxl')
+for i in ["21", "22"]:
+    df = pd.read_excel("ta.xlsx", sheet_name=i, engine='openpyxl')
     orb_data = list()  #
     for row, column in df.iterrows():
         job = []
         for j in range(0, len(column.tolist()), 2):
-            #print(i, j, (column.tolist()[j], column.tolist()[j + 1]))
             element = (column.tolist()[j], column.tolist()[j + 1])
             job.append(element)
         orb_data.append(job)
@@ -102,23 +103,19 @@ def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=Non
     heterogeneous_edges = (edge_precedence, edge_antiprecedence, edge_machine_sharing)
     heterogeneous_edges = [heterogeneous_edges for _ in range(eval_number)]
     input_data = (node_feature, heterogeneous_edges)
-    pred_seq, ll_old, _ = act_model(input_data,
+    pred_seq, ll_old, _, _, _, _, _ = act_model(input_data,
                                     device,
                                     scheduler_list=scheduler_list_val,
                                     num_machine=num_machine,
                                     num_job=num_job,
-                                    upperbound=upperbound)
-    makespan_list = list()
-    j = 0
+                                    upperbound=upperbound,
+                                    train = False)
     for sequence in pred_seq:
         scheduler = AdaptiveScheduler(orb_list[p - 1])
         makespan = scheduler.run(sequence.tolist())
         val_makespan.append(makespan)
-        makespan_list.append(makespan)
-        print(j, makespan)
-        j+=1
     # print("크크크", val_makespan)
-    return np.min(val_makespan), np.mean(val_makespan), makespan_list
+    return np.min(val_makespan), np.mean(val_makespan)
 
 
 def train_model(params, log_path=None):
@@ -135,58 +132,15 @@ def train_model(params, log_path=None):
 
     act_model = PtrNet1(params).to(device)
 
-    file_name = '0720_02_10_step48401'
-    checkpoint = torch.load('temp/' + '{}_act.pt'.format(file_name))
-
-    # 33401 별로임
-    # 41601이 그나마 ㅈ좀더 나음
-    # 18901 별로
-    # 48801 괜찮음 / 벗 모자름
-    # 49201 현재까지 최고(BEST) / 실험 177 # 경로 : params["model_dir"] +
-    #                             '/ppo_w_third_feature/' +
-    #                             '0710_22_54_step49201_act.pt'
-
-
-    # 26901 <
-    # 21901 현재까지 베스트
-
-
-    # 0713_20_37 new 17101 O
-    # 17201 <
-    # 16901 X
-    # 16801 X
-    # 23101 X
-    # 26501 O 31501
-    # 29501 괜찮음
-    # 29201 O
-    # 40401 ㅒ
-    # 39501 X
-    # 42401 <
-    # 48401 <
-
-
-    # New27801 O
-    # 42301 X
-    # 42201 >
-    # 48201 >
-    # 48101 X
-    # 48401 X
-    # 49401 >
-    # 49701 >
-    # 49201 >
-
-    #checkpoint = torch.load(params["model_dir"] + '/ppo_w_third_feature/' + '0613_19_18_step20801_act.pt')
-    #20001도 괘아늠
-    #20751도 괘아늠
-    #20251 괘아늠
-    #20651 별로
-
-    act_model.load_state_dict(checkpoint['model_state_dict_actor'])
-
     baseline_model = PtrNet1(params).to(device)  # baseline_model 불필요
     baseline_model.load_state_dict(act_model.state_dict())  # baseline_model 불필요
     if params["optimizer"] == 'Adam':
-        act_optim = optim.Adam(act_model.parameters(), lr=params["lr"])
+        latent_optim = optim.Adam(act_model.Latent.parameters(), lr=params["lr"])
+        act_optim = optim.Adam(act_model.all_attention_params, lr=params["lr"])
+        cri_optim = optim.Adam(act_model.critic.parameters(), lr=1e-3)
+        act_lr_scheduler = optim.lr_scheduler.StepLR(act_optim, step_size=params["lr_decay_step"], gamma=params["lr_decay"])
+        latent_lr_scheduler = optim.lr_scheduler.StepLR(latent_optim, step_size=params["lr_decay_step"],
+                                                     gamma=params["lr_decay"])
         """
         act_model이라는 신경망 뭉치에 파라미터(가중치, 편향)을 업데이트 할꺼야.
 
@@ -194,19 +148,19 @@ def train_model(params, log_path=None):
 
     elif params["optimizer"] == "RMSProp":
         act_optim = optim.RMSprop(act_model.parameters(), lr=params["lr"])
-    if params["is_lr_decay"]:
-        act_lr_scheduler = optim.lr_scheduler.StepLR(act_optim, step_size=params["lr_decay_step"],
-                                                     gamma=params["lr_decay"])
+    # if params["is_lr_decay"]:
+    #     act_lr_scheduler = optim.lr_scheduler.StepLR(act_optim, step_size=params["lr_decay_step"],
+    #                                                  gamma=params["lr_decay"])
 
     t1 = time()
     ave_makespan = 0
 
     c_max = list()
     b = 0
-    problem_list = [i+1 for i in range(80)]
+    problem_list = [1, 2]
     validation_records_min = [[] for _ in problem_list]
     validation_records_mean = [[] for _ in problem_list]
-
+    empty_records = [[], []]
     for s in range(epoch + 1, params["step"]):
 
         """
@@ -219,27 +173,24 @@ def train_model(params, log_path=None):
         b += 1
 
         if s % 100 == 1:  # Evaluation 수행
-            makespan_records = dict()
             for p in problem_list:
                 min_makespan = heuristic_eval(p)
-                eval_number = 2
-                set_seed(50)  # 30 했었음
+                eval_number = 5
                 with torch.no_grad():
                     min_makespan_list = [min_makespan] * eval_number
-                    min_makespan1, mean_makespan1, makespan_list1 = evaluation(act_model, baseline_model, p, eval_number, device, upperbound=min_makespan_list)
+                    min_makespan1, mean_makespan1 = evaluation(act_model, baseline_model, p, eval_number, device,
+                                                               upperbound=min_makespan_list)
 
-                min_makespan = np.min([min_makespan1])
+
+
+                min_makespan = min_makespan1
                 mean_makespan = mean_makespan1
-                makespan_list = [makespan for makespan in makespan_list1]
-                name = problem_number[p-1]
-                j = 0
-                makespan_records[p] = makespan_list[0]
-                #print(makespan_records)
-                df = pd.DataFrame(list(makespan_records.items()), columns=['Key', 'Value'])
-                df.to_csv("makespan_records_ta25.csv")
 
-                print("DMU{}".format(problem_list[p - 1]), makespan_list[0], min_makespan, mean_makespan)
-
+                print("TA{}".format(problem_list[p - 1]), min_makespan, mean_makespan)
+                empty_records[p - 1].append(mean_makespan)
+                #
+                # if len(empty_records[1]) > 35 and np.mean(empty_records[1][-30:]) >= 3300:
+                #     sys.exit()
 
                 if cfg.vessl == True:
                     vessl.log(step=s, payload={'minmakespan{}'.format(str(problem_list[p - 1])): min_makespan})
@@ -253,8 +204,13 @@ def train_model(params, log_path=None):
                     mean_m = mean_m.transpose()
                     min_m.columns = problem_list
                     mean_m.columns = problem_list
-                    #min_m.to_csv('min_makespan_w_third_feature2.csv')
-                    #mean_m.to_csv('mean_makespan_w_third_feature2.csv')
+
+                    if params['w_representation_learning'] == True:
+                        min_m.to_csv('min_makespan_w_third_feature_w_rep+alpha.csv'.format())
+                        mean_m.to_csv('mean_makespan_w_third_feature_w_rep+alpha.csv')
+                    else:
+                        min_m.to_csv('min_makespan_w_third_feature_wo_rep.csv'.format())
+                        mean_m.to_csv('mean_makespan_w_third_feature_wo_rep.csv')
 
         act_model.block_indices = []
         baseline_model.block_indices = []
@@ -263,10 +219,16 @@ def train_model(params, log_path=None):
             """
             훈련용 데이터셋 생성하는 코드
             """
-            num_job = np.random.randint(5, 10)
-            num_machine = np.random.randint(num_job, 10)
+            num_machine = np.random.randint(5, 10)
+            num_job = np.random.randint(num_machine, 10)
+
+
             jobs_datas, scheduler_list = generate_jssp_instance(num_jobs=num_job, num_machine=num_machine,
                                                                 batch_size=params['batch_size'])
+            act_model.Latent.current_num_edges = num_machine*num_job
+
+            # print(jobs_datas)
+            # print("======================")
             makespan_list_for_upperbound = list()
             for scheduler in scheduler_list:
                 c_max_heu = scheduler.heuristic_run()
@@ -291,6 +253,7 @@ def train_model(params, log_path=None):
             """
 
             scheduler = AdaptiveScheduler(jobs_datas[n])
+
             node_feature = scheduler.get_node_feature()
             node_features.append(node_feature)
             edge_precedence = scheduler.get_edge_index_precedence()
@@ -301,14 +264,14 @@ def train_model(params, log_path=None):
         input_data = (node_features, heterogeneous_edges)
         act_model.train()
         if cfg.algo == 'reinforce':
-            pred_seq, ll_old, _ = act_model(input_data,
+
+            pred_seq, ll_old, _, edge_loss, node_loss, loss_kld, baselines = act_model(input_data,
                                             device,
                                             scheduler_list=scheduler_list,
                                             num_machine=num_machine,
                                             num_job=num_job,
                                             upperbound=makespan_list_for_upperbound
                                             )
-
             real_makespan = list()
             for n in range(pred_seq.shape[0]):  # act_model(agent)가 산출한 해를 평가하는 부분
                 sequence = pred_seq[n]
@@ -320,21 +283,24 @@ def train_model(params, log_path=None):
             """
             vanila actor critic
             """
-            beta = params['beta']
-            if baseline_reset == False:
-                if s == 1:
-                    be = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)  # baseline을 구하는 부분
-                else:
-                    be = beta * be + (1 - beta) * torch.tensor(real_makespan).to(device)
-            else:
-                if s % cfg.gen_step == 1:
-                    be = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)  # baseline을 구하는 부분
-                else:
-                    be = beta * be + (1 - beta) * torch.tensor(real_makespan).unsqueeze(1).to(device)
+            # beta = params['beta']
+            # if baseline_reset == False:
+            #     if s == 1:
+            #         be = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)  # baseline을 구하는 부분
+            #     else:
+            #         be = beta * be + (1 - beta) * torch.tensor(real_makespan).unsqueeze(1).to(device)
+            # else:
+            #     if s % cfg.gen_step == 1:
+            #         be = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)  # baseline을 구하는 부분
+            #     else:
+            #         be = beta * be + (1 - beta) * torch.tensor(real_makespan).unsqueeze(1).to(device)
             ####
 
-            act_optim.zero_grad()
-            adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - be  # baseline(advantage) 구하는 부분
+
+
+            adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - baselines  # baseline(advantage) 구하는 부분
+            cri_loss = F.mse_loss(torch.tensor(real_makespan).to(device), baselines.squeeze(1))
+            #print(torch.tensor(real_makespan).detach().unsqueeze(1).to(device).shape, baselines.shape, ll_old.shape)
             """
 
             1. Loss 구하기
@@ -342,70 +308,47 @@ def train_model(params, log_path=None):
             3. Update 하기(act_optim.step)
 
             """
-            act_loss = -(ll_old * adv).mean()  # loss 구하는 부분 /  ll_old의 의미 log_theta (pi | s)
-            act_loss.backward()
-            nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 10)),
-                                     norm_type=2)
-            act_optim.step()
-        if cfg.algo == 'ppo':
-            pred_seq, ll_old, old_sequence = act_model(input_data,
-                                                       device,
-                                                       scheduler_list=scheduler_list,
-                                                       num_machine=num_machine,
-                                                       num_job=num_job,
-                                                       upperbound=makespan_list_for_upperbound
-                                                       )
+            latent_loss = edge_loss+node_loss+loss_kld
+            act_loss = -(ll_old * adv.detach()).mean()  # loss 구하는 부분 /  ll_old의 의미 log_theta (pi | s)
 
-            real_makespan = list()
-            for n in range(pred_seq.shape[0]):  # act_model(agent)가 산출한 해를 평가하는 부분
-                sequence = pred_seq[n]
-                scheduler = AdaptiveScheduler(jobs_datas[n])
-                makespan = -scheduler.run(sequence.tolist()) / params['reward_scaler']
-                real_makespan.append(makespan)
-                c_max.append(makespan)
-            ave_makespan += sum(real_makespan) / (params["batch_size"] * params["log_step"])
-            """
-
-            vanila actor critic
-
-            """
-            beta = params['beta']
-            if baseline_reset == False:
-                if s == 1:
-                    be = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)  # baseline을 구하는 부분
-                else:
-                    be = beta * be + (1 - beta) * torch.tensor(real_makespan).to(device)
+            if params['w_representation_learning'] == True:
+                total_loss = latent_loss + act_loss + cri_loss
             else:
-                if s % cfg.gen_step == 1:
-                    be = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)  # baseline을 구하는 부분
-                else:
-                    be = beta * be + (1 - beta) * torch.tensor(real_makespan).unsqueeze(1).to(device)
-            ####
-            for i in range(params['k_epoch']):
-                for scheduler in scheduler_list:
-                    scheduler.reset()
-                _, ll_new, _ = act_model(input_data,
-                                         device,
-                                         scheduler_list=scheduler_list,
-                                         num_machine=num_machine,
-                                         num_job=num_job,
-                                         upperbound=makespan_list_for_upperbound,
-                                         old_sequence=old_sequence
-                                         )
+                total_loss = act_loss + cri_loss
+            latent_optim.zero_grad()
+            act_optim.zero_grad()
+            cri_optim.zero_grad()
+            total_loss.backward()
 
-                ratio = torch.exp(ll_new - ll_old.detach()).unsqueeze(-1)
-                adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - be  # baseline(advantage) 구하는 부분
+            # 그 후 각 옵티마이저 단계 실행
+            latent_optim.step()
+            act_optim.step()
+            cri_optim.step()
 
-                surr1 = ratio * adv
-                surr2 = torch.clamp(ratio, 1 - params["epsilon"], 1 + params["epsilon"]) * adv
-                act_loss = -torch.min(surr1, surr2).mean()
-                act_optim.zero_grad()
-                act_loss.backward()
-                nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 10)),
-                                         norm_type=2)
-                act_optim.step()
+            act_lr_scheduler.step()
 
-        if act_lr_scheduler.get_last_lr()[0] >= 1e-4:
+            #latent_lr_scheduler.step()
+
+            # latent_optim = optim.Adam(act_model.Latent.parameters(), lr=params["lr"])
+            # act_optim = optim.Adam(act_model.all_attention_params, lr=params["lr"])
+            # cri_optim = optim.Adam(act_model.critic.parameters(), lr=1e-3)
+
+            nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 10)), norm_type=2)
+            nn.utils.clip_grad_norm_(act_model.all_attention_params, max_norm=float(os.environ.get("grad_clip", 10)),
+                                     norm_type=2)
+            nn.utils.clip_grad_norm_(act_model.critic.parameters(), max_norm=float(os.environ.get("grad_clip", 10)),
+                                     norm_type=2)
+            # nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 1)),
+            #                          norm_type=2)
+
+
+
+
+            # cri_optim.step()
+
+
+        if act_lr_scheduler.get_last_lr()[0] >= \
+                float(os.environ.get("lr_decay_min", 5.0e-4)):
             if params["is_lr_decay"]:
                 act_lr_scheduler.step()
         ave_act_loss += act_loss.item()
@@ -430,7 +373,7 @@ def train_model(params, log_path=None):
             t1 = time()
 
         if s % params["save_step"] == 1:
-            if vessl == False:
+            if cfg.vessl == False:
                 torch.save({'epoch': s,
                             'model_state_dict_actor': act_model.state_dict(),
                             'optimizer_state_dict_actor': act_optim.state_dict(),
@@ -487,26 +430,25 @@ if __name__ == '__main__':
         "lr_critic": cfg.lr_critic,
 
         "reward_scaler": cfg.reward_scaler,
-        "beta": float(os.environ.get("beta", 0.7)),
-        "alpha": float(os.environ.get("alpha", 0.1)),
+        "beta": float(os.environ.get("beta", 0.65)),
+        "alpha": float(os.environ.get("alpha", 0.05)),
         "lr": float(os.environ.get("lr", 1.0e-3)),
-        "lr_decay": float(os.environ.get("lr_decay", 0.85)),
-        "lr_decay_step":
-            int(os.environ.get("lr_decay_step", 500)),
-        "layers": eval(str(os.environ.get("layers", '[196, 108]'))),
-        "n_embedding":
-            int(os.environ.get("n_embedding", 42)),
-        "n_hidden": int(os.environ.get("n_hidden", 96)),
-        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 92)),
-        "n_multi_head": int(os.environ.get("n_multi_head", 3)),
-        "ex_embedding_size": int(os.environ.get("ex_embedding_size", 42)),
+        "lr_decay": float(os.environ.get("lr_decay", 0.95)),
+        "lr_decay_step": int(os.environ.get("lr_decay_step",500)),
+        "layers": eval(str(os.environ.get("layers", '[196, 84]'))),
+        "n_embedding": int(os.environ.get("n_embedding", 48)),
+        "n_hidden": int(os.environ.get("n_hidden", 72)),
+        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 96)),
+        "n_multi_head": int(os.environ.get("n_multi_head", 1)),
+        "ex_embedding_size": int(os.environ.get("ex_embedding_size",42)),
         "k_hop": int(os.environ.get("k_hop", 1)),
         "is_lr_decay": True,
         "third_feature": 'first_and_second',  # first_and_second, first_only, second_only
         "baseline_reset": True,
         "ex_embedding": True,
+        "w_representation_learning": True,
         "k_epoch": int(os.environ.get("k_epoch", 2)),
 
     }
 
-    train_model(params)  #
+    train_model(params)

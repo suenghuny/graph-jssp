@@ -1,6 +1,8 @@
 import pandas as pd
 import torch
+#torch.autograd.set_detect_anomaly(True)
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
 import os
@@ -9,10 +11,11 @@ import sys
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 from time import time
 from datetime import datetime
-from actor2 import PtrNet1
+from actor_VAE3 import PtrNet1
 from jssp2 import AdaptiveScheduler
 from cfg import get_cfg
 import random
+from utils import *
 
 cfg = get_cfg()
 baseline_reset = cfg.baseline_reset
@@ -56,30 +59,27 @@ for i in ["21", "22"]:
 
 
 def generate_jssp_instance(num_jobs, num_machine, batch_size):
+    temp = []
+    for job in range(num_jobs):
+        machine_sequence = list(range(num_machine))
+        np.random.shuffle(machine_sequence)
+        empty = list()
+        for ops in range(num_machine):
+            empty.append((machine_sequence[ops], np.random.randint(1, 100)))
+        temp.append(empty)
     jobs_datas = []
     for _ in range(batch_size):
-        temp = []
-        for job in range(num_jobs):
-            machine_sequence = list(range(num_machine))
-            np.random.shuffle(machine_sequence)
-            empty = list()
-            for ops in range(num_machine):
-                empty.append((machine_sequence[ops], np.random.randint(1, 100)))
-            temp.append(empty)
         jobs_datas.append(temp)
+
     scheduler_list = list()
     for n in range(len(jobs_datas)):
         scheduler_list.append(AdaptiveScheduler(jobs_datas[n]))
     return jobs_datas, scheduler_list
 
 
-def heuristic_eval(p):  # 불필요(현재로써는)
-    scheduler = AdaptiveScheduler(orb_list[p - 1])
-    makespan_heu = scheduler.heuristic_run()
-    return makespan_heu
 
 
-def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=None):
+def evaluation(act_model, baseline_model, p, eval_number, device):
     scheduler_list_val = [AdaptiveScheduler(orb_list[p - 1]) for _ in range(eval_number)]
     val_makespan = list()
     act_model.get_jssp_instance(scheduler_list_val)
@@ -101,12 +101,12 @@ def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=Non
     heterogeneous_edges = (edge_precedence, edge_antiprecedence, edge_machine_sharing)
     heterogeneous_edges = [heterogeneous_edges for _ in range(eval_number)]
     input_data = (node_feature, heterogeneous_edges)
-    pred_seq, ll_old, _ = act_model(input_data,
+    pred_seq, ll_old, _, _, _, _, _ = act_model(input_data,
                                     device,
                                     scheduler_list=scheduler_list_val,
                                     num_machine=num_machine,
                                     num_job=num_job,
-                                    upperbound=upperbound)
+                                    train = False)
     for sequence in pred_seq:
         scheduler = AdaptiveScheduler(orb_list[p - 1])
         makespan = scheduler.run(sequence.tolist())
@@ -132,7 +132,12 @@ def train_model(params, log_path=None):
     baseline_model = PtrNet1(params).to(device)  # baseline_model 불필요
     baseline_model.load_state_dict(act_model.state_dict())  # baseline_model 불필요
     if params["optimizer"] == 'Adam':
-        act_optim = optim.Adam(act_model.parameters(), lr=params["lr"])
+        latent_optim = optim.Adam(act_model.Latent.parameters(), lr=params["lr"])
+        act_optim = optim.Adam(act_model.all_attention_params, lr=params["lr"])
+        cri_optim = optim.Adam(act_model.critic.parameters(), lr=1e-3)
+        act_lr_scheduler = optim.lr_scheduler.StepLR(act_optim, step_size=params["lr_decay_step"], gamma=params["lr_decay"])
+        latent_lr_scheduler = optim.lr_scheduler.StepLR(latent_optim, step_size=params["lr_decay_step"],
+                                                     gamma=params["lr_decay"])
         """
         act_model이라는 신경망 뭉치에 파라미터(가중치, 편향)을 업데이트 할꺼야.
 
@@ -140,9 +145,9 @@ def train_model(params, log_path=None):
 
     elif params["optimizer"] == "RMSProp":
         act_optim = optim.RMSprop(act_model.parameters(), lr=params["lr"])
-    if params["is_lr_decay"]:
-        act_lr_scheduler = optim.lr_scheduler.StepLR(act_optim, step_size=params["lr_decay_step"],
-                                                     gamma=params["lr_decay"])
+    # if params["is_lr_decay"]:
+    #     act_lr_scheduler = optim.lr_scheduler.StepLR(act_optim, step_size=params["lr_decay_step"],
+    #                                                  gamma=params["lr_decay"])
 
     t1 = time()
     ave_makespan = 0
@@ -166,12 +171,9 @@ def train_model(params, log_path=None):
 
         if s % 100 == 1:  # Evaluation 수행
             for p in problem_list:
-                min_makespan = heuristic_eval(p)
-                eval_number = 5
+                eval_number = 2
                 with torch.no_grad():
-                    min_makespan_list = [min_makespan] * eval_number
-                    min_makespan1, mean_makespan1 = evaluation(act_model, baseline_model, p, eval_number, device,
-                                                               upperbound=min_makespan_list)
+                    min_makespan1, mean_makespan1 = evaluation(act_model, baseline_model, p, eval_number, device)
 
 
 
@@ -201,23 +203,21 @@ def train_model(params, log_path=None):
 
         act_model.block_indices = []
         baseline_model.block_indices = []
+        job_range = [5, 10]
+        machine_range = [5, 10]
+        buffer = Replay_Buffer(buffer_size = 20000, batch_size = 30, job_range = job_range, machine_range = machine_range)
+
 
         if s % cfg.gen_step == 1:  # 훈련용 Data Instance 새롭게 생성 (gen_step 마다 생성)
             """
             훈련용 데이터셋 생성하는 코드
             """
-            num_machine = np.random.randint(5, 10)
-            num_job = np.random.randint(num_machine, 10)
-
-
+            num_machine = np.random.randint(job_range[0], job_range[1])
+            num_job = np.random.randint(num_machine, machine_range[1])
             jobs_datas, scheduler_list = generate_jssp_instance(num_jobs=num_job, num_machine=num_machine,
                                                                 batch_size=params['batch_size'])
-            # print(jobs_datas)
-            # print("======================")
-            makespan_list_for_upperbound = list()
+            act_model.Latent.current_num_edges = num_machine*num_job
             for scheduler in scheduler_list:
-                c_max_heu = scheduler.heuristic_run()
-                makespan_list_for_upperbound.append(c_max_heu)
                 scheduler.reset()
         else:
             for scheduler in scheduler_list:
@@ -226,63 +226,86 @@ def train_model(params, log_path=None):
 
         """
         act_model.get_jssp_instance(scheduler_list)  # 훈련해야할 instance를 에이전트가 참조(등록)하는 코드
+
+        act_model.eval()
+
+        scheduler = AdaptiveScheduler(jobs_datas[0])
+        node_feature = scheduler.get_node_feature()
+        node_features.append(node_feature)
+        edge_precedence = scheduler.get_edge_index_precedence()
+        edge_antiprecedence = scheduler.get_edge_index_antiprecedence()
+        edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
         heterogeneous_edges = list()
         node_features = list()
-
         for n in range(params['batch_size']):
             """
             Instance를 명세하는 부분
             - Node feature: Operation의 다섯개 feature
             - Edge: 
-
             """
-
-            scheduler = AdaptiveScheduler(jobs_datas[n])
-
-            node_feature = scheduler.get_node_feature()
-            node_features.append(node_feature)
-            edge_precedence = scheduler.get_edge_index_precedence()
-            edge_antiprecedence = scheduler.get_edge_index_antiprecedence()
-            edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
             heterogeneous_edge = (edge_precedence, edge_antiprecedence, edge_machine_sharing)  # 세종류의 엑지들을 하나의 변수로 참조시킴
             heterogeneous_edges.append(heterogeneous_edge)
         input_data = (node_features, heterogeneous_edges)
         act_model.train()
         if cfg.algo == 'reinforce':
 
-            pred_seq, ll_old, _ = act_model(input_data,
+            pred_seq, ll_old, _, edge_loss, node_loss, loss_kld, baselines = act_model(input_data,
                                             device,
                                             scheduler_list=scheduler_list,
                                             num_machine=num_machine,
-                                            num_job=num_job,
-                                            upperbound=makespan_list_for_upperbound
+                                            num_job=num_job
                                             )
+
             real_makespan = list()
-            for n in range(pred_seq.shape[0]):  # act_model(agent)가 산출한 해를 평가하는 부분
+            for n in range(params['batch_size']):  # act_model(agent)가 산출한 해를 평가하는 부분
                 sequence = pred_seq[n]
                 scheduler = AdaptiveScheduler(jobs_datas[n])
                 makespan = -scheduler.run(sequence.tolist()) / params['reward_scaler']
                 real_makespan.append(makespan)
                 c_max.append(makespan)
+                buffer.memory(jobs_datas[n], pred_seq[n].detach().numpy(), ll_old[n].detach().numpy(), makespan, num_job, num_machine)
+
+
             ave_makespan += sum(real_makespan) / (params["batch_size"] * params["log_step"])
             """
-            vanila actor critic
+            soft actor critic
+            
             """
-            beta = params['beta']
-            if baseline_reset == False:
-                if s == 1:
-                    be = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)  # baseline을 구하는 부분
-                else:
-                    be = beta * be + (1 - beta) * torch.tensor(real_makespan).unsqueeze(1).to(device)
-            else:
-                if s % cfg.gen_step == 1:
-                    be = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)  # baseline을 구하는 부분
-                else:
-                    be = beta * be + (1 - beta) * torch.tensor(real_makespan).unsqueeze(1).to(device)
-            ####
 
-            act_optim.zero_grad()
-            adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - be  # baseline(advantage) 구하는 부분
+            sampled_jobs_datas, action_sequences, pi_olds, makespan = buffer.sample()
+            sampled_scheduler_list = list()
+            for n in range(len(sampled_jobs_datas)):
+                sampled_scheduler_list.append(AdaptiveScheduler(sampled_jobs_datas[n]))
+
+            act_model.get_jssp_instance(sampled_scheduler_list)  # 훈련해야할 instance를 에이전트가 참조(등록)하는 코드
+            heterogeneous_edges = list()
+            node_features = list()
+
+            for n in range(params['batch_size']):
+                """
+
+                Instance를 명세하는 부분
+                - Node feature: Operation의 다섯개 feature
+                - Edge: 
+
+                """
+
+                scheduler = AdaptiveScheduler(jobs_datas[n])
+                node_feature = scheduler.get_node_feature()
+                node_features.append(node_feature)
+                edge_precedence = scheduler.get_edge_index_precedence()
+                edge_antiprecedence = scheduler.get_edge_index_antiprecedence()
+                edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
+                heterogeneous_edge = (
+                edge_precedence, edge_antiprecedence, edge_machine_sharing)  # 세종류의 엑지들을 하나의 변수로 참조시킴
+                heterogeneous_edges.append(heterogeneous_edge)
+            input_data = (node_features, heterogeneous_edges)
+
+
+
+            adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - baselines  # baseline(advantage) 구하는 부분
+            cri_loss = F.mse_loss(torch.tensor(real_makespan).to(device), baselines.squeeze(1))
+            #print(torch.tensor(real_makespan).detach().unsqueeze(1).to(device).shape, baselines.shape, ll_old.shape)
             """
 
             1. Loss 구하기
@@ -290,74 +313,36 @@ def train_model(params, log_path=None):
             3. Update 하기(act_optim.step)
 
             """
-            act_loss = -(ll_old * adv).mean()  # loss 구하는 부분 /  ll_old의 의미 log_theta (pi | s)
-            act_loss.backward()
-            nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 1)), norm_type=2)
+            latent_loss = edge_loss+node_loss+loss_kld
+            act_loss = -(ll_old * adv.detach()).mean()  # loss 구하는 부분 /  ll_old의 의미 log_theta (pi | s)
+
+
+
+            total_loss = latent_loss + act_loss + cri_loss
+            latent_optim.zero_grad()
+            act_optim.zero_grad()
+            cri_optim.zero_grad()
+            total_loss.backward()
+
+            # 그 후 각 옵티마이저 단계 실행
+            latent_optim.step()
             act_optim.step()
-        if cfg.algo == 'ppo':
-            pred_seq, ll_old, old_sequence = act_model(input_data,
-                                                       device,
-                                                       scheduler_list=scheduler_list,
-                                                       num_machine=num_machine,
-                                                       num_job=num_job,
-                                                       upperbound=makespan_list_for_upperbound
-                                                       )
+            cri_optim.step()
 
-            real_makespan = list()
-            for n in range(pred_seq.shape[0]):  # act_model(agent)가 산출한 해를 평가하는 부분
-                sequence = pred_seq[n]
-                scheduler = AdaptiveScheduler(jobs_datas[n])
-                makespan = -scheduler.run(sequence.tolist()) / params['reward_scaler']
-                real_makespan.append(makespan)
-                c_max.append(makespan)
-            ave_makespan += sum(real_makespan) / (params["batch_size"] * params["log_step"])
-            """
+            act_lr_scheduler.step()
 
-            vanila actor critic
+            #latent_lr_scheduler.step()
 
-            """
-            beta = params['beta']
-            if baseline_reset == False:
-                if s == 1:
-                    be = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)  # baseline을 구하는 부분
-                else:
-                    be = beta * be + (1 - beta) * torch.tensor(real_makespan).unsqueeze(1).to(device)
-            else:
-                if s % cfg.gen_step == 1:
-                    be = torch.tensor(real_makespan).detach().unsqueeze(1).to(device)  # baseline을 구하는 부분
-                else:
-                    be = beta * be + (1 - beta) * torch.tensor(real_makespan).unsqueeze(1).to(device)
-            ####
-            adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - be  # baseline(advantage) 구하는 부분
+            # latent_optim = optim.Adam(act_model.Latent.parameters(), lr=params["lr"])
+            # act_optim = optim.Adam(act_model.all_attention_params, lr=params["lr"])
+            # cri_optim = optim.Adam(act_model.critic.parameters(), lr=1e-3)
 
+            nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 10)), norm_type=2)
+            nn.utils.clip_grad_norm_(act_model.all_attention_params, max_norm=float(os.environ.get("grad_clip", 10)),
+                                     norm_type=2)
+            nn.utils.clip_grad_norm_(act_model.critic.parameters(), max_norm=float(os.environ.get("grad_clip", 10)),
+                                     norm_type=2)
 
-            for i in range(params['k_epoch']):
-                for scheduler in scheduler_list:
-                    scheduler.reset()
-                _, ll_new, _ = act_model(input_data,
-                                         device,
-                                         scheduler_list=scheduler_list,
-                                         num_machine=num_machine,
-                                         num_job=num_job,
-                                         upperbound=makespan_list_for_upperbound,
-                                         old_sequence=old_sequence
-                                         )
-
-                ratio = torch.exp(ll_new - ll_old.detach())
-
-                # print(ratio)
-                # print(ratio.shape, adv.shape)
-                surr1 = ratio * adv
-                surr2 = torch.clamp(ratio, 1 - params["epsilon"], 1 + params["epsilon"]) * adv
-
-                act_loss = -torch.min(surr1, surr2).mean()
-
-                act_optim.zero_grad()
-                act_loss.backward()
-                nn.utils.clip_grad_norm_(act_model.parameters(),
-                                         max_norm=float(os.environ.get("grad_clip", 5)),
-                                         norm_type=2)
-                act_optim.step()
 
         if act_lr_scheduler.get_last_lr()[0] >= \
                 float(os.environ.get("lr_decay_min", 5.0e-4)):
@@ -443,15 +428,15 @@ if __name__ == '__main__':
 
         "reward_scaler": cfg.reward_scaler,
         "beta": float(os.environ.get("beta", 0.65)),
-        "alpha": float(os.environ.get("alpha", 0.01)),
+        "alpha": float(os.environ.get("alpha", 0.05)),
         "lr": float(os.environ.get("lr", 1.0e-3)),
         "lr_decay": float(os.environ.get("lr_decay", 0.95)),
-        "lr_decay_step": int(os.environ.get("lr_decay_step", 700)),
+        "lr_decay_step": int(os.environ.get("lr_decay_step",500)),
         "layers": eval(str(os.environ.get("layers", '[196, 84]'))),
         "n_embedding": int(os.environ.get("n_embedding", 48)),
         "n_hidden": int(os.environ.get("n_hidden", 72)),
-        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 90)),
-        "n_multi_head": int(os.environ.get("n_multi_head", 3)),
+        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 96)),
+        "n_multi_head": int(os.environ.get("n_multi_head", 1)),
         "ex_embedding_size": int(os.environ.get("ex_embedding_size",42)),
         "k_hop": int(os.environ.get("k_hop", 1)),
         "is_lr_decay": True,
@@ -462,4 +447,4 @@ if __name__ == '__main__':
 
     }
 
-    train_model(params)  #
+    train_model(params)
