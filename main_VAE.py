@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
 import os
+import wandb
 import sys
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
@@ -173,6 +174,9 @@ def train_model(params, log_path=None):
         b += 1
 
         if s % 100 == 1:  # Evaluation 수행
+
+
+
             for p in problem_list:
                 min_makespan = heuristic_eval(p)
                 eval_number = 5
@@ -185,6 +189,12 @@ def train_model(params, log_path=None):
 
                 min_makespan = min_makespan1
                 mean_makespan = mean_makespan1
+                if p == 1:
+                    mean_makespan71 = mean_makespan1
+                    min_makespan71 = min_makespan1
+                else:
+                    mean_makespan72 = mean_makespan1
+                    min_makespan72 = min_makespan1
 
                 print("TA{}".format(problem_list[p - 1]), min_makespan, mean_makespan)
                 empty_records[p - 1].append(mean_makespan)
@@ -205,13 +215,23 @@ def train_model(params, log_path=None):
                     min_m.columns = problem_list
                     mean_m.columns = problem_list
 
+
+                    t1 = time()
+
                     if params['w_representation_learning'] == True:
                         min_m.to_csv('min_makespan_w_third_feature_w_rep+alpha.csv'.format())
                         mean_m.to_csv('mean_makespan_w_third_feature_w_rep+alpha.csv')
                     else:
                         min_m.to_csv('min_makespan_w_third_feature_wo_rep.csv'.format())
                         mean_m.to_csv('mean_makespan_w_third_feature_wo_rep.csv')
+            wandb.log({
+                "episode": s,
+                "71 mean_makespan": mean_makespan71,
+                "72 mean_makespan": mean_makespan72,
+                "71 min_makespan": min_makespan71,
+                "72 min_makespan": min_makespan72,
 
+            })
         act_model.block_indices = []
         baseline_model.block_indices = []
 
@@ -326,25 +346,12 @@ def train_model(params, log_path=None):
             cri_optim.step()
 
             act_lr_scheduler.step()
-
-            #latent_lr_scheduler.step()
-
-            # latent_optim = optim.Adam(act_model.Latent.parameters(), lr=params["lr"])
-            # act_optim = optim.Adam(act_model.all_attention_params, lr=params["lr"])
-            # cri_optim = optim.Adam(act_model.critic.parameters(), lr=1e-3)
-
             nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 10)), norm_type=2)
             nn.utils.clip_grad_norm_(act_model.all_attention_params, max_norm=float(os.environ.get("grad_clip", 10)),
                                      norm_type=2)
             nn.utils.clip_grad_norm_(act_model.critic.parameters(), max_norm=float(os.environ.get("grad_clip", 10)),
                                      norm_type=2)
-            # nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 1)),
-            #                          norm_type=2)
 
-
-
-
-            # cri_optim.step()
 
 
         if act_lr_scheduler.get_last_lr()[0] >= \
@@ -353,24 +360,6 @@ def train_model(params, log_path=None):
                 act_lr_scheduler.step()
         ave_act_loss += act_loss.item()
 
-        if s % params["log_step"] == 0:
-            t2 = time()
-            print('step:%d/%d, actic loss:%1.3f, crictic loss:%1.3f, L:%1.3f, %dmin%dsec' % (
-                s, params["step"], ave_act_loss / ((s + 1) * params["iteration"]),
-                ave_cri_loss / ((s + 1) * params["iteration"]), ave_makespan, (t2 - t1) // 60, (t2 - t1) % 60))
-            ave_makespan = 0
-            if log_path is None:
-                log_path = params["log_dir"] + '/ppo' + '/%s_train.csv' % date
-                with open(log_path, 'w') as f:
-                    f.write('step,actic loss, crictic loss, average makespan,time\n')
-            else:
-                with open(log_path, 'a') as f:
-                    f.write('%d,%1.4f,%1.4f,%1.4f,%dmin%dsec\n' % (
-                        s, ave_act_loss / ((s + 1) * params["iteration"]),
-                        ave_cri_loss / ((s + 1) * params["iteration"]),
-                        ave_makespan / (s + 1),
-                        (t2 - t1) // 60, (t2 - t1) % 60))
-            t1 = time()
 
         if s % params["save_step"] == 1:
             if cfg.vessl == False:
@@ -451,4 +440,18 @@ if __name__ == '__main__':
 
     }
 
+
+    wandb.login()
+    if params['w_representation_learning'] == True:
+        wandb.init(project="Graph JSSP", name="W_REP GES_{} EXEMB_{} KHOP_{} NMH_{} NH_{}".format(params['graph_embedding_size'],
+                                                                           params['ex_embedding_size'],
+                                                                           params['k_hop'],
+                                                                           params['n_multi_head'],
+                                                                           params['n_hidden']))
+    else:
+        wandb.init(project="Graph JSSP", name="WO_REP GES_{} EXEMB_{} KHOP_{} NMH_{} NH_{}".format(params['graph_embedding_size'],
+                                                                           params['ex_embedding_size'],
+                                                                           params['k_hop'],
+                                                                           params['n_multi_head'],
+                                                                           params['n_hidden']))
     train_model(params)
