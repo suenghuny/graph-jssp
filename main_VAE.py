@@ -378,7 +378,7 @@ def train_model(params, log_path=None):
             latent_optim.step()
             act_optim.step()
             cri_optim.step()
-            act_lr_scheduler.step()
+            #act_lr_scheduler.step()
 
 
         ave_act_loss += act_loss.item()
