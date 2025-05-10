@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
+import numpy as np
 from cfg import get_cfg
 cfg = get_cfg()
 from collections import OrderedDict
@@ -391,3 +392,245 @@ class GCRN(nn.Module):
 
         Z = Z.reshape(batch_size, num_nodes, -1)
         return Z, edge_cat_tensor
+
+
+class EnhancedPositionalEncoding(nn.Module):
+    """
+    액션 시퀀스에 위치 정보를 추가하고 MLP를 통과시켜 한 번 더 임베딩하는 향상된 Positional Encoding
+    """
+
+    def __init__(self, d_model, max_seq_length=1000, mlp_hidden_dim=None, dropout=0.1):
+        super(EnhancedPositionalEncoding, self).__init__()
+
+        # MLP 히든 차원이 지정되지 않은 경우 기본값 설정
+        if mlp_hidden_dim is None:
+            mlp_hidden_dim = d_model * 2
+
+        # 위치 인코딩 행렬 생성
+        pe = torch.zeros(max_seq_length, d_model)
+        position = torch.arange(0, max_seq_length, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0)  # [1, max_seq_length, d_model]
+
+        # 버퍼로 등록 (학습 파라미터는 아님)
+        self.register_buffer('pe', pe)
+
+        # MLP를 통한 추가 임베딩
+        self.embedding_mlp = nn.Sequential(
+            nn.Linear(d_model, mlp_hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(mlp_hidden_dim, d_model),
+            nn.Dropout(dropout)
+        )
+
+        # Layer Normalization (임베딩 전후의 특성을 보존하기 위해)
+        self.layer_norm = nn.LayerNorm(d_model)
+
+    def forward(self, x):
+        """
+        Args:
+            x: [batch_size, seq_length, d_model]
+        Returns:
+            위치 정보가 추가되고 MLP를 통과한 향상된 임베딩: [batch_size, seq_length, d_model]
+        """
+        # 위치 인코딩 적용
+        x_with_pos = x + self.pe[:, :x.size(1), :]
+
+        # 원본 형태 저장
+        original_shape = x_with_pos.shape
+
+        # 배치와 시퀀스 차원 합치기 (MLP 통과를 위해)
+        x_reshaped = x_with_pos.view(-1, x_with_pos.size(-1))  # [batch_size * seq_length, d_model]
+
+        # MLP 통과
+        enhanced = self.embedding_mlp(x_reshaped)
+
+        # 원래 형태로 복원
+        enhanced = enhanced.view(original_shape)  # [batch_size, seq_length, d_model]
+
+        # 잔차 연결 및 Layer Normalization
+        enhanced = self.layer_norm(enhanced + x_with_pos)
+
+        return enhanced
+
+
+class MultiHeadAttention(nn.Module):
+    """
+    Multi-Head Attention 모듈
+    """
+
+    def __init__(self, d_model, num_heads):
+        super(MultiHeadAttention, self).__init__()
+        self.num_heads = num_heads
+        self.d_model = d_model
+
+        assert d_model % num_heads == 0, "d_model must be divisible by num_heads"
+
+        self.depth = d_model // num_heads
+
+        # Query, Key, Value 변환을 위한 선형 레이어
+        self.q_linear = nn.Linear(d_model, d_model)
+        self.k_linear = nn.Linear(d_model, d_model)
+        self.v_linear = nn.Linear(d_model, d_model)
+
+        self.out_linear = nn.Linear(d_model, d_model)
+
+    def split_heads(self, x, batch_size):
+        """
+        입력 텐서를 여러 개의 헤드로 분할
+        Args:
+            x: [batch_size, seq_length, d_model]
+            batch_size: 배치 사이즈
+        Returns:
+            분할된 헤드: [batch_size, num_heads, seq_length, depth]
+        """
+        x = x.view(batch_size, -1, self.num_heads, self.depth)
+        return x.permute(0, 2, 1, 3)
+
+    def forward(self, query, key, value, mask=None):
+        """
+        Args:
+            query: [batch_size, query_length, d_model]
+            key: [batch_size, key_length, d_model]
+            value: [batch_size, value_length, d_model]
+            mask: 선택적 마스크 [batch_size, 1, 1, key_length]
+        Returns:
+            출력: [batch_size, query_length, d_model]
+        """
+        batch_size = query.size(0)
+
+        # 선형 변환
+        q = self.q_linear(query)  # [batch_size, query_length, d_model]
+        k = self.k_linear(key)  # [batch_size, key_length, d_model]
+        v = self.v_linear(value)  # [batch_size, value_length, d_model]
+
+        # 헤드 분할
+        q = self.split_heads(q, batch_size)  # [batch_size, num_heads, query_length, depth]
+        k = self.split_heads(k, batch_size)  # [batch_size, num_heads, key_length, depth]
+        v = self.split_heads(v, batch_size)  # [batch_size, num_heads, value_length, depth]
+
+        # 스케일드 닷-프로덕트 어텐션 계산
+        # q * k^T / sqrt(d_k)
+        matmul_qk = torch.matmul(q, k.transpose(-2, -1))  # [batch_size, num_heads, query_length, key_length]
+
+        # 스케일링
+        scaled_attention_logits = matmul_qk / math.sqrt(self.depth)
+
+        # 마스킹 적용 (선택 사항)
+        if mask is not None:
+            scaled_attention_logits += (mask * -1e9)
+
+        # softmax 적용
+        attention_weights = F.softmax(scaled_attention_logits,
+                                      dim=-1)  # [batch_size, num_heads, query_length, key_length]
+
+        # 가중치와 value를 곱함
+        output = torch.matmul(attention_weights, v)  # [batch_size, num_heads, query_length, depth]
+
+        # 헤드 결합
+        output = output.permute(0, 2, 1, 3).contiguous()  # [batch_size, query_length, num_heads, depth]
+        output = output.view(batch_size, -1, self.d_model)  # [batch_size, query_length, d_model]
+
+        # 최종 선형 변환
+        output = self.out_linear(output)  # [batch_size, query_length, d_model]
+
+        return output
+
+
+class QValueAttentionModel(nn.Module):
+    """
+    강화학습에서 Q값을 출력하는 모델
+    - latent variable z: 현재 상태(state)를 인코딩한 벡터, query 역할
+    - action_sequence: 이전 행동 시퀀스나 가능한 행동들을 featurize한 시퀀스, key/value 역할
+    """
+
+    def __init__(self, state_dim, action_feature_dim, num_heads=4, mlp_hidden_dim=128,
+                 pos_mlp_hidden_dim=None, state_projection_dim=None, dropout=0.1):
+        super(QValueAttentionModel, self).__init__()
+
+        self.state_dim = state_dim
+        self.action_feature_dim = action_feature_dim
+
+        # 상태 임베딩을 action_feature_dim과 맞추기 위한 projection 차원
+        # 지정하지 않으면 action_feature_dim과 동일하게 설정
+        self.state_projection_dim = state_projection_dim if state_projection_dim is not None else action_feature_dim
+
+        # 상태(latent variable)를 action_feature_dim과 동일한 차원으로 확장하는 MLP
+        self.state_projection = nn.Sequential(
+            nn.Linear(state_dim, mlp_hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(mlp_hidden_dim, self.state_projection_dim),
+            nn.Dropout(dropout)
+        )
+
+        # 상태 확장 후 Layer Normalization
+        self.state_norm = nn.LayerNorm(self.state_projection_dim)
+
+        # 향상된 positional encoding (MLP 추가)
+        self.pos_encoding = EnhancedPositionalEncoding(
+            d_model=action_feature_dim,
+            mlp_hidden_dim=pos_mlp_hidden_dim,
+            dropout=dropout
+        )
+
+        # multi-head attention
+        self.attention = MultiHeadAttention(self.state_projection_dim, num_heads)
+
+        # Layer normalization
+        self.norm1 = nn.LayerNorm(self.state_projection_dim)
+
+        # MLP - Q값 추정을 위한 네트워크
+        self.q_mlp = nn.Sequential(
+            nn.Linear(self.state_projection_dim, mlp_hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(mlp_hidden_dim, mlp_hidden_dim // 2),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(mlp_hidden_dim // 2, 1)  # Q값(scalar) 출력
+        )
+
+    def forward(self, state_encoding, action_sequence, mask=None):
+        """
+        Args:
+            state_encoding: [batch_size, state_dim] - 상태 인코딩 (latent z), query 역할
+            action_sequence: [batch_size, seq_length, action_feature_dim] - 행동 시퀀스, key/value 역할
+            mask: 선택적 마스크 [batch_size, 1, 1, seq_length] - 유효하지 않은 행동 마스킹
+        Returns:
+            Q값 출력: [batch_size, 1] - 각 상태-행동 쌍의 Q값
+        """
+        batch_size, seq_length, _ = action_sequence.size()
+
+        # state_encoding을 MLP를 통해 확장
+        # [batch_size, state_dim] -> [batch_size, state_projection_dim]
+        projected_state = self.state_projection(state_encoding)
+        projected_state = self.state_norm(projected_state)
+
+        # action sequence에 향상된 positional encoding 적용 (MLP를 통한 추가 임베딩 포함)
+        action_sequence = self.pos_encoding(action_sequence)
+
+        # 확장된 state를 attention query로 변환 (차원 확장)
+        # [batch_size, state_projection_dim] -> [batch_size, 1, state_projection_dim]
+        query = projected_state.unsqueeze(1)
+
+        # multi-head attention 적용
+        # query: [batch_size, 1, state_projection_dim] - 확장된 상태
+        # key, value: [batch_size, seq_length, action_feature_dim] - 행동 시퀀스
+        attn_output = self.attention(query, action_sequence, action_sequence,
+                                     mask)  # [batch_size, 1, state_projection_dim]
+
+        # add & norm (residual connection)
+        attn_output = self.norm1(attn_output + query)  # [batch_size, 1, state_projection_dim]
+
+        # 차원 축소 [batch_size, 1, state_projection_dim] -> [batch_size, state_projection_dim]
+        attn_output = attn_output.squeeze(1)
+
+        # MLP를 통해 Q값(scalar) 출력
+        q_value = self.q_mlp(attn_output)  # [batch_size, 1]
+
+        return q_value

@@ -5,7 +5,7 @@ import numpy as np
 import cfg
 from copy import deepcopy
 cfg = cfg.get_cfg()
-from model import GCRN
+from model import *
 from latent import LatentModel
 device = torch.device(cfg.device)
 
@@ -17,6 +17,11 @@ class Categorical(nn.Module):
     def forward(self, log_p):
         return torch.multinomial(log_p.exp(), 1).long().squeeze(1)
 
+class Categorical2(nn.Module):
+    def __init__(self):
+        super().__init__()
+    def forward(self, log_p):
+        return torch.multinomial(log_p.exp(), 1).long().squeeze(1)
 
 class ExEmbedding(nn.Module):
     def __init__(self, raw_feature_size, feature_size):
@@ -57,7 +62,15 @@ class PtrNet1(nn.Module):
 
         num_edge_cat = 3
         z_dim = 144
-        self.critic = Critic(z_dim)
+        action_feature_dim = 4
+        self.critic = QValueAttentionModel(
+            state_dim=z_dim,
+            action_feature_dim=action_feature_dim,
+            num_heads=4,
+            mlp_hidden_dim=128,
+            pos_mlp_hidden_dim=action_feature_dim * 2,  # 추가된 파라미터
+            dropout=0.1
+        )
         self.Latent = LatentModel(z_dim=z_dim, params = params).to(device)
 
 
@@ -213,10 +226,7 @@ class PtrNet1(nn.Module):
 
 
         edge_loss, node_loss, loss_kld, mean_feature, features, z = self.Latent.calculate_loss(node_features, heterogeneous_edges, train)
-        if self.params['w_representation_learning']==True:
-            baselines = self.critic(z.detach())
-        else:
-            baselines = self.critic(z)
+
 
         batch = features.shape[0]
         num_operations = features.shape[1]
@@ -230,6 +240,7 @@ class PtrNet1(nn.Module):
         mask1_debug, mask2_debug = self.init_mask()
 
         batch_size = h_pi_t_minus_one.shape[1]
+        #print(h_pi_t_minus_one.shape)
 
         if old_sequence != None:
             old_sequence = torch.tensor(old_sequence).long().to(device)
@@ -313,14 +324,18 @@ class PtrNet1(nn.Module):
             Query를 만들때에는 이전 단계의 query와 extended node embedding을 가지고 만든다
 
             """
+            #print(query.shape, ref.shape)
             query = self.glimpse(query, ref, mask2_debug)  # 보는 부분 /  multi-head attention 부분 (mask2는 보는 masking)
             logits = self.pointer(query, ref, mask1_debug) # 선택하는 부분 / logit 구하는 부분 (#mask1은 선택하는 masking)
 
             cp_list = torch.tensor(cp_list)
             #print(cp_list.shape)
 
-            log_p = torch.log_softmax(logits / self.T, dim=-1) # log_softmax로 구하는 부분
+            #log_p = torch.log_softmax(logits / self.T, dim=-1) # log_softmax로 구하는 부분
 
+            log_p = torch.log(F.gumbel_softmax(logits, tau=1, hard=True, dim = -1)+1e-8)
+            #print(F.gumbel_softmax(logits, tau=1, hard=True, dim = -1))
+            #log_p = torch.log(p)
             if old_sequence == None:
                 next_operation_index = self.job_selecter(log_p)
             else:
@@ -336,6 +351,7 @@ class PtrNet1(nn.Module):
             mask1_debug, mask2_debug = self.update_mask(next_job.tolist()) # update masking을 수행해주는
 
             batch_indices = torch.arange(features.size(0))
+            print(next_operation_index)
             h_pi_t_minus_one = features[batch_indices, next_operation_index]
 
 
@@ -344,12 +360,16 @@ class PtrNet1(nn.Module):
             next_operation_indices.append(next_operation_index.tolist())
             pi_list.append(next_job)
 
-
+        # if train == True:
+        #     if self.params['w_representation_learning']==True:
+        #         baselines = self.critic(z.detach())
+        #     else:
+        #         baselines = self.critic(z)
 
         pi = torch.stack(pi_list, dim=1)
         log_probabilities = torch.stack(log_probabilities, dim=1)
-        ll = log_probabilities.sum(dim=1)    # 각 solution element의 log probability를 더하는 방식
 
+        ll = log_probabilities.sum(dim=1)    # 각 solution element의 log probability를 더하는 방식
         return pi, ll, next_operation_indices, edge_loss, node_loss, loss_kld, baselines
 
     def glimpse(self, query, ref, mask0):
@@ -357,6 +377,8 @@ class PtrNet1(nn.Module):
         query는 decoder의 출력
         ref는   encoder의 출력
         """
+        batch_size = query.shape[0]
+
         dk = self.params["n_hidden"]/self.n_multi_head
         for m in range(self.n_multi_head):
             u1 = self.W_q[m](query).unsqueeze(1)
@@ -369,6 +391,7 @@ class PtrNet1(nn.Module):
 
 
             a = F.softmax(u, dim=1)
+
 
             if m == 0:
                 g = torch.bmm(a.unsqueeze(1), v).squeeze(1)
@@ -403,9 +426,9 @@ class PtrNet1(nn.Module):
             u = u.squeeze(1).masked_fill(mask0 == 0, -1e8)
             a = F.softmax(u, dim=1)
             if m == 0:
-                g = torch.bmm(a.squeeze().unsqueeze(1), v).squeeze(1)
+                g = torch.bmm(a.reshape(batch_size, 1, -1), v).squeeze(1)
             else:
-                g += torch.bmm(a.squeeze().unsqueeze(1), v).squeeze(1)
+                g += torch.bmm(a.reshape(batch_size, 1, -1), v).squeeze(1)
 
         return g
 

@@ -111,12 +111,14 @@ class Replay_Buffer:
         buffer[1].append(action_sequences)
         buffer[2].append(pi_olds)
         buffer[3].append(makespan)
+        #print('전', self.buffer_size,self.step_count[problem_size] )
         if self.step_count[problem_size] < self.buffer_size - 1:
             self.step_count_list[problem_size].append(self.step_count[problem_size])
             self.step_count[problem_size] += 1
+            #print('후', self.buffer_size, self.step_count[problem_size])
 
 
-    def generating_mini_batch(self, datas, batch_idx, cat, problem_size):
+    def generating_mini_batch(self, datas, batch_idx, cat):
         for s in batch_idx:
             if cat == 'jobs_data':
                 yield datas[0][s]
@@ -126,6 +128,7 @@ class Replay_Buffer:
                 yield datas[2][s]
             if cat == 'makespan':
                 yield datas[3][s]
+
 
 
     def sample(self):
@@ -141,8 +144,7 @@ class Replay_Buffer:
         else:
             eligible_problem_sizes = self.problem_size_list
 
-        sampled_problem_size = random.sample(eligible_problem_sizes)
-
+        sampled_problem_size = random.sample(eligible_problem_sizes, k = 1)[0]
 
         step_count_list = self.step_count_list[sampled_problem_size][:]
         buffer = self.total_buffer[sampled_problem_size]
@@ -161,5 +163,5 @@ class Replay_Buffer:
         makespan = self.generating_mini_batch(buffer, sampled_batch_idx, cat='makespan')
         makespan = list(makespan)
 
-        return jobs_data , action_sequences, pi_olds, makespan
+        return jobs_data , action_sequences, pi_olds, makespan, sampled_problem_size
 

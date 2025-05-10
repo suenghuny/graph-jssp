@@ -136,9 +136,9 @@ def train_model(params, log_path=None):
     baseline_model = PtrNet1(params).to(device)  # baseline_model 불필요
     baseline_model.load_state_dict(act_model.state_dict())  # baseline_model 불필요
     if params["optimizer"] == 'Adam':
-        latent_optim = optim.Adam(act_model.Latent.parameters(), lr=params["lr"])
+        latent_optim = optim.Adam(act_model.Latent.parameters(), lr=1.0e-4)
         act_optim = optim.Adam(act_model.all_attention_params, lr=params["lr"])
-        cri_optim = optim.Adam(act_model.critic.parameters(), lr=1e-3)
+        cri_optim = optim.Adam(act_model.critic.parameters(), lr=params['lr'])
         act_lr_scheduler = optim.lr_scheduler.StepLR(act_optim, step_size=params["lr_decay_step"], gamma=params["lr_decay"])
         latent_lr_scheduler = optim.lr_scheduler.StepLR(latent_optim, step_size=params["lr_decay_step"],
                                                      gamma=params["lr_decay"])
@@ -219,11 +219,33 @@ def train_model(params, log_path=None):
                     t1 = time()
 
                     if params['w_representation_learning'] == True:
-                        min_m.to_csv('min_makespan_w_third_feature_w_rep+alpha.csv'.format())
-                        mean_m.to_csv('mean_makespan_w_third_feature_w_rep+alpha.csv')
+                        min_m.to_csv('w_rep_min_makespan_GES_{} EXEMB_{} KHOP_{} NMH_{} NH_{}.csv'.format(params['graph_embedding_size'],
+                    params['ex_embedding_size'],
+                    params['k_hop'],
+                    params['n_multi_head'],
+                    params['n_hidden']))
+                        mean_m.to_csv(
+                            'w_rep_mean_makespan_GES_{} EXEMB_{} KHOP_{} NMH_{} NH_{}.csv'.format(
+                                params['graph_embedding_size'],
+                                params['ex_embedding_size'],
+                                params['k_hop'],
+                                params['n_multi_head'],
+                                params['n_hidden']))
+
                     else:
-                        min_m.to_csv('min_makespan_w_third_feature_wo_rep.csv'.format())
-                        mean_m.to_csv('mean_makespan_w_third_feature_wo_rep.csv')
+                        min_m.to_csv('wo_rep_min_makespan_GES_{} EXEMB_{} KHOP_{} NMH_{} NH_{}.csv'.format(
+                            params['graph_embedding_size'],
+                            params['ex_embedding_size'],
+                            params['k_hop'],
+                            params['n_multi_head'],
+                            params['n_hidden']))
+                        mean_m.to_csv(
+                            'wo_rep_mean_makespan_GES_{} EXEMB_{} KHOP_{} NMH_{} NH_{}.csv'.format(
+                                params['graph_embedding_size'],
+                                params['ex_embedding_size'],
+                                params['k_hop'],
+                                params['n_multi_head'],
+                                params['n_hidden']))
             wandb.log({
                 "episode": s,
                 "71 mean_makespan": mean_makespan71,
@@ -340,12 +362,10 @@ def train_model(params, log_path=None):
             cri_optim.zero_grad()
             total_loss.backward()
 
-            # 그 후 각 옵티마이저 단계 실행
-            latent_optim.step()
-            act_optim.step()
-            cri_optim.step()
+            if params['w_representation_learning'] == True:
+                if latent_lr_scheduler.get_last_lr()[0] >=  float(os.environ.get("lr_decay_min", 5.0e-5)):
+                    latent_lr_scheduler.step()
 
-            act_lr_scheduler.step()
             nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 10)), norm_type=2)
             nn.utils.clip_grad_norm_(act_model.all_attention_params, max_norm=float(os.environ.get("grad_clip", 10)),
                                      norm_type=2)
@@ -354,22 +374,34 @@ def train_model(params, log_path=None):
 
 
 
-        if act_lr_scheduler.get_last_lr()[0] >= \
-                float(os.environ.get("lr_decay_min", 5.0e-4)):
-            if params["is_lr_decay"]:
-                act_lr_scheduler.step()
-        ave_act_loss += act_loss.item()
+            # 그 후 각 옵티마이저 단계 실행
+            latent_optim.step()
+            act_optim.step()
+            cri_optim.step()
+            act_lr_scheduler.step()
 
+
+        ave_act_loss += act_loss.item()
+        if s % params["log_step"] == 0:
+            t2 = time()
+            if params['w_representation_learning'] == True:
+                print('with representation learning step:%d/%d, actic loss:%1.3f, crictic loss:%1.3f, L:%1.3f, %dmin%dsec' % (
+                    s, params["step"], ave_act_loss / ((s + 1) * params["iteration"]),
+                    ave_cri_loss / ((s + 1) * params["iteration"]), ave_makespan, (t2 - t1) // 60, (t2 - t1) % 60))
+            else:
+                print('without representation learning step:%d/%d, actic loss:%1.3f, crictic loss:%1.3f, L:%1.3f, %dmin%dsec' % (
+                    s, params["step"], ave_act_loss / ((s + 1) * params["iteration"]),
+                    ave_cri_loss / ((s + 1) * params["iteration"]), ave_makespan, (t2 - t1) // 60, (t2 - t1) % 60))
 
         if s % params["save_step"] == 1:
-            if cfg.vessl == False:
+            if params['w_representation_learning'] == True:
                 torch.save({'epoch': s,
                             'model_state_dict_actor': act_model.state_dict(),
                             'optimizer_state_dict_actor': act_optim.state_dict(),
                             'ave_act_loss': ave_act_loss,
                             'ave_cri_loss': 0,
                             'ave_makespan': ave_makespan},
-                           params["model_dir"] + '/ppo_w_third_feature' + '/%s_step%d_act.pt' % (date, s))
+                           output_dir + '/%s_step%d_act_w_rep.pt' % (date, s))
             else:
                 torch.save({'epoch': s,
                             'model_state_dict_actor': act_model.state_dict(),
@@ -377,9 +409,8 @@ def train_model(params, log_path=None):
                             'ave_act_loss': ave_act_loss,
                             'ave_cri_loss': 0,
                             'ave_makespan': ave_makespan},
-                           output_dir + '/%s_step%d_act.pt' % (date, s))
+                           output_dir + '/%s_step%d_act_wo_rep.pt' % (date, s))
 
-        #     print('save model...')
 
 
 if __name__ == '__main__':
@@ -420,22 +451,23 @@ if __name__ == '__main__':
 
         "reward_scaler": cfg.reward_scaler,
         "beta": float(os.environ.get("beta", 0.65)),
-        "alpha": float(os.environ.get("alpha", 0.05)),
-        "lr": float(os.environ.get("lr", 1.0e-3)),
+        "alpha": float(os.environ.get("alpha", 0.1)),
+        "lr": float(os.environ.get("lr", 5.0e-4)),
         "lr_decay": float(os.environ.get("lr_decay", 0.95)),
         "lr_decay_step": int(os.environ.get("lr_decay_step",500)),
-        "layers": eval(str(os.environ.get("layers", '[196, 84]'))),
+        "layers": eval(str(os.environ.get("layers", '[256, 128]'))),
         "n_embedding": int(os.environ.get("n_embedding", 48)),
-        "n_hidden": int(os.environ.get("n_hidden", 72)),
+        "n_hidden": int(os.environ.get("n_hidden", 84)),
         "graph_embedding_size": int(os.environ.get("graph_embedding_size", 96)),
-        "n_multi_head": int(os.environ.get("n_multi_head", 1)),
-        "ex_embedding_size": int(os.environ.get("ex_embedding_size",42)),
+        "n_multi_head": int(os.environ.get("n_multi_head", 2)),
+        "ex_embedding_size": int(os.environ.get("ex_embedding_size",36)),
         "k_hop": int(os.environ.get("k_hop", 1)),
         "is_lr_decay": True,
         "third_feature": 'first_and_second',  # first_and_second, first_only, second_only
         "baseline_reset": True,
         "ex_embedding": True,
-        "w_representation_learning": True,
+        "w_representation_learning": False,
+        "z_dim": 128,
         "k_epoch": int(os.environ.get("k_epoch", 2)),
 
     }

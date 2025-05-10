@@ -58,7 +58,7 @@ for i in ["21", "22"]:
     orb_list.append(orb_data)
 
 
-def generate_jssp_instance(num_jobs, num_machine, batch_size):
+def generate_jssp_instance(num_jobs, num_machine):
     temp = []
     for job in range(num_jobs):
         machine_sequence = list(range(num_machine))
@@ -68,12 +68,9 @@ def generate_jssp_instance(num_jobs, num_machine, batch_size):
             empty.append((machine_sequence[ops], np.random.randint(1, 100)))
         temp.append(empty)
     jobs_datas = []
-    for _ in range(batch_size):
-        jobs_datas.append(temp)
-
+    jobs_datas.append(temp)
     scheduler_list = list()
-    for n in range(len(jobs_datas)):
-        scheduler_list.append(AdaptiveScheduler(jobs_datas[n]))
+    scheduler_list.append(AdaptiveScheduler(jobs_datas[0]))
     return jobs_datas, scheduler_list
 
 
@@ -126,8 +123,11 @@ def train_model(params, log_path=None):
     epoch = 0
     ave_act_loss = 0.0
     ave_cri_loss = 0.0
-
+    job_range = [5, 10]
+    machine_range = [5, 10]
     act_model = PtrNet1(params).to(device)
+    buffer = Replay_Buffer(buffer_size=2000, batch_size=params['batch_size'], job_range=job_range,
+                           machine_range=machine_range)
 
     baseline_model = PtrNet1(params).to(device)  # baseline_model 불필요
     baseline_model.load_state_dict(act_model.state_dict())  # baseline_model 불필요
@@ -203,32 +203,27 @@ def train_model(params, log_path=None):
 
         act_model.block_indices = []
         baseline_model.block_indices = []
-        job_range = [5, 10]
-        machine_range = [5, 10]
-        buffer = Replay_Buffer(buffer_size = 20000, batch_size = 30, job_range = job_range, machine_range = machine_range)
 
 
-        if s % cfg.gen_step == 1:  # 훈련용 Data Instance 새롭게 생성 (gen_step 마다 생성)
-            """
-            훈련용 데이터셋 생성하는 코드
-            """
-            num_machine = np.random.randint(job_range[0], job_range[1])
-            num_job = np.random.randint(num_machine, machine_range[1])
-            jobs_datas, scheduler_list = generate_jssp_instance(num_jobs=num_job, num_machine=num_machine,
-                                                                batch_size=params['batch_size'])
-            act_model.Latent.current_num_edges = num_machine*num_job
-            for scheduler in scheduler_list:
-                scheduler.reset()
-        else:
-            for scheduler in scheduler_list:
-                scheduler.reset()
+
+
+        """
+        훈련용 데이터셋 생성하는 코드
+        """
+        num_machine = np.random.randint(job_range[0], job_range[1])
+        num_job = np.random.randint(num_machine, machine_range[1])
+        jobs_datas, scheduler_list = generate_jssp_instance(num_jobs=num_job,
+                                                            num_machine=num_machine)
+        act_model.Latent.current_num_edges = num_machine*num_job
+        for scheduler in scheduler_list:
+            scheduler.reset()
+
         """
 
         """
         act_model.get_jssp_instance(scheduler_list)  # 훈련해야할 instance를 에이전트가 참조(등록)하는 코드
-
         act_model.eval()
-
+        node_features = list()
         scheduler = AdaptiveScheduler(jobs_datas[0])
         node_feature = scheduler.get_node_feature()
         node_features.append(node_feature)
@@ -236,46 +231,48 @@ def train_model(params, log_path=None):
         edge_antiprecedence = scheduler.get_edge_index_antiprecedence()
         edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
         heterogeneous_edges = list()
-        node_features = list()
-        for n in range(params['batch_size']):
-            """
-            Instance를 명세하는 부분
-            - Node feature: Operation의 다섯개 feature
-            - Edge: 
-            """
-            heterogeneous_edge = (edge_precedence, edge_antiprecedence, edge_machine_sharing)  # 세종류의 엑지들을 하나의 변수로 참조시킴
-            heterogeneous_edges.append(heterogeneous_edge)
+        heterogeneous_edge = (edge_precedence, edge_antiprecedence, edge_machine_sharing)  # 세종류의 엑지들을 하나의 변수로 참조시킴
+        heterogeneous_edges.append(heterogeneous_edge)
         input_data = (node_features, heterogeneous_edges)
-        act_model.train()
-        if cfg.algo == 'reinforce':
+        act_model.eval()
+        pred_seq, ll_old, _, _, _, _, _ = act_model(input_data,
+                                                    device,
+                                                    scheduler_list=scheduler_list,
+                                                    num_machine=num_machine,
+                                                    num_job=num_job,
+                                                    train=False
+                                                    )
 
-            pred_seq, ll_old, _, edge_loss, node_loss, loss_kld, baselines = act_model(input_data,
-                                            device,
-                                            scheduler_list=scheduler_list,
-                                            num_machine=num_machine,
-                                            num_job=num_job
-                                            )
+        sequence = pred_seq[0]
+        makespan = -scheduler.run(sequence.tolist()) / params['reward_scaler']
+        real_makespan = list()
+        real_makespan.append(makespan)
+        c_max.append(makespan)
+        buffer.memory(jobs_datas[0], pred_seq[0].cpu().detach().numpy(), ll_old[0].cpu().detach().numpy(), makespan,
+                      num_job, num_machine)
+        ave_makespan += sum(real_makespan) / (params["batch_size"] * params["log_step"])
+        """
+        soft actor critic
+        
+        """
+        eligible_problem_sizes = \
+            [
+                ps for ps, count in buffer.step_count.items()
+                if count > buffer.batch_size
+            ]
+        if len(eligible_problem_sizes)>=1 :
+            sampled_jobs_datas, action_sequences, pi_olds, makespan, sampled_problem_size = buffer.sample()
+            sampled_problem_size = sampled_problem_size.split('_')
+            sampled_num_job = int(sampled_problem_size[0])
+            sampled_num_machine = int(sampled_problem_size[1])
+            #print(sampled_problem_size)
 
-            real_makespan = list()
-            for n in range(params['batch_size']):  # act_model(agent)가 산출한 해를 평가하는 부분
-                sequence = pred_seq[n]
-                scheduler = AdaptiveScheduler(jobs_datas[n])
-                makespan = -scheduler.run(sequence.tolist()) / params['reward_scaler']
-                real_makespan.append(makespan)
-                c_max.append(makespan)
-                buffer.memory(jobs_datas[n], pred_seq[n].detach().numpy(), ll_old[n].detach().numpy(), makespan, num_job, num_machine)
 
-
-            ave_makespan += sum(real_makespan) / (params["batch_size"] * params["log_step"])
-            """
-            soft actor critic
-            
-            """
-
-            sampled_jobs_datas, action_sequences, pi_olds, makespan = buffer.sample()
             sampled_scheduler_list = list()
             for n in range(len(sampled_jobs_datas)):
                 sampled_scheduler_list.append(AdaptiveScheduler(sampled_jobs_datas[n]))
+
+
 
             act_model.get_jssp_instance(sampled_scheduler_list)  # 훈련해야할 instance를 에이전트가 참조(등록)하는 코드
             heterogeneous_edges = list()
@@ -283,23 +280,31 @@ def train_model(params, log_path=None):
 
             for n in range(params['batch_size']):
                 """
-
+    
                 Instance를 명세하는 부분
                 - Node feature: Operation의 다섯개 feature
                 - Edge: 
-
+    
                 """
 
-                scheduler = AdaptiveScheduler(jobs_datas[n])
+                scheduler = AdaptiveScheduler(sampled_jobs_datas[n])
                 node_feature = scheduler.get_node_feature()
                 node_features.append(node_feature)
                 edge_precedence = scheduler.get_edge_index_precedence()
                 edge_antiprecedence = scheduler.get_edge_index_antiprecedence()
                 edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
-                heterogeneous_edge = (
-                edge_precedence, edge_antiprecedence, edge_machine_sharing)  # 세종류의 엑지들을 하나의 변수로 참조시킴
+                heterogeneous_edge = (edge_precedence, edge_antiprecedence, edge_machine_sharing)  # 세종류의 엑지들을 하나의 변수로 참조시킴
                 heterogeneous_edges.append(heterogeneous_edge)
-            input_data = (node_features, heterogeneous_edges)
+            sampled_input_data = (node_features, heterogeneous_edges)
+            act_model.train()
+            act_model.Latent.current_num_edges = sampled_num_machine * sampled_num_job
+            pred_seq, ll_old, _, edge_loss, node_loss, loss_kld, baselines = act_model(sampled_input_data,
+                                                                                       device,
+                                                                                       scheduler_list=sampled_scheduler_list,
+                                                                                       num_machine=sampled_num_machine,
+                                                                                       num_job=sampled_num_job,
+                                                                                       train = True
+                                                                                       )
 
 
 
@@ -307,13 +312,14 @@ def train_model(params, log_path=None):
             cri_loss = F.mse_loss(torch.tensor(real_makespan).to(device), baselines.squeeze(1))
             #print(torch.tensor(real_makespan).detach().unsqueeze(1).to(device).shape, baselines.shape, ll_old.shape)
             """
-
+    
             1. Loss 구하기
             2. Gradient 구하기 (loss.backward)
             3. Update 하기(act_optim.step)
-
+    
             """
             latent_loss = edge_loss+node_loss+loss_kld
+            #print(ll_old)
             act_loss = -(ll_old * adv.detach()).mean()  # loss 구하는 부분 /  ll_old의 의미 log_theta (pi | s)
 
 
@@ -324,6 +330,12 @@ def train_model(params, log_path=None):
             cri_optim.zero_grad()
             total_loss.backward()
 
+            nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 10)), norm_type=2)
+            nn.utils.clip_grad_norm_(act_model.all_attention_params, max_norm=float(os.environ.get("grad_clip", 10)),
+                                     norm_type=2)
+            nn.utils.clip_grad_norm_(act_model.critic.parameters(), max_norm=float(os.environ.get("grad_clip", 10)),
+                                     norm_type=2)
+
             # 그 후 각 옵티마이저 단계 실행
             latent_optim.step()
             act_optim.step()
@@ -331,63 +343,38 @@ def train_model(params, log_path=None):
 
             act_lr_scheduler.step()
 
-            #latent_lr_scheduler.step()
-
-            # latent_optim = optim.Adam(act_model.Latent.parameters(), lr=params["lr"])
-            # act_optim = optim.Adam(act_model.all_attention_params, lr=params["lr"])
-            # cri_optim = optim.Adam(act_model.critic.parameters(), lr=1e-3)
-
-            nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 10)), norm_type=2)
-            nn.utils.clip_grad_norm_(act_model.all_attention_params, max_norm=float(os.environ.get("grad_clip", 10)),
-                                     norm_type=2)
-            nn.utils.clip_grad_norm_(act_model.critic.parameters(), max_norm=float(os.environ.get("grad_clip", 10)),
-                                     norm_type=2)
 
 
-        if act_lr_scheduler.get_last_lr()[0] >= \
-                float(os.environ.get("lr_decay_min", 5.0e-4)):
-            if params["is_lr_decay"]:
-                act_lr_scheduler.step()
-        ave_act_loss += act_loss.item()
 
-        if s % params["log_step"] == 0:
-            t2 = time()
-            print('step:%d/%d, actic loss:%1.3f, crictic loss:%1.3f, L:%1.3f, %dmin%dsec' % (
-                s, params["step"], ave_act_loss / ((s + 1) * params["iteration"]),
-                ave_cri_loss / ((s + 1) * params["iteration"]), ave_makespan, (t2 - t1) // 60, (t2 - t1) % 60))
-            ave_makespan = 0
-            if log_path is None:
-                log_path = params["log_dir"] + '/ppo' + '/%s_train.csv' % date
-                with open(log_path, 'w') as f:
-                    f.write('step,actic loss, crictic loss, average makespan,time\n')
-            else:
-                with open(log_path, 'a') as f:
-                    f.write('%d,%1.4f,%1.4f,%1.4f,%dmin%dsec\n' % (
-                        s, ave_act_loss / ((s + 1) * params["iteration"]),
-                        ave_cri_loss / ((s + 1) * params["iteration"]),
-                        ave_makespan / (s + 1),
-                        (t2 - t1) // 60, (t2 - t1) % 60))
-            t1 = time()
 
-        if s % params["save_step"] == 1:
-            if cfg.vessl == False:
-                torch.save({'epoch': s,
-                            'model_state_dict_actor': act_model.state_dict(),
-                            'optimizer_state_dict_actor': act_optim.state_dict(),
-                            'ave_act_loss': ave_act_loss,
-                            'ave_cri_loss': 0,
-                            'ave_makespan': ave_makespan},
-                           params["model_dir"] + '/ppo_w_third_feature' + '/%s_step%d_act.pt' % (date, s))
-            else:
-                torch.save({'epoch': s,
-                            'model_state_dict_actor': act_model.state_dict(),
-                            'optimizer_state_dict_actor': act_optim.state_dict(),
-                            'ave_act_loss': ave_act_loss,
-                            'ave_cri_loss': 0,
-                            'ave_makespan': ave_makespan},
-                           output_dir + '/%s_step%d_act.pt' % (date, s))
+            ave_act_loss += act_loss.item()
 
-        #     print('save model...')
+            if s % params["log_step"] == 0:
+                t2 = time()
+                print('step:%d/%d, actic loss:%1.3f, crictic loss:%1.3f, L:%1.3f, %dmin%dsec' % (
+                    s, params["step"], ave_act_loss / ((s + 1) * params["iteration"]),
+                    ave_cri_loss / ((s + 1) * params["iteration"]), ave_makespan, (t2 - t1) // 60, (t2 - t1) % 60))
+
+
+            if s % params["save_step"] == 1:
+                if cfg.vessl == False:
+                    torch.save({'epoch': s,
+                                'model_state_dict_actor': act_model.state_dict(),
+                                'optimizer_state_dict_actor': act_optim.state_dict(),
+                                'ave_act_loss': ave_act_loss,
+                                'ave_cri_loss': 0,
+                                'ave_makespan': ave_makespan},
+                               params["model_dir"] + '/ppo_w_third_feature' + '/%s_step%d_act.pt' % (date, s))
+                else:
+                    torch.save({'epoch': s,
+                                'model_state_dict_actor': act_model.state_dict(),
+                                'optimizer_state_dict_actor': act_optim.state_dict(),
+                                'ave_act_loss': ave_act_loss,
+                                'ave_cri_loss': 0,
+                                'ave_makespan': ave_makespan},
+                               output_dir + '/%s_step%d_act.pt' % (date, s))
+
+            #     print('save model...')
 
 
 if __name__ == '__main__':
@@ -409,7 +396,7 @@ if __name__ == '__main__':
         "log_dir": log_dir,
         "save_step": cfg.save_step,
         "model_dir": model_dir,
-        "batch_size": cfg.batch_size,
+        "batch_size": 3,
         "init_min": -0.08,
         "init_max": 0.08,
         "use_logit_clipping": True,
@@ -444,7 +431,7 @@ if __name__ == '__main__':
         "baseline_reset": True,
         "ex_embedding": True,
         "k_epoch": int(os.environ.get("k_epoch", 2)),
-
+        "w_representation_learning": False,
     }
 
     train_model(params)

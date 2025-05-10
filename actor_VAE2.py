@@ -56,12 +56,9 @@ class PtrNet1(nn.Module):
         self.k_hop = params["k_hop"]
 
         num_edge_cat = 3
-        z_dim = 144
+        z_dim = params["z_dim"]
         self.critic = Critic(z_dim)
         self.Latent = LatentModel(z_dim=z_dim, params = params).to(device)
-
-
-
         augmented_hidden_size = params["n_hidden"]
 
         self.ex_embedding = ExEmbedding(raw_feature_size=4, feature_size=params["ex_embedding_size"])
