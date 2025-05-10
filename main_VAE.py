@@ -366,10 +366,10 @@ def train_model(params, log_path=None):
                 if latent_lr_scheduler.get_last_lr()[0] >=  float(os.environ.get("lr_decay_min", 5.0e-5)):
                     latent_lr_scheduler.step()
 
-            nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 10)), norm_type=2)
-            nn.utils.clip_grad_norm_(act_model.all_attention_params, max_norm=float(os.environ.get("grad_clip", 10)),
+            nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 5)), norm_type=2)
+            nn.utils.clip_grad_norm_(act_model.all_attention_params, max_norm=float(os.environ.get("grad_clip", 5)),
                                      norm_type=2)
-            nn.utils.clip_grad_norm_(act_model.critic.parameters(), max_norm=float(os.environ.get("grad_clip", 10)),
+            nn.utils.clip_grad_norm_(act_model.critic.parameters(), max_norm=float(os.environ.get("grad_clip", 5)),
                                      norm_type=2)
 
 
@@ -401,7 +401,7 @@ def train_model(params, log_path=None):
                             'ave_act_loss': ave_act_loss,
                             'ave_cri_loss': 0,
                             'ave_makespan': ave_makespan},
-                           output_dir + '/%s_step%d_act_w_rep.pt' % (date, s))
+                           params["model_dir"] + '/%s_step%d_act_w_rep.pt' % (date, s))
             else:
                 torch.save({'epoch': s,
                             'model_state_dict_actor': act_model.state_dict(),
@@ -409,7 +409,7 @@ def train_model(params, log_path=None):
                             'ave_act_loss': ave_act_loss,
                             'ave_cri_loss': 0,
                             'ave_makespan': ave_makespan},
-                           output_dir + '/%s_step%d_act_wo_rep.pt' % (date, s))
+                           params["model_dir"] + '/%s_step%d_act_wo_rep.pt' % (date, s))
 
 
 
@@ -457,17 +457,17 @@ if __name__ == '__main__':
         "lr_decay_step": int(os.environ.get("lr_decay_step",500)),
         "layers": eval(str(os.environ.get("layers", '[256, 128]'))),
         "n_embedding": int(os.environ.get("n_embedding", 48)),
-        "n_hidden": int(os.environ.get("n_hidden", 84)),
-        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 96)),
-        "n_multi_head": int(os.environ.get("n_multi_head", 2)),
-        "ex_embedding_size": int(os.environ.get("ex_embedding_size",36)),
+        "n_hidden": int(os.environ.get("n_hidden", 128)),
+        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 108)),
+        "n_multi_head": int(os.environ.get("n_multi_head", 1)),
+        "ex_embedding_size": int(os.environ.get("ex_embedding_size",32)),
         "k_hop": int(os.environ.get("k_hop", 1)),
         "is_lr_decay": True,
         "third_feature": 'first_and_second',  # first_and_second, first_only, second_only
         "baseline_reset": True,
         "ex_embedding": True,
         "w_representation_learning": False,
-        "z_dim": 128,
+        "z_dim": 196,
         "k_epoch": int(os.environ.get("k_epoch", 2)),
 
     }
