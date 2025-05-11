@@ -362,9 +362,29 @@ def train_model(params, log_path=None):
             cri_optim.zero_grad()
             total_loss.backward()
 
-            if params['w_representation_learning'] == True:
-                if latent_lr_scheduler.get_last_lr()[0] >=  float(os.environ.get("lr_decay_min", 5.0e-5)):
-                    latent_lr_scheduler.step()
+            #print("critic loss : ", np.round(cri_loss.detach().cpu().numpy().tolist(), 2), " q : ", np.round(q.detach().mean().cpu().numpy().tolist(), 2), " act loss : ",np.round(act_loss.detach().cpu().numpy().tolist(), 2), " sample makespan : ", np.round(torch.tensor(sampled_makespans).float().to(device).mean().detach().cpu().numpy().tolist(), 2))
+            #if s %  50 == 0:
+            param_to_name = {}
+            for name, param in act_model.named_parameters():
+                param_to_name[param] = name
+            print("============================================================")
+            for i, param in enumerate(act_model.critic.parameters()):
+                param_name = param_to_name.get(param, f"unknown_param_{i}")
+
+                if param.grad is not None:
+                    print(f"[{i}] {param_name}: 그래디언트 있음, norm: {param.grad.norm().item():.12f}")
+                else:
+                    print(f"[{i}] {param_name}: 그래디언트 없음")
+            print("---------------------------------")
+            for i, param in enumerate(act_model.all_attention_params):
+                param_name = param_to_name.get(param, f"unknown_param_{i}")
+
+                if param.grad is not None:
+                    print(f"[{i}] {param_name}: 그래디언트 있음, norm: {param.grad.norm().item():.12f}")
+                else:
+                    print(f"[{i}] {param_name}: 그래디언트 없음")
+
+
 
             nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 5)), norm_type=2)
             nn.utils.clip_grad_norm_(act_model.all_attention_params, max_norm=float(os.environ.get("grad_clip", 5)),
@@ -379,6 +399,10 @@ def train_model(params, log_path=None):
             act_optim.step()
             cri_optim.step()
             #act_lr_scheduler.step()
+
+            if params['w_representation_learning'] == True:
+                if latent_lr_scheduler.get_last_lr()[0] >=  float(os.environ.get("lr_decay_min", 5.0e-5)):
+                    latent_lr_scheduler.step()
 
 
         ave_act_loss += act_loss.item()

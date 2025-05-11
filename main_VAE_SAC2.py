@@ -131,9 +131,9 @@ def train_model(params, log_path=None):
     baseline_model = PtrNet1(params).to(device)  # baseline_model 불필요
     baseline_model.load_state_dict(act_model.state_dict())  # baseline_model 불필요
     if params["optimizer"] == 'Adam':
-        latent_optim = optim.Adam(act_model.Latent.parameters(), lr=1e-4)
-        act_optim = optim.Adam(act_model.all_attention_params, lr=5e-4)
-        cri_optim = optim.Adam(act_model.critic.parameters(), lr=5e-4)
+        latent_optim = optim.Adam(act_model.Latent.parameters(), lr=5e-5)
+        act_optim = optim.Adam(act_model.all_attention_params, lr=3e-4)
+        cri_optim = optim.Adam(act_model.critic.parameters(), lr=3e-4)
         log_alpha = torch.zeros(1, requires_grad=True, device=device)
         alpha_optim = optim.Adam([log_alpha], lr=5e-4)
 
@@ -332,32 +332,42 @@ def train_model(params, log_path=None):
             cri_optim.zero_grad()
             latent_optim.zero_grad()
 
-            if cri_loss.detach().cpu().numpy().tolist() <= 300000:
-                pred_seq, lls, _, edge_loss, node_loss, loss_kld, q = act_model(copied_sampled_input_data,
-                                                                                                        device,
-                                                                                                        scheduler_list=copied_sampled_scheduler_list,
-                                                                                                        num_machine=sampled_num_machine,
-                                                                                                        num_job=sampled_num_job,
-                                                                                                        train=True
-                                                                                                        )
+            #if cri_loss.detach().cpu().numpy().tolist() <= 300000:
+            pred_seq, lls, _, edge_loss, node_loss, loss_kld, q = act_model(copied_sampled_input_data,
+                                                                                                    device,
+                                                                                                    scheduler_list=copied_sampled_scheduler_list,
+                                                                                                    num_machine=sampled_num_machine,
+                                                                                                    num_job=sampled_num_job,
+                                                                                                    train=True
+                                                                                                    )
 
-                act_loss = -q.squeeze(1).mean()
-                act_loss.backward()
-                act_optim.step()
-                act_optim.zero_grad()
-                print(np.round(cri_loss.detach().cpu().numpy().tolist(), 2), np.round(act_loss.detach().cpu().numpy().tolist(), 2), np.round(torch.tensor(sampled_makespans).float().to(device).mean().detach().cpu().numpy().tolist(), 2))
+            act_loss = -(q.squeeze(1)-lls).mean()
+            act_loss.backward()
+
+            print("critic loss : ", np.round(cri_loss.detach().cpu().numpy().tolist(), 2), " q : ", np.round(q.detach().mean().cpu().numpy().tolist(), 2), " act loss : ",np.round(act_loss.detach().cpu().numpy().tolist(), 2), " sample makespan : ", np.round(torch.tensor(sampled_makespans).float().to(device).mean().detach().cpu().numpy().tolist(), 2))
+            if s %  50 == 0:
                 param_to_name = {}
-                # for name, param in act_model.named_parameters():
-                #     param_to_name[param] = name
-                # for i, param in enumerate(act_model.all_attention_params):
-                #     param_name = param_to_name.get(param, f"unknown_param_{i}")
-                #
-                #     if param.grad is not None:
-                #         print(f"[{i}] {param_name}: 그래디언트 있음, norm: {param.grad.norm().item():.12f}")
-                #     else:
-                #         print(f"[{i}] {param_name}: 그래디언트 없음")
+                for name, param in act_model.named_parameters():
+                    param_to_name[param] = name
+                print("============================================================")
+                for i, param in enumerate(act_model.critic.parameters()):
+                    param_name = param_to_name.get(param, f"unknown_param_{i}")
 
-                ave_act_loss += act_loss.item()
+                    if param.grad is not None:
+                        print(f"[{i}] {param_name}: 그래디언트 있음, norm: {param.grad.norm().item():.12f}")
+                    else:
+                        print(f"[{i}] {param_name}: 그래디언트 없음")
+                print("---------------------------------")
+                for i, param in enumerate(act_model.all_attention_params):
+                    param_name = param_to_name.get(param, f"unknown_param_{i}")
+
+                    if param.grad is not None:
+                        print(f"[{i}] {param_name}: 그래디언트 있음, norm: {param.grad.norm().item():.12f}")
+                    else:
+                        print(f"[{i}] {param_name}: 그래디언트 없음")
+            act_optim.step()
+            act_optim.zero_grad()
+            ave_act_loss += act_loss.item()
 
             if s % params["log_step"] == 0:
                 t2 = time()

@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from utils import *
 import numpy as np
 import cfg
 from copy import deepcopy
@@ -70,7 +71,7 @@ class PtrNet1(nn.Module):
             mlp_hidden_dim=128,
             pos_mlp_hidden_dim=action_feature_dim * 2,  # 추가된 파라미터
             dropout=0.1
-        )
+        ).to(device)
         self.Latent = LatentModel(z_dim=z_dim, params = params).to(device)
 
 
@@ -78,49 +79,73 @@ class PtrNet1(nn.Module):
         augmented_hidden_size = params["n_hidden"]
 
         self.ex_embedding = ExEmbedding(raw_feature_size=4, feature_size=params["ex_embedding_size"])
-        self.Vec = [nn.Parameter(torch.FloatTensor(augmented_hidden_size+params["ex_embedding_size"], augmented_hidden_size)) for _ in range(self.n_multi_head)]
-        self.Vec = nn.ParameterList(self.Vec)
-        self.W_q = [nn.Linear(augmented_hidden_size+z_dim, augmented_hidden_size+z_dim, bias=False).to(device)  for _ in range(self.n_multi_head)]
-        self.W_q_weights = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_q])
-        self.W_q_biases = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_q])
-        self.W_ref =[nn.Linear(augmented_hidden_size+params["ex_embedding_size"],augmented_hidden_size+z_dim, bias=False).to(device) for _ in range(self.n_multi_head)]
-        self.W_ref_weights = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_ref])
-        self.W_ref_biases = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_ref])
 
+        # Vec 파라미터 리스트 생성 (문제 없음)
+        self.Vec = nn.ParameterList([
+            nn.Parameter(torch.FloatTensor(augmented_hidden_size + params["ex_embedding_size"], augmented_hidden_size))
+            for _ in range(self.n_multi_head)
+        ])
 
-        self.Vec3 = [nn.Parameter(torch.FloatTensor(augmented_hidden_size+params["ex_embedding_size"], augmented_hidden_size)) for _ in range(self.n_multi_head)]
-        self.Vec3 = nn.ParameterList(self.Vec3)
-        self.W_q3 = [nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False).to(device)  for _ in range(self.n_multi_head)]
-        self.W_q_weights3 = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_q3])
-        self.W_q_biases3 = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_q3])
-        self.W_ref3 =[nn.Linear(augmented_hidden_size+params["ex_embedding_size"],augmented_hidden_size, bias=False).to(device) for _ in range(self.n_multi_head)]
-        self.W_ref_weights3 = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_ref3])
-        self.W_ref_biases3 = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_ref3])
+        # 중복 파라미터 제거: W_q와 W_ref를 ModuleList로 변경
+        self.W_q = nn.ModuleList([
+            nn.Linear(augmented_hidden_size + z_dim, augmented_hidden_size + z_dim, bias=False).to(device)
+            for _ in range(self.n_multi_head)
+        ])
 
-        self.Vec4 = [nn.Parameter(torch.FloatTensor(augmented_hidden_size+params["ex_embedding_size"], augmented_hidden_size)) for _ in range(self.n_multi_head)]
-        self.Vec4 = nn.ParameterList(self.Vec4)
-        self.W_q4 = [nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False).to(device)  for _ in range(self.n_multi_head)]
-        self.W_q_weights4 = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_q4])
-        self.W_q_biases4 = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_q4])
-        self.W_ref4 =[nn.Linear(augmented_hidden_size+params["ex_embedding_size"],augmented_hidden_size, bias=False).to(device) for _ in range(self.n_multi_head)]
-        self.W_ref_weights4 = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_ref4])
-        self.W_ref_biases4 = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_ref4])
+        self.W_ref = nn.ModuleList([
+            nn.Linear(augmented_hidden_size + params["ex_embedding_size"], augmented_hidden_size + z_dim,
+                      bias=False).to(device)
+            for _ in range(self.n_multi_head)
+        ])
 
+        # 두 번째 어텐션 블록도 ModuleList로 변경
+        self.Vec3 = nn.ParameterList([
+            nn.Parameter(torch.FloatTensor(augmented_hidden_size + params["ex_embedding_size"], augmented_hidden_size))
+            for _ in range(self.n_multi_head)
+        ])
+
+        self.W_q3 = nn.ModuleList([
+            nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False).to(device)
+            for _ in range(self.n_multi_head)
+        ])
+
+        self.W_ref3 = nn.ModuleList([
+            nn.Linear(augmented_hidden_size + params["ex_embedding_size"], augmented_hidden_size, bias=False).to(device)
+            for _ in range(self.n_multi_head)
+        ])
+
+        # 세 번째 어텐션 블록도 ModuleList로 변경
+        self.Vec4 = nn.ParameterList([
+            nn.Parameter(torch.FloatTensor(augmented_hidden_size + params["ex_embedding_size"], augmented_hidden_size))
+            for _ in range(self.n_multi_head)
+        ])
+
+        self.W_q4 = nn.ModuleList([
+            nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False).to(device)
+            for _ in range(self.n_multi_head)
+        ])
+
+        self.W_ref4 = nn.ModuleList([
+            nn.Linear(augmented_hidden_size + params["ex_embedding_size"], augmented_hidden_size, bias=False).to(device)
+            for _ in range(self.n_multi_head)
+        ])
+
+        # 마지막 포인터 네트워크 관련 파라미터는 그대로 유지
         self.Vec2 = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
         self.W_q2 = nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False)
-        self.W_ref2 = nn.Linear(augmented_hidden_size+params["ex_embedding_size"],augmented_hidden_size, bias=False)
+        self.W_ref2 = nn.Linear(augmented_hidden_size + params["ex_embedding_size"], augmented_hidden_size, bias=False)
         self.v_1 = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
 
-        attention_params_1 = list(self.Vec) + list(self.W_q_weights) + list(self.W_q_biases) + list(
-            self.W_ref_weights) + list(self.W_ref_biases)
-
-        # 두 번째 어텐션 블록 파라미터
-        attention_params_2 = list(self.Vec3) + list(self.W_q_weights3) + list(self.W_q_biases3) + list(
-            self.W_ref_weights3) + list(self.W_ref_biases3)
-
-        # 세 번째 어텐션 블록 파라미터
-        attention_params_3 = list(self.Vec4) + list(self.W_q_weights4) + list(self.W_q_biases4) + list(
-            self.W_ref_weights4) + list(self.W_ref_biases4)
+        # 파라미터 목록 생성 방식도 변경
+        # 모든 어텐션 관련 파라미터를 각 모듈에서 parameters() 메소드로 추출
+        attention_params_1 = list(self.Vec) + [p for m in self.W_q for p in m.parameters()] + [p for m in self.W_ref for
+                                                                                               p in m.parameters()]
+        attention_params_2 = list(self.Vec3) + [p for m in self.W_q3 for p in m.parameters()] + [p for m in self.W_ref3
+                                                                                                 for p in
+                                                                                                 m.parameters()]
+        attention_params_3 = list(self.Vec4) + [p for m in self.W_q4 for p in m.parameters()] + [p for m in self.W_ref4
+                                                                                                 for p in
+                                                                                                 m.parameters()]
 
         # 마지막 포인터 네트워크 관련 파라미터
         pointer_params = [self.Vec2, self.W_q2.weight]
@@ -132,10 +157,8 @@ class PtrNet1(nn.Module):
         pointer_params.append(self.v_1)
 
         # 모든 어텐션 관련 파라미터
-        self.all_attention_params = list(self.ex_embedding.parameters())+attention_params_1 + attention_params_2 + attention_params_3 + pointer_params
-        #self.all_attention_params = [p for p in model.parameters() if p not in set(self.all_attention_params)]
-
-
+        self.all_attention_params = list(
+            self.ex_embedding.parameters()) + attention_params_1 + attention_params_2 + attention_params_3 + pointer_params
 
         self._initialize_weights(params["init_min"], params["init_max"])
         self.use_logit_clipping = params["use_logit_clipping"]
@@ -212,7 +235,7 @@ class PtrNet1(nn.Module):
 
 
 ####
-    def forward(self, x, device, scheduler_list, num_job, num_machine, old_sequence = None, train = True):
+    def forward(self, x, device, scheduler_list, num_job, num_machine, old_sequence = None, train = True, q_update = False):
 
         node_features, heterogeneous_edges = x
         node_features = torch.tensor(node_features).to(device).float()
@@ -245,8 +268,8 @@ class PtrNet1(nn.Module):
         if old_sequence != None:
             old_sequence = torch.tensor(old_sequence).long().to(device)
         next_operation_indices = list()
-        lb_records = [[],[],[],[],[],[]]
 
+        action_sequences = torch.zeros([batch_size, num_operations, 4]).to(device)
         for i in range(num_operations):
             est_placeholder = mask2_debug.clone().to(device)
             fin_placeholder = mask2_debug.clone().to(device)
@@ -306,14 +329,13 @@ class PtrNet1(nn.Module):
             empty_zero = empty_zero.unsqueeze(2)
             empty_zero2 = empty_zero2.unsqueeze(2)
 
-            r_temp = torch.concat([est_placeholder, fin_placeholder, empty_zero, empty_zero2], dim=2)  # extended node embedding을 만드는 부분(z_t_i에 해당)
-            r_temp = r_temp.reshape([batch*num_operations, -1])
+            r_temp_raw = torch.concat([est_placeholder, fin_placeholder, empty_zero, empty_zero2], dim=2)  # extended node embedding을 만드는 부분(z_t_i에 해당)
+            r_temp = r_temp_raw.reshape([batch*num_operations, -1])
             r_temp = self.ex_embedding(r_temp)
             r_temp = r_temp.reshape([batch, num_operations, -1])
 
 
             ref = torch.concat([features, r_temp], dim=2)
-            #print(ref.shape)
             if self.params['w_representation_learning'] == True:
                 h_c = self.decoder(z.reshape(1, batch_size, -1).detach(), h_pi_t_minus_one.reshape(1, batch_size, -1)) # decoding 만드는 부분
             else:
@@ -328,49 +350,59 @@ class PtrNet1(nn.Module):
             query = self.glimpse(query, ref, mask2_debug)  # 보는 부분 /  multi-head attention 부분 (mask2는 보는 masking)
             logits = self.pointer(query, ref, mask1_debug) # 선택하는 부분 / logit 구하는 부분 (#mask1은 선택하는 masking)
 
-            cp_list = torch.tensor(cp_list)
-            #print(cp_list.shape)
+            y_hard, y_soft = gumbel_softmax_hard(logits, tau=1, dim=-1)
+            mask = (y_hard == 1)
+            selected_action = torch.einsum('bnk, bn -> bk', r_temp_raw, y_hard)
 
-            #log_p = torch.log_softmax(logits / self.T, dim=-1) # log_softmax로 구하는 부분
+            # selected_action = r_temp_raw[mask]*y_hard[mask].reshape(batch_size,1)
+            # y_soft에서 마스크가 True인 요소만 추출
 
-            log_p = torch.log(F.gumbel_softmax(logits, tau=1, hard=True, dim = -1)+1e-8)
-            #print(F.gumbel_softmax(logits, tau=1, hard=True, dim = -1))
-            #log_p = torch.log(p)
+
+            action_sequences[:, i, :] = selected_action
+
+            hard_log_p = torch.log(y_hard)
             if old_sequence == None:
-                next_operation_index = self.job_selecter(log_p)
+                next_operation_index = self.job_selecter(hard_log_p)
             else:
                 next_operation_index = old_sequence[i, :]
 
-
-
-
-
-            log_probabilities.append(log_p.gather(1, next_operation_index.unsqueeze(1)))
+            selected_elements = y_soft[mask]
+            log_p = torch.log(selected_elements+1e-10)
+            log_probabilities.append(log_p)
             sample_space = sample_space.to(device)
             next_job = sample_space[next_operation_index].to(device)
             mask1_debug, mask2_debug = self.update_mask(next_job.tolist()) # update masking을 수행해주는
 
             batch_indices = torch.arange(features.size(0))
-            print(next_operation_index)
             h_pi_t_minus_one = features[batch_indices, next_operation_index]
-
 
 
             #h_pi_t_minus_one = torch.gather(input=features, dim=1, index=next_operation_index.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, mean_feature.shape[2])).squeeze(1).unsqueeze(0)  # 다음 sequence의 input은 encoder의 output 중에서 현재 sequence에 해당하는 embedding이 된다.
             next_operation_indices.append(next_operation_index.tolist())
             pi_list.append(next_job)
 
-        # if train == True:
-        #     if self.params['w_representation_learning']==True:
-        #         baselines = self.critic(z.detach())
-        #     else:
-        #         baselines = self.critic(z)
+        if train == True:
+            if self.params['w_representation_learning']==True:
+                if q_update == True:
+                    q = self.critic(z.detach(), action_sequences.detach())
+                else:
+                    q = self.critic(z.detach(), action_sequences)
+
+
+            else:
+                q = self.critic(z, action_sequences)
+
+        else:
+            q = None
+            q_for_critic_update = None
+
+
 
         pi = torch.stack(pi_list, dim=1)
         log_probabilities = torch.stack(log_probabilities, dim=1)
 
         ll = log_probabilities.sum(dim=1)    # 각 solution element의 log probability를 더하는 방식
-        return pi, ll, next_operation_indices, edge_loss, node_loss, loss_kld, baselines
+        return pi, ll, next_operation_indices, edge_loss, node_loss, loss_kld, q
 
     def glimpse(self, query, ref, mask0):
         """
@@ -388,11 +420,7 @@ class PtrNet1(nn.Module):
             u = torch.bmm(u1, u2)/dk**0.5
             v = ref@self.Vec[m]
             u = u.squeeze(1).masked_fill(mask0 == 0, -1e8)
-
-
             a = F.softmax(u, dim=1)
-
-
             if m == 0:
                 g = torch.bmm(a.unsqueeze(1), v).squeeze(1)
             else:

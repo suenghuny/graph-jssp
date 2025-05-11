@@ -62,49 +62,73 @@ class PtrNet1(nn.Module):
         augmented_hidden_size = params["n_hidden"]
 
         self.ex_embedding = ExEmbedding(raw_feature_size=4, feature_size=params["ex_embedding_size"])
-        self.Vec = [nn.Parameter(torch.FloatTensor(augmented_hidden_size+params["ex_embedding_size"], augmented_hidden_size)) for _ in range(self.n_multi_head)]
-        self.Vec = nn.ParameterList(self.Vec)
-        self.W_q = [nn.Linear(augmented_hidden_size+z_dim, augmented_hidden_size+z_dim, bias=False).to(device)  for _ in range(self.n_multi_head)]
-        self.W_q_weights = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_q])
-        self.W_q_biases = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_q])
-        self.W_ref =[nn.Linear(augmented_hidden_size+params["ex_embedding_size"],augmented_hidden_size+z_dim, bias=False).to(device) for _ in range(self.n_multi_head)]
-        self.W_ref_weights = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_ref])
-        self.W_ref_biases = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_ref])
 
+        # Vec 파라미터 리스트 생성 (문제 없음)
+        self.Vec = nn.ParameterList([
+            nn.Parameter(torch.FloatTensor(augmented_hidden_size + params["ex_embedding_size"], augmented_hidden_size))
+            for _ in range(self.n_multi_head)
+        ])
 
-        self.Vec3 = [nn.Parameter(torch.FloatTensor(augmented_hidden_size+params["ex_embedding_size"], augmented_hidden_size)) for _ in range(self.n_multi_head)]
-        self.Vec3 = nn.ParameterList(self.Vec3)
-        self.W_q3 = [nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False).to(device)  for _ in range(self.n_multi_head)]
-        self.W_q_weights3 = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_q3])
-        self.W_q_biases3 = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_q3])
-        self.W_ref3 =[nn.Linear(augmented_hidden_size+params["ex_embedding_size"],augmented_hidden_size, bias=False).to(device) for _ in range(self.n_multi_head)]
-        self.W_ref_weights3 = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_ref3])
-        self.W_ref_biases3 = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_ref3])
+        # 중복 파라미터 제거: W_q와 W_ref를 ModuleList로 변경
+        self.W_q = nn.ModuleList([
+            nn.Linear(augmented_hidden_size + z_dim, augmented_hidden_size + z_dim, bias=False).to(device)
+            for _ in range(self.n_multi_head)
+        ])
 
-        self.Vec4 = [nn.Parameter(torch.FloatTensor(augmented_hidden_size+params["ex_embedding_size"], augmented_hidden_size)) for _ in range(self.n_multi_head)]
-        self.Vec4 = nn.ParameterList(self.Vec4)
-        self.W_q4 = [nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False).to(device)  for _ in range(self.n_multi_head)]
-        self.W_q_weights4 = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_q4])
-        self.W_q_biases4 = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_q4])
-        self.W_ref4 =[nn.Linear(augmented_hidden_size+params["ex_embedding_size"],augmented_hidden_size, bias=False).to(device) for _ in range(self.n_multi_head)]
-        self.W_ref_weights4 = nn.ParameterList([nn.Parameter(q.weight) for q in self.W_ref4])
-        self.W_ref_biases4 = nn.ParameterList([nn.Parameter(q.bias) for q in self.W_ref4])
+        self.W_ref = nn.ModuleList([
+            nn.Linear(augmented_hidden_size + params["ex_embedding_size"], augmented_hidden_size + z_dim,
+                      bias=False).to(device)
+            for _ in range(self.n_multi_head)
+        ])
 
+        # 두 번째 어텐션 블록도 ModuleList로 변경
+        self.Vec3 = nn.ParameterList([
+            nn.Parameter(torch.FloatTensor(augmented_hidden_size + params["ex_embedding_size"], augmented_hidden_size))
+            for _ in range(self.n_multi_head)
+        ])
+
+        self.W_q3 = nn.ModuleList([
+            nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False).to(device)
+            for _ in range(self.n_multi_head)
+        ])
+
+        self.W_ref3 = nn.ModuleList([
+            nn.Linear(augmented_hidden_size + params["ex_embedding_size"], augmented_hidden_size, bias=False).to(device)
+            for _ in range(self.n_multi_head)
+        ])
+
+        # 세 번째 어텐션 블록도 ModuleList로 변경
+        self.Vec4 = nn.ParameterList([
+            nn.Parameter(torch.FloatTensor(augmented_hidden_size + params["ex_embedding_size"], augmented_hidden_size))
+            for _ in range(self.n_multi_head)
+        ])
+
+        self.W_q4 = nn.ModuleList([
+            nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False).to(device)
+            for _ in range(self.n_multi_head)
+        ])
+
+        self.W_ref4 = nn.ModuleList([
+            nn.Linear(augmented_hidden_size + params["ex_embedding_size"], augmented_hidden_size, bias=False).to(device)
+            for _ in range(self.n_multi_head)
+        ])
+
+        # 마지막 포인터 네트워크 관련 파라미터는 그대로 유지
         self.Vec2 = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
         self.W_q2 = nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False)
-        self.W_ref2 = nn.Linear(augmented_hidden_size+params["ex_embedding_size"],augmented_hidden_size, bias=False)
+        self.W_ref2 = nn.Linear(augmented_hidden_size + params["ex_embedding_size"], augmented_hidden_size, bias=False)
         self.v_1 = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
 
-        attention_params_1 = list(self.Vec) + list(self.W_q_weights) + list(self.W_q_biases) + list(
-            self.W_ref_weights) + list(self.W_ref_biases)
-
-        # 두 번째 어텐션 블록 파라미터
-        attention_params_2 = list(self.Vec3) + list(self.W_q_weights3) + list(self.W_q_biases3) + list(
-            self.W_ref_weights3) + list(self.W_ref_biases3)
-
-        # 세 번째 어텐션 블록 파라미터
-        attention_params_3 = list(self.Vec4) + list(self.W_q_weights4) + list(self.W_q_biases4) + list(
-            self.W_ref_weights4) + list(self.W_ref_biases4)
+        # 파라미터 목록 생성 방식도 변경
+        # 모든 어텐션 관련 파라미터를 각 모듈에서 parameters() 메소드로 추출
+        attention_params_1 = list(self.Vec) + [p for m in self.W_q for p in m.parameters()] + [p for m in self.W_ref for
+                                                                                               p in m.parameters()]
+        attention_params_2 = list(self.Vec3) + [p for m in self.W_q3 for p in m.parameters()] + [p for m in self.W_ref3
+                                                                                                 for p in
+                                                                                                 m.parameters()]
+        attention_params_3 = list(self.Vec4) + [p for m in self.W_q4 for p in m.parameters()] + [p for m in self.W_ref4
+                                                                                                 for p in
+                                                                                                 m.parameters()]
 
         # 마지막 포인터 네트워크 관련 파라미터
         pointer_params = [self.Vec2, self.W_q2.weight]
@@ -116,10 +140,8 @@ class PtrNet1(nn.Module):
         pointer_params.append(self.v_1)
 
         # 모든 어텐션 관련 파라미터
-        self.all_attention_params = list(self.ex_embedding.parameters())+attention_params_1 + attention_params_2 + attention_params_3 + pointer_params
-        #self.all_attention_params = [p for p in model.parameters() if p not in set(self.all_attention_params)]
-
-
+        self.all_attention_params = list(
+            self.ex_embedding.parameters()) + attention_params_1 + attention_params_2 + attention_params_3 + pointer_params
 
         self._initialize_weights(params["init_min"], params["init_max"])
         self.use_logit_clipping = params["use_logit_clipping"]

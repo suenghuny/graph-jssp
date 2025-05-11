@@ -165,3 +165,25 @@ class Replay_Buffer:
 
         return jobs_data , action_sequences, pi_olds, makespan, sampled_problem_size
 
+def gumbel_softmax_hard(
+    logits,
+    tau = 1.0,
+    dim: int = -1,
+) :
+
+
+    gumbels = (
+        -torch.empty_like(logits, memory_format=torch.legacy_contiguous_format)
+        .exponential_()
+        .log()
+    )  # ~Gumbel(0,1)
+    gumbels = (logits + gumbels) / tau  # ~Gumbel(logits,tau)
+    y_soft = gumbels.softmax(dim)
+
+    index = y_soft.max(dim, keepdim=True)[1]
+    y_hard = torch.zeros_like(
+        logits, memory_format=torch.legacy_contiguous_format
+    ).scatter_(dim, index, 1.0)
+    ret = y_hard - y_soft.detach() + y_soft
+    return ret, y_soft
+

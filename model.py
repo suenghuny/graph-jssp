@@ -399,7 +399,7 @@ class EnhancedPositionalEncoding(nn.Module):
     액션 시퀀스에 위치 정보를 추가하고 MLP를 통과시켜 한 번 더 임베딩하는 향상된 Positional Encoding
     """
 
-    def __init__(self, d_model, max_seq_length=1000, mlp_hidden_dim=None, dropout=0.1):
+    def __init__(self, d_model, max_seq_length=100, mlp_hidden_dim=None, dropout=0.1):
         super(EnhancedPositionalEncoding, self).__init__()
 
         # MLP 히든 차원이 지정되지 않은 경우 기본값 설정
@@ -453,7 +453,7 @@ class EnhancedPositionalEncoding(nn.Module):
         enhanced = enhanced.view(original_shape)  # [batch_size, seq_length, d_model]
 
         # 잔차 연결 및 Layer Normalization
-        enhanced = self.layer_norm(enhanced + x_with_pos)
+        enhanced = enhanced + x_with_pos
 
         return enhanced
 
@@ -609,7 +609,7 @@ class QValueAttentionModel(nn.Module):
         # state_encoding을 MLP를 통해 확장
         # [batch_size, state_dim] -> [batch_size, state_projection_dim]
         projected_state = self.state_projection(state_encoding)
-        projected_state = self.state_norm(projected_state)
+        #projected_state = self.state_norm(projected_state)
 
         # action sequence에 향상된 positional encoding 적용 (MLP를 통한 추가 임베딩 포함)
         action_sequence = self.pos_encoding(action_sequence)
@@ -625,12 +625,13 @@ class QValueAttentionModel(nn.Module):
                                      mask)  # [batch_size, 1, state_projection_dim]
 
         # add & norm (residual connection)
-        attn_output = self.norm1(attn_output + query)  # [batch_size, 1, state_projection_dim]
+        attn_output = attn_output + query  # [batch_size, 1, state_projection_dim]
 
         # 차원 축소 [batch_size, 1, state_projection_dim] -> [batch_size, state_projection_dim]
         attn_output = attn_output.squeeze(1)
 
         # MLP를 통해 Q값(scalar) 출력
-        q_value = self.q_mlp(attn_output)  # [batch_size, 1]
+        q_value = self.q_mlp(attn_output)*1000  # [batch_size, 1]
+        #q_value = F.softplus(q_value)
 
         return q_value
