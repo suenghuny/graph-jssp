@@ -443,6 +443,7 @@ if __name__ == '__main__':
         "graph_embedding_size": int(os.environ.get("graph_embedding_size", 96)),
         "n_multi_head": int(os.environ.get("n_multi_head", 1)),
         "ex_embedding_size": int(os.environ.get("ex_embedding_size", 42)),
+
         "k_hop": int(os.environ.get("k_hop", 1)),
         "is_lr_decay": True,
         "third_feature": 'first_and_second',  # first_and_second, first_only, second_only

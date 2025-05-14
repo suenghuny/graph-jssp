@@ -72,8 +72,8 @@ class PtrNet1(nn.Module):
 
         # 마지막 포인터 네트워크 관련 파라미터는 그대로 유지
         self.Vec2 = nn.Parameter(torch.FloatTensor(2 *  params["n_hidden"]))
-        self.W_q2 = nn.Linear(2 *  params["n_hidden"], 2 *  params["n_hidden"], bias=False)
-        self.W_ref2 = nn.Linear(2 *  params["n_hidden"],2 *  params["n_hidden"],  bias=False)
+        self.W_q2 = nn.Linear(2 *  params["n_hidden"], params["n_hidden"]+params["ex_embedding_size2"], bias=False)
+        self.W_ref2 = nn.Linear(2 *  params["n_hidden"],  params["n_hidden"]+params["ex_embedding_size2"],  bias=False)
         self.v_1 = nn.Parameter(torch.FloatTensor( params["n_hidden"]))
 
         # 파라미터 목록 생성 방식도 변경
