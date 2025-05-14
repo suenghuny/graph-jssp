@@ -219,30 +219,34 @@ def train_model(params, log_path=None):
                     t1 = time()
 
                     if params['w_representation_learning'] == True:
-                        min_m.to_csv('w_rep_min_makespan_GES_{} EXEMB_{} KHOP_{} NMH_{} NH_{}.csv'.format(params['graph_embedding_size'],
+                        min_m.to_csv('w_rep_min_makespan_GES_{} EXEMB_{}_{} KHOP_{} NMH_{} NH_{}.csv'.format(params['graph_embedding_size'],
                     params['ex_embedding_size'],
+                    params[                                           'ex_embedding_size2'],
                     params['k_hop'],
                     params['n_multi_head'],
                     params['n_hidden']))
                         mean_m.to_csv(
-                            'w_rep_mean_makespan_GES_{} EXEMB_{} KHOP_{} NMH_{} NH_{}.csv'.format(
+                            'w_rep_mean_makespan_GES_{} EXEMB_{}_{} KHOP_{} NMH_{} NH_{}.csv'.format(
                                 params['graph_embedding_size'],
                                 params['ex_embedding_size'],
+                                params['ex_embedding_size2'],
                                 params['k_hop'],
                                 params['n_multi_head'],
                                 params['n_hidden']))
 
                     else:
-                        min_m.to_csv('wo_rep_min_makespan_GES_{} EXEMB_{} KHOP_{} NMH_{} NH_{}.csv'.format(
+                        min_m.to_csv('wo_rep_min_makespan_GES_{} EXEMB_{}_{} KHOP_{} NMH_{} NH_{}.csv'.format(
                             params['graph_embedding_size'],
                             params['ex_embedding_size'],
+                            params['ex_embedding_size2'],
                             params['k_hop'],
                             params['n_multi_head'],
                             params['n_hidden']))
                         mean_m.to_csv(
-                            'wo_rep_mean_makespan_GES_{} EXEMB_{} KHOP_{} NMH_{} NH_{}.csv'.format(
+                            'wo_rep_mean_makespan_GES_{} EXEMB_{}_{} KHOP_{} NMH_{} NH_{}.csv'.format(
                                 params['graph_embedding_size'],
                                 params['ex_embedding_size'],
+                                params['ex_embedding_size2'],
                                 params['k_hop'],
                                 params['n_multi_head'],
                                 params['n_hidden']))
@@ -481,14 +485,16 @@ if __name__ == '__main__':
 
     wandb.login()
     if params['w_representation_learning'] == True:
-        wandb.init(project="Graph JSSP", name="W_REP GES_{} EXEMB_{} KHOP_{} NMH_{} NH_{}".format(params['graph_embedding_size'],
+        wandb.init(project="Graph JSSP", name="W_REP GES_{} EXEMB_{}_{}  KHOP_{} NMH_{} NH_{}".format(params['graph_embedding_size'],
                                                                            params['ex_embedding_size'],
+                                                                           params['ex_embedding_size2'],
                                                                            params['k_hop'],
                                                                            params['n_multi_head'],
                                                                            params['n_hidden']))
     else:
-        wandb.init(project="Graph JSSP", name="WO_REP GES_{} EXEMB_{} KHOP_{} NMH_{} NH_{}".format(params['graph_embedding_size'],
+        wandb.init(project="Graph JSSP", name="WO_REP GES_{} EXEMB_{}_{} KHOP_{} NMH_{} NH_{}".format(params['graph_embedding_size'],
                                                                            params['ex_embedding_size'],
+                                                                           params['ex_embedding_size2'],
                                                                            params['k_hop'],
                                                                            params['n_multi_head'],
                                                                            params['n_hidden']))
