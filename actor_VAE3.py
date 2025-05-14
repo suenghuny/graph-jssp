@@ -426,15 +426,14 @@ class PtrNet1(nn.Module):
             else:
                 g += torch.bmm(a.unsqueeze(1), v).squeeze(1)
 
-           # print(u1.shape, u2.shape, a.unsqueeze(1).shape, v.shape, g.shape)
-        query = g
+        dk = self.params["n_hidden"] / self.n_multi_head
         for m in range(self.n_multi_head):
-            u1 = self.W_q3[m](query).unsqueeze(1)
-            u2 = self.W_ref3[m](ref.reshape(ref.shape[0] * ref.shape[1], -1))  # u2: (batch, 128, block_num)
+            u1 = self.W_q[m](query).unsqueeze(1)
+            u2 = self.W_ref[m](ref.reshape(ref.shape[0] * ref.shape[1], -1))  # u2: (batch, 128, block_num)
             u2 = u2.reshape(ref.shape[0], ref.shape[1], -1)
             u2 = u2.permute(0, 2, 1)
             u = torch.bmm(u1, u2) / dk ** 0.5
-            v = ref @ self.Vec3[m]
+            v = ref @ self.Vec[m]
             u = u.squeeze(1).masked_fill(mask0 == 0, -1e8)
             a = F.softmax(u, dim=1)
             if m == 0:
@@ -443,20 +442,20 @@ class PtrNet1(nn.Module):
                 g += torch.bmm(a.unsqueeze(1), v).squeeze(1)
 
 
-        query = g
+        dk = self.params["n_hidden"]/self.n_multi_head
         for m in range(self.n_multi_head):
-            u1 = self.W_q4[m](query).unsqueeze(1)
-            u2 = self.W_ref4[m](ref.reshape(ref.shape[0] * ref.shape[1], -1))  # u2: (batch, 128, block_num)
+            u1 = self.W_q[m](query).unsqueeze(1)
+            u2 = self.W_ref[m](ref.reshape(ref.shape[0]*ref.shape[1],-1))                             # u2: (batch, 128, block_num)
             u2 = u2.reshape(ref.shape[0], ref.shape[1], -1)
             u2 = u2.permute(0, 2, 1)
-            u = torch.bmm(u1, u2) / dk ** 0.5
-            v = ref @ self.Vec4[m]
+            u = torch.bmm(u1, u2)/dk**0.5
+            v = ref@self.Vec[m]
             u = u.squeeze(1).masked_fill(mask0 == 0, -1e8)
             a = F.softmax(u, dim=1)
             if m == 0:
-                g = torch.bmm(a.reshape(batch_size, 1, -1), v).squeeze(1)
+                g = torch.bmm(a.unsqueeze(1), v).squeeze(1)
             else:
-                g += torch.bmm(a.reshape(batch_size, 1, -1), v).squeeze(1)
+                g += torch.bmm(a.unsqueeze(1), v).squeeze(1)
 
         return g
 

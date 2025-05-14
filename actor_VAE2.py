@@ -56,79 +56,36 @@ class PtrNet1(nn.Module):
         self.k_hop = params["k_hop"]
 
         num_edge_cat = 3
-        z_dim = params["z_dim"]
+        z_dim = params["n_hidden"]
         self.critic = Critic(z_dim)
         self.Latent = LatentModel(z_dim=z_dim, params = params).to(device)
         augmented_hidden_size = params["n_hidden"]
 
-        self.ex_embedding = ExEmbedding(raw_feature_size=4, feature_size=params["ex_embedding_size"])
+        self.ex_embedding = ExEmbedding(raw_feature_size=4, feature_size= params["n_hidden"])
 
         # Vec 파라미터 리스트 생성 (문제 없음)
-        self.Vec = nn.ParameterList([
-            nn.Parameter(torch.FloatTensor(augmented_hidden_size + params["ex_embedding_size"], augmented_hidden_size))
-            for _ in range(self.n_multi_head)
-        ])
+        self.W_v = nn.ParameterList([nn.Parameter(torch.FloatTensor(2 * params["n_hidden"], 2 * params["n_hidden"]))for _ in range(self.n_multi_head)])
 
-        # 중복 파라미터 제거: W_q와 W_ref를 ModuleList로 변경
-        self.W_q = nn.ModuleList([
-            nn.Linear(augmented_hidden_size + z_dim, augmented_hidden_size + z_dim, bias=False).to(device)
-            for _ in range(self.n_multi_head)
-        ])
+        self.W_q = nn.ModuleList([nn.Linear(2 * params["n_hidden"],  params["n_hidden"]+params["ex_embedding_size"], bias=False).to(device)for _ in range(self.n_multi_head)])
 
-        self.W_ref = nn.ModuleList([
-            nn.Linear(augmented_hidden_size + params["ex_embedding_size"], augmented_hidden_size + z_dim,
-                      bias=False).to(device)
-            for _ in range(self.n_multi_head)
-        ])
-
-        # 두 번째 어텐션 블록도 ModuleList로 변경
-        self.Vec3 = nn.ParameterList([
-            nn.Parameter(torch.FloatTensor(augmented_hidden_size + params["ex_embedding_size"], augmented_hidden_size))
-            for _ in range(self.n_multi_head)
-        ])
-
-        self.W_q3 = nn.ModuleList([
-            nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False).to(device)
-            for _ in range(self.n_multi_head)
-        ])
-
-        self.W_ref3 = nn.ModuleList([
-            nn.Linear(augmented_hidden_size + params["ex_embedding_size"], augmented_hidden_size, bias=False).to(device)
-            for _ in range(self.n_multi_head)
-        ])
-
-        # 세 번째 어텐션 블록도 ModuleList로 변경
-        self.Vec4 = nn.ParameterList([
-            nn.Parameter(torch.FloatTensor(augmented_hidden_size + params["ex_embedding_size"], augmented_hidden_size))
-            for _ in range(self.n_multi_head)
-        ])
-
-        self.W_q4 = nn.ModuleList([
-            nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False).to(device)
-            for _ in range(self.n_multi_head)
-        ])
-
-        self.W_ref4 = nn.ModuleList([
-            nn.Linear(augmented_hidden_size + params["ex_embedding_size"], augmented_hidden_size, bias=False).to(device)
-            for _ in range(self.n_multi_head)
-        ])
+        self.W_k = nn.ModuleList([nn.Linear(2 * params["n_hidden"],  params["n_hidden"]+params["ex_embedding_size"],bias=False).to(device) for _ in range(self.n_multi_head)])
 
         # 마지막 포인터 네트워크 관련 파라미터는 그대로 유지
-        self.Vec2 = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
-        self.W_q2 = nn.Linear(augmented_hidden_size, augmented_hidden_size, bias=False)
-        self.W_ref2 = nn.Linear(augmented_hidden_size + params["ex_embedding_size"], augmented_hidden_size, bias=False)
-        self.v_1 = nn.Parameter(torch.FloatTensor(augmented_hidden_size))
+        self.Vec2 = nn.Parameter(torch.FloatTensor(2 *  params["n_hidden"]))
+        self.W_q2 = nn.Linear(2 *  params["n_hidden"], 2 *  params["n_hidden"], bias=False)
+        self.W_ref2 = nn.Linear(2 *  params["n_hidden"],2 *  params["n_hidden"],  bias=False)
+        self.v_1 = nn.Parameter(torch.FloatTensor( params["n_hidden"]))
 
         # 파라미터 목록 생성 방식도 변경
         # 모든 어텐션 관련 파라미터를 각 모듈에서 parameters() 메소드로 추출
-        attention_params_1 = list(self.Vec) + [p for m in self.W_q for p in m.parameters()] + [p for m in self.W_ref for
+        attention_params_1 = list(self.W_v) + [p for m in self.W_q for p in m.parameters()] + [p for m in self.W_k for
                                                                                                p in m.parameters()]
-        attention_params_2 = list(self.Vec3) + [p for m in self.W_q3 for p in m.parameters()] + [p for m in self.W_ref3
-                                                                                                 for p in
-                                                                                                 m.parameters()]
-        attention_params_3 = list(self.Vec4) + [p for m in self.W_q4 for p in m.parameters()] + [p for m in self.W_ref4
-                                                                                                 for p in
-                                                                                                 m.parameters()]
+        # attention_params_2 = list(self.Vec3) + [p for m in self.W_q3 for p in m.parameters()] + [p for m in self.W_ref3
+        #                                                                                          for p in
+        #                                                                                          m.parameters()]
+        # attention_params_3 = list(self.Vec4) + [p for m in self.W_q4 for p in m.parameters()] + [p for m in self.W_ref4
+        #                                                                                          for p in
+        #                                                                                          m.parameters()]
 
         # 마지막 포인터 네트워크 관련 파라미터
         pointer_params = [self.Vec2, self.W_q2.weight]
@@ -141,7 +98,8 @@ class PtrNet1(nn.Module):
 
         # 모든 어텐션 관련 파라미터
         self.all_attention_params = list(
-            self.ex_embedding.parameters()) + attention_params_1 + attention_params_2 + attention_params_3 + pointer_params
+            self.ex_embedding.parameters()) + attention_params_1 + pointer_params
+
 
         self._initialize_weights(params["init_min"], params["init_max"])
         self.use_logit_clipping = params["use_logit_clipping"]
@@ -318,10 +276,8 @@ class PtrNet1(nn.Module):
             r_temp = r_temp.reshape([batch*num_operations, -1])
             r_temp = self.ex_embedding(r_temp)
             r_temp = r_temp.reshape([batch, num_operations, -1])
-
-
             ref = torch.concat([features, r_temp], dim=2)
-            #print(ref.shape)
+
             if self.params['w_representation_learning'] == True:
                 h_c = self.decoder(z.reshape(1, batch_size, -1).detach(),
                                    h_pi_t_minus_one.reshape(1, batch_size, -1))  # decoding 만드는 부분
@@ -377,55 +333,22 @@ class PtrNet1(nn.Module):
         query는 decoder의 출력
         ref는   encoder의 출력
         """
-        dk = self.params["n_hidden"]/self.n_multi_head
-        for m in range(self.n_multi_head):
-            u1 = self.W_q[m](query).unsqueeze(1)
-            u2 = self.W_ref[m](ref.reshape(ref.shape[0]*ref.shape[1],-1))                             # u2: (batch, 128, block_num)
-            u2 = u2.reshape(ref.shape[0], ref.shape[1], -1)
-            u2 = u2.permute(0, 2, 1)
-            u = torch.bmm(u1, u2)/dk**0.5
-            v = ref@self.Vec[m]
-            u = u.squeeze(1).masked_fill(mask0 == 0, -1e8)
-
-
-            a = F.softmax(u, dim=1)
-
-            if m == 0:
-                g = torch.bmm(a.unsqueeze(1), v).squeeze(1)
-            else:
-                g += torch.bmm(a.unsqueeze(1), v).squeeze(1)
-
-           # print(u1.shape, u2.shape, a.unsqueeze(1).shape, v.shape, g.shape)
-        query = g
-        for m in range(self.n_multi_head):
-            u1 = self.W_q3[m](query).unsqueeze(1)
-            u2 = self.W_ref3[m](ref.reshape(ref.shape[0] * ref.shape[1], -1))  # u2: (batch, 128, block_num)
-            u2 = u2.reshape(ref.shape[0], ref.shape[1], -1)
-            u2 = u2.permute(0, 2, 1)
-            u = torch.bmm(u1, u2) / dk ** 0.5
-            v = ref @ self.Vec3[m]
-            u = u.squeeze(1).masked_fill(mask0 == 0, -1e8)
-            a = F.softmax(u, dim=1)
-            if m == 0:
-                g = torch.bmm(a.unsqueeze(1), v).squeeze(1)
-            else:
-                g += torch.bmm(a.unsqueeze(1), v).squeeze(1)
-
-
-        query = g
-        for m in range(self.n_multi_head):
-            u1 = self.W_q4[m](query).unsqueeze(1)
-            u2 = self.W_ref4[m](ref.reshape(ref.shape[0] * ref.shape[1], -1))  # u2: (batch, 128, block_num)
-            u2 = u2.reshape(ref.shape[0], ref.shape[1], -1)
-            u2 = u2.permute(0, 2, 1)
-            u = torch.bmm(u1, u2) / dk ** 0.5
-            v = ref @ self.Vec4[m]
-            u = u.squeeze(1).masked_fill(mask0 == 0, -1e8)
-            a = F.softmax(u, dim=1)
-            if m == 0:
-                g = torch.bmm(a.squeeze().unsqueeze(1), v).squeeze(1)
-            else:
-                g += torch.bmm(a.squeeze().unsqueeze(1), v).squeeze(1)
+        dk = self.params["n_hidden"]#/self.n_multi_head
+        for dd in range(3):
+            for m in range(self.n_multi_head):
+                u1 = self.W_q[m](query).unsqueeze(1)
+                u2 = self.W_k[m](ref.reshape(ref.shape[0]*ref.shape[1],-1))                             # u2: (batch, 128, block_num)
+                u2 = u2.reshape(ref.shape[0], ref.shape[1], -1)
+                u2 = u2.permute(0, 2, 1)
+                u = torch.bmm(u1, u2)/dk**0.5
+                v = ref@self.W_v[m]
+                u = u.squeeze(1).masked_fill(mask0 == 0, -1e8)
+                a = F.softmax(u, dim=1)
+                if m == 0:
+                    g = torch.bmm(a.unsqueeze(1), v).squeeze(1)/self.n_multi_head
+                else:
+                    g += torch.bmm(a.unsqueeze(1), v).squeeze(1)/self.n_multi_head
+            query = g
 
         return g
 
@@ -455,4 +378,5 @@ class PtrNet1(nn.Module):
         return torch.sum(log_p.squeeze(-1), dim = 2)
 
     def decoder(self, h_bar, h_t_minus_one):
+        #print(h_bar.shape, h_t_minus_one.shape)
         return torch.concat([h_bar, h_t_minus_one], dim =2)

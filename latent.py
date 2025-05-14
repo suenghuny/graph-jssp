@@ -58,13 +58,15 @@ class Encoder(nn.Module):
         self.k_hop = params["k_hop"]
         num_edge_cat = 3
 
-        self.GraphEmbedding = GCRN(feature_size =  params["n_hidden"],
+        self.GraphEmbedding = GCRN(
+                                   feature_size =  params["n_hidden"],
                                    graph_embedding_size= params["graph_embedding_size"],
                                    embedding_size =  params["n_hidden"],
                                    layers =  params["layers"],
                                    alpha =  params["alpha"],
                                    n_multi_head = params["n_multi_head"],
-                                   num_edge_cat = num_edge_cat).to(device)
+                                   num_edge_cat = num_edge_cat
+                                   ).to(device)
         self.GraphEmbedding1 = GCRN(feature_size =  params["n_hidden"],
                                    graph_embedding_size= params["graph_embedding_size"],
                                    embedding_size =  params["n_hidden"],
@@ -222,11 +224,11 @@ class LatentModel(nn.Module):
 
             edge_loss = edge_cats*torch.log(edge_pred)+(1-edge_cats)*torch.log(1-edge_pred)
             node_loss = X*torch.log(node_pred)+(1-X)*torch.log(1-node_pred)
-            edge_loss = -edge_loss.mean()
-            node_loss = -node_loss.mean()
+            edge_loss = -edge_loss.sum([1,2]).mean()
+            node_loss = -node_loss.sum(1).mean()
         else:
             edge_loss = None
             node_loss = None
 
 
-        return edge_loss, node_loss, loss_kld, mean_feature, features, z.detach()
+        return edge_loss, node_loss, loss_kld, mean_feature, features, z

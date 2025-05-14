@@ -292,7 +292,7 @@ class GCRN(nn.Module):
         super(GCRN, self).__init__()
         #device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.num_edge_cat = num_edge_cat
-        self.feature_size =feature_size
+        self.feature_size = feature_size
         self.graph_embedding_size = graph_embedding_size
         self.embedding_size = embedding_size
         self.attention = attention

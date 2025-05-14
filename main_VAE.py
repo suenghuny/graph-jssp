@@ -363,26 +363,7 @@ def train_model(params, log_path=None):
             total_loss.backward()
 
             #print("critic loss : ", np.round(cri_loss.detach().cpu().numpy().tolist(), 2), " q : ", np.round(q.detach().mean().cpu().numpy().tolist(), 2), " act loss : ",np.round(act_loss.detach().cpu().numpy().tolist(), 2), " sample makespan : ", np.round(torch.tensor(sampled_makespans).float().to(device).mean().detach().cpu().numpy().tolist(), 2))
-            #if s %  50 == 0:
-            param_to_name = {}
-            for name, param in act_model.named_parameters():
-                param_to_name[param] = name
-            print("============================================================")
-            for i, param in enumerate(act_model.critic.parameters()):
-                param_name = param_to_name.get(param, f"unknown_param_{i}")
 
-                if param.grad is not None:
-                    print(f"[{i}] {param_name}: 그래디언트 있음, norm: {param.grad.norm().item():.12f}")
-                else:
-                    print(f"[{i}] {param_name}: 그래디언트 없음")
-            print("---------------------------------")
-            for i, param in enumerate(act_model.all_attention_params):
-                param_name = param_to_name.get(param, f"unknown_param_{i}")
-
-                if param.grad is not None:
-                    print(f"[{i}] {param_name}: 그래디언트 있음, norm: {param.grad.norm().item():.12f}")
-                else:
-                    print(f"[{i}] {param_name}: 그래디언트 없음")
 
 
 
@@ -481,17 +462,17 @@ if __name__ == '__main__':
         "lr_decay_step": int(os.environ.get("lr_decay_step",500)),
         "layers": eval(str(os.environ.get("layers", '[256, 128]'))),
         "n_embedding": int(os.environ.get("n_embedding", 48)),
-        "n_hidden": int(os.environ.get("n_hidden", 128)),
-        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 108)),
-        "n_multi_head": int(os.environ.get("n_multi_head", 1)),
-        "ex_embedding_size": int(os.environ.get("ex_embedding_size",32)),
+        "n_hidden": int(os.environ.get("n_hidden", 64)),
+        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 96)),
+        "n_multi_head": int(os.environ.get("n_multi_head",1)),
+        "ex_embedding_size": int(os.environ.get("ex_embedding_size",45)),
         "k_hop": int(os.environ.get("k_hop", 1)),
         "is_lr_decay": True,
         "third_feature": 'first_and_second',  # first_and_second, first_only, second_only
         "baseline_reset": True,
         "ex_embedding": True,
-        "w_representation_learning": False,
-        "z_dim": 196,
+        "w_representation_learning":True,
+        "z_dim": 128,
         "k_epoch": int(os.environ.get("k_epoch", 2)),
 
     }
