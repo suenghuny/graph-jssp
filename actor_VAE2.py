@@ -65,20 +65,20 @@ class PtrNet1(nn.Module):
 
         # Vec 파라미터 리스트 생성 (문제 없음)
         self.W_v = nn.ParameterList([nn.Parameter(torch.FloatTensor(2 * params["n_hidden"], 2 * params["n_hidden"]))for _ in range(self.n_multi_head)])
-
         self.W_q = nn.ModuleList([nn.Linear(2 * params["n_hidden"],  params["n_hidden"]+params["ex_embedding_size"], bias=False).to(device)for _ in range(self.n_multi_head)])
-
         self.W_k = nn.ModuleList([nn.Linear(2 * params["n_hidden"],  params["n_hidden"]+params["ex_embedding_size"],bias=False).to(device) for _ in range(self.n_multi_head)])
+        self.W_o = nn.ModuleList([nn.Linear(2 * params["n_hidden"], 2 * params["n_hidden"], bias=False).to(device) for _ in range(self.n_multi_head)])
 
         # 마지막 포인터 네트워크 관련 파라미터는 그대로 유지
         self.Vec2 = nn.Parameter(torch.FloatTensor(2 *  params["n_hidden"]))
         self.W_q2 = nn.Linear(2 *  params["n_hidden"], params["n_hidden"]+params["ex_embedding_size2"], bias=False)
         self.W_ref2 = nn.Linear(2 *  params["n_hidden"],  params["n_hidden"]+params["ex_embedding_size2"],  bias=False)
-        self.v_1 = nn.Parameter(torch.FloatTensor( params["n_hidden"]))
+        self.v_1 = nn.Parameter(torch.FloatTensor(params["n_hidden"]))
 
         # 파라미터 목록 생성 방식도 변경
         # 모든 어텐션 관련 파라미터를 각 모듈에서 parameters() 메소드로 추출
         attention_params_1 = list(self.W_v) + [p for m in self.W_q for p in m.parameters()] + [p for m in self.W_k for
+                                                                                               p in m.parameters()] +[p for m in self.W_o for
                                                                                                p in m.parameters()]
         # attention_params_2 = list(self.Vec3) + [p for m in self.W_q3 for p in m.parameters()] + [p for m in self.W_ref3
         #                                                                                          for p in
@@ -333,7 +333,7 @@ class PtrNet1(nn.Module):
         query는 decoder의 출력
         ref는   encoder의 출력
         """
-        dk = self.params["n_hidden"]#/self.n_multi_head
+        dk = self.params["n_hidden"]/self.n_multi_head
         for dd in range(3):
             for m in range(self.n_multi_head):
                 u1 = self.W_q[m](query).unsqueeze(1)
@@ -345,9 +345,10 @@ class PtrNet1(nn.Module):
                 u = u.squeeze(1).masked_fill(mask0 == 0, -1e8)
                 a = F.softmax(u, dim=1)
                 if m == 0:
-                    g = torch.bmm(a.unsqueeze(1), v).squeeze(1)/self.n_multi_head
+                    g = torch.bmm(a.unsqueeze(1), v).squeeze(1)#/self.n_multi_head
+                    #print(g.shape, self.W_o.shape)
                 else:
-                    g += torch.bmm(a.unsqueeze(1), v).squeeze(1)/self.n_multi_head
+                    g += torch.bmm(a.unsqueeze(1), v).squeeze(1)#/self.n_multi_head
             query = g
 
         return g

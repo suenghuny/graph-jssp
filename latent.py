@@ -224,8 +224,8 @@ class LatentModel(nn.Module):
 
             edge_loss = edge_cats*torch.log(edge_pred)+(1-edge_cats)*torch.log(1-edge_pred)
             node_loss = X*torch.log(node_pred)+(1-X)*torch.log(1-node_pred)
-            edge_loss = -edge_loss.sum([1,2]).mean()
-            node_loss = -node_loss.sum(1).mean()
+            edge_loss = -edge_loss.mean()
+            node_loss = -node_loss.mean()
         else:
             edge_loss = None
             node_loss = None
