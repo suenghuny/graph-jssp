@@ -136,7 +136,7 @@ def train_model(params, log_path=None):
     baseline_model = PtrNet1(params).to(device)  # baseline_model 불필요
     baseline_model.load_state_dict(act_model.state_dict())  # baseline_model 불필요
     if params["optimizer"] == 'Adam':
-        latent_optim = optim.Adam(act_model.Latent.parameters(), lr=5.0e-5)
+        latent_optim = optim.Adam(act_model.Latent.parameters(), lr=params["lr_latent"])
         act_optim = optim.Adam(act_model.all_attention_params, lr=params["lr_critic"])
         cri_optim = optim.Adam(act_model.critic.parameters(), lr=params['lr'])
         act_lr_scheduler = optim.lr_scheduler.StepLR(act_optim, step_size=params["lr_decay_step"], gamma=params["lr_decay"])
@@ -461,17 +461,18 @@ if __name__ == '__main__':
         "reward_scaler": cfg.reward_scaler,
         "beta": float(os.environ.get("beta", 0.65)),
         "alpha": float(os.environ.get("alpha", 0.1)),
-        "lr": float(os.environ.get("lr_critic", 5.0e-4)),
+        "lr_latent": float(os.environ.get("lr_latent", 5.0e-5)),
+        "lr_critic": float(os.environ.get("lr_critic", 1.0e-3)),
         "lr": float(os.environ.get("lr", 1.0e-4)),
         "lr_decay": float(os.environ.get("lr_decay", 0.95)),
         "lr_decay_step": int(os.environ.get("lr_decay_step",500)),
         "layers": eval(str(os.environ.get("layers", '[256, 128]'))),
         "n_embedding": int(os.environ.get("n_embedding", 48)),
-        "n_hidden": int(os.environ.get("n_hidden", 108)),
+        "n_hidden": int(os.environ.get("n_hidden", 128)),
         "graph_embedding_size": int(os.environ.get("graph_embedding_size", 96)),
         "n_multi_head": int(os.environ.get("n_multi_head",2)),
-        "ex_embedding_size": int(os.environ.get("ex_embedding_size",42)),
-        "ex_embedding_size2": int(os.environ.get("ex_embedding_size2", 54)),
+        "ex_embedding_size": int(os.environ.get("ex_embedding_size",36)),
+        "ex_embedding_size2": int(os.environ.get("ex_embedding_size2", 45)),
         "k_hop": int(os.environ.get("k_hop", 1)),
         "is_lr_decay": True,
         "third_feature": 'first_and_second',  # first_and_second, first_only, second_only
@@ -486,18 +487,26 @@ if __name__ == '__main__':
 
     wandb.login()
     if params['w_representation_learning'] == True:
-        wandb.init(project="Graph JSSP", name="W_REP GES_{} EXEMB_{}_{}  KHOP_{} NMH_{} NH_{}".format(params['graph_embedding_size'],
+        wandb.init(project="Graph JSSP", name="W_REP GES_{} EXEMB_{}_{}  KHOP_{} NMH_{} NH_{} LR_{} LR CRI_{} LR LAT_{}".format(params['graph_embedding_size'],
                                                                            params['ex_embedding_size'],
                                                                            params['ex_embedding_size2'],
                                                                            params['k_hop'],
 
                                                                            params['n_multi_head'],
-                                                                           params['n_hidden']))
+                                                                           params['n_hidden'],
+                                                                                                                      params['lr'],
+                                                                                                                      params['lr_critic'],
+                                                                                                                                params['lr_latent']
+                                                                                                                                ))
     else:
-        wandb.init(project="Graph JSSP", name="WO_REP GES_{} EXEMB_{}_{} KHOP_{} NMH_{} NH_{}".format(params['graph_embedding_size'],
+        wandb.init(project="Graph JSSP", name="WO_REP GES_{} EXEMB_{}_{} KHOP_{} NMH_{} NH_{} LR_{} LR CRI_{} LR LAT_{}".format(params['graph_embedding_size'],
                                                                            params['ex_embedding_size'],
                                                                            params['ex_embedding_size2'],
                                                                            params['k_hop'],
                                                                            params['n_multi_head'],
-                                                                           params['n_hidden']))
+                                                                           params['n_hidden'],
+                                                                                                                      params['lr'],
+                                                                                                                      params['lr_critic'],
+                                                                                                                                params['lr_latent']
+                                                                                                                                ))
     train_model(params)
