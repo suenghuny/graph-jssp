@@ -35,17 +35,17 @@ class Gaussian(nn.Module):
         super().__init__()
         self.net = build_mlp(
             input_dim=input_dim,
-            output_dim=2 * output_dim,
+            output_dim=output_dim,
             hidden_units=hidden_units,
             hidden_activation=nn.LeakyReLU(0.2),
         ).apply(initialize_weight)
 
 
     def forward(self, x):
-        x = self.net(x)
-        mean, std = torch.chunk(x, 2, dim=-1)
-        std = F.softplus(std) + 1e-5
-        return mean, std
+        mean = self.net(x)
+        # mean, std = torch.chunk(x, 2, dim=-1)
+        # std = F.softplus(std) + 1e-5
+        return mean
 
 
 class Encoder(nn.Module):
@@ -179,7 +179,7 @@ class LatentModel(nn.Module):
 
         self.current_num_edges = 100
         # p(z) = N(0, I)
-        self.z_prior = FixedGaussian(z_dim, 1.0)
+        self.z_prior = FixedGaussian(z_dim, 0.1)
 
         # x = encoder(G)
         self.encoder = Encoder(params)
@@ -197,11 +197,13 @@ class LatentModel(nn.Module):
 
     def sample_prior(self, x):
         z_mean, z_std = self.z_prior(x)
+        #z_std = torch.ones_like(z_mean)*0.1
         return z_mean, z_std
 
     def sample_posterior(self, features):
         # p(z1(0)) = N(0, I)
-        z_mean, z_std = self.z_posterior(features)
+        z_mean = self.z_posterior(features)
+        z_std = torch.ones_like(z_mean) * 0.1
         z = z_mean + torch.randn_like(z_std) * z_std
         return z_mean, z_std, z
 
