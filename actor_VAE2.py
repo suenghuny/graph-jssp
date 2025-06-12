@@ -176,7 +176,7 @@ class PtrNet1(nn.Module):
 
 
 ####
-    def forward(self, x, device, scheduler_list, num_job, num_machine, upperbound= None, old_sequence = None, train = True):
+    def forward(self, x, device, scheduler_list, num_job, num_machine, old_sequence = None, train = True):
 
         node_features, heterogeneous_edges = x
         node_features = torch.tensor(node_features).to(device).float()
@@ -254,7 +254,11 @@ class PtrNet1(nn.Module):
                 """
                 cp_list = []
                 for nb in range(batch_size):
-                    next_b = next_job[nb].item()
+                    if old_sequence != None:
+                        #print(old_sequence.shape)
+                        next_b = old_sequence[nb, i].item()
+                    else:
+                        next_b = next_job[nb].item()
                     c_max, est, fin, critical_path, critical_path2 = scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb], i = next_b) # next_b는 이전 스텝에서 선택된 Job이고, Adaptive Run이라는 것은 선택된 Job에 따라 update한 다음에 EST, EFIN을 구하라는 의미
                     empty_zero[nb, :]  = torch.tensor(critical_path.reshape(-1)).to(device)
                     empty_zero2[nb, :] = torch.tensor(critical_path2.reshape(-1)).to(device)  # 안중요
@@ -300,10 +304,7 @@ class PtrNet1(nn.Module):
             if old_sequence == None:
                 next_operation_index = self.job_selecter(log_p)
             else:
-                next_operation_index = old_sequence[i, :]
-
-
-
+                next_operation_index = old_sequence[:, i]
 
 
             log_probabilities.append(log_p.gather(1, next_operation_index.unsqueeze(1)))
