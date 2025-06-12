@@ -334,7 +334,7 @@ class PtrNet1(nn.Module):
         ref는   encoder의 출력
         """
         dk = self.params["n_hidden"]/self.n_multi_head
-        for dd in range(3):
+        for dd in range(2):
             for m in range(self.n_multi_head):
                 u1 = self.W_q[m](query).unsqueeze(1)
                 u2 = self.W_k[m](ref.reshape(ref.shape[0]*ref.shape[1],-1))                             # u2: (batch, 128, block_num)

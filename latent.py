@@ -96,19 +96,77 @@ class Encoder(nn.Module):
 
 
 
+#
+# class GraphVAEDecoder(nn.Module):
+#     """
+#     GraphVAE decoder that takes a latent vector z and outputs a probabilistic fully-connected graph.
+#     The graph consists of:
+#     - Adjacency matrix A ∈ [0,1]^(k×k)
+#     - Edge attribute tensor E ∈ [0,1]^(k×k×de)
+#     - Node attribute matrix F ∈ [0,1]^(k×dn)
+#
+#     Where:
+#     - k is the maximum number of nodes
+#     - de is the number of edge types
+#     - dn is the number of node types
+#     """
+#
+#     def __init__(self, latent_dim, max_nodes=100, edge_types=3, node_types=4, hidden_dims=[128, 256, 512]):
+#         super().__init__()
+#         self.latent_dim = latent_dim
+#         self.max_nodes = max_nodes
+#         self.edge_types = edge_types
+#         self.node_types = node_types
+#
+#
+#
+#         # Fully connected layers
+#         layers = []
+#         prev_dim = latent_dim
+#         for hidden_dim in hidden_dims:
+#             layers.append(nn.Linear(prev_dim, hidden_dim))
+#             layers.append(nn.BatchNorm1d(hidden_dim))
+#             layers.append(nn.ReLU())
+#             prev_dim = hidden_dim
+#
+#         self.fc_layers = nn.Sequential(*layers)
+#
+#         # Output layers for adjacency matrix, edge attributes, and node attributes
+#         self.fc_edge = nn.Linear(hidden_dims[-1], max_nodes * max_nodes * edge_types)
+#         self.fc_node = nn.Linear(hidden_dims[-1], max_nodes * node_types)
+#
+#     def forward(self, z):
+#         """
+#         Forward pass through the decoder.
+#
+#         Args:
+#             z: Latent vectors of shape [batch_size, latent_dim]
+#
+#         Returns:
+#             adj_prob: Adjacency matrix probabilities [batch_size, max_nodes, max_nodes]
+#             edge_prob: Edge type probabilities [batch_size, max_nodes, max_nodes, edge_types]
+#             node_prob: Node type probabilities [batch_size, max_nodes, node_types]
+#         """
+#         batch_size = z.size(0)
+#
+#         # Compute feature representation
+#         h = self.fc_layers(z)
+#
+#
+#         # Compute edge type probabilities
+#         edge_logits = self.fc_edge(h).view(batch_size, self.max_nodes, self.max_nodes, self.edge_types)
+#         edge_prob = F.sigmoid(edge_logits)
+#
+#         # Compute node type probabilities
+#         node_logits = self.fc_node(h).view(batch_size, self.max_nodes, self.node_types)
+#         node_prob = F.sigmoid(node_logits)
+#         return node_prob, edge_prob
+
 
 class GraphVAEDecoder(nn.Module):
     """
-    GraphVAE decoder that takes a latent vector z and outputs a probabilistic fully-connected graph.
-    The graph consists of:
-    - Adjacency matrix A ∈ [0,1]^(k×k)
-    - Edge attribute tensor E ∈ [0,1]^(k×k×de)
-    - Node attribute matrix F ∈ [0,1]^(k×dn)
-
-    Where:
-    - k is the maximum number of nodes
-    - de is the number of edge types
-    - dn is the number of node types
+    Alternative approach: Use 1D transposed convolutions to generate sequences,
+    then reshape for graph structure.
     """
 
     def __init__(self, latent_dim, max_nodes=100, edge_types=3, node_types=4, hidden_dims=[128, 256, 512]):
@@ -118,51 +176,77 @@ class GraphVAEDecoder(nn.Module):
         self.edge_types = edge_types
         self.node_types = node_types
 
+        # Initial expansion
+        self.fc_initial = nn.Linear(latent_dim, 512)
 
+        # 1D transposed convolutions for sequence generation
+        self.conv1d_layers = nn.Sequential(
+            # Start with a small sequence length and expand
+            nn.ConvTranspose1d(512, 256, kernel_size=4, stride=2, padding=1),  # Length: 2
+            nn.BatchNorm1d(256),
+            nn.ReLU(),
 
-        # Fully connected layers
-        layers = []
-        prev_dim = latent_dim
-        for hidden_dim in hidden_dims:
-            layers.append(nn.Linear(prev_dim, hidden_dim))
-            layers.append(nn.BatchNorm1d(hidden_dim))
-            layers.append(nn.ReLU())
-            prev_dim = hidden_dim
+            nn.ConvTranspose1d(256, 128, kernel_size=4, stride=2, padding=1),  # Length: 4
+            nn.BatchNorm1d(128),
+            nn.ReLU(),
 
-        self.fc_layers = nn.Sequential(*layers)
+            nn.ConvTranspose1d(128, 64, kernel_size=4, stride=2, padding=1),  # Length: 8
+            nn.BatchNorm1d(64),
+            nn.ReLU(),
+        )
 
-        # Output layers for adjacency matrix, edge attributes, and node attributes
-        self.fc_edge = nn.Linear(hidden_dims[-1], max_nodes * max_nodes * edge_types)
-        self.fc_node = nn.Linear(hidden_dims[-1], max_nodes * node_types)
+        # Calculate final sequence length after conv1d layers
+        temp_length = 8  # From the conv1d operations above
+
+        # Additional layers to reach desired length
+        remaining_layers = []
+        while temp_length < max_nodes * max_nodes:
+            next_length = min(temp_length * 2, max_nodes * max_nodes)
+            remaining_layers.extend([
+                nn.ConvTranspose1d(64, 64, kernel_size=4, stride=2, padding=1),
+                nn.BatchNorm1d(64),
+                nn.ReLU()
+            ])
+            temp_length = next_length
+
+        self.additional_conv1d = nn.Sequential(*remaining_layers)
+
+        # Final output layers
+        self.edge_output = nn.Conv1d(64, edge_types, kernel_size=1)
+        self.node_output = nn.Sequential(
+            nn.AdaptiveAvgPool1d(max_nodes),
+            nn.Conv1d(64, node_types, kernel_size=1)
+        )
 
     def forward(self, z):
-        """
-        Forward pass through the decoder.
-
-        Args:
-            z: Latent vectors of shape [batch_size, latent_dim]
-
-        Returns:
-            adj_prob: Adjacency matrix probabilities [batch_size, max_nodes, max_nodes]
-            edge_prob: Edge type probabilities [batch_size, max_nodes, max_nodes, edge_types]
-            node_prob: Node type probabilities [batch_size, max_nodes, node_types]
-        """
         batch_size = z.size(0)
 
-        # Compute feature representation
-        h = self.fc_layers(z)
+        # Initial transformation
+        h = self.fc_initial(z).unsqueeze(-1)  # [batch_size, 512, 1]
 
+        # Apply 1D transposed convolutions
+        h = self.conv1d_layers(h)
+        h = self.additional_conv1d(h)
 
-        # Compute edge type probabilities
-        edge_logits = self.fc_edge(h).view(batch_size, self.max_nodes, self.max_nodes, self.edge_types)
-        edge_prob = F.sigmoid(edge_logits)
+        # Adjust sequence length for edges
+        edge_seq_len = self.max_nodes * self.max_nodes
+        if h.size(-1) != edge_seq_len:
+            h_edges = F.interpolate(h, size=edge_seq_len, mode='linear', align_corners=False)
+        else:
+            h_edges = h
 
-        # Compute node type probabilities
-        node_logits = self.fc_node(h).view(batch_size, self.max_nodes, self.node_types)
-        node_prob = F.sigmoid(node_logits)
+        # Generate edge probabilities
+        edge_logits = self.edge_output(h_edges)  # [batch_size, edge_types, max_nodes*max_nodes]
+        edge_logits = edge_logits.view(batch_size, self.edge_types, self.max_nodes, self.max_nodes)
+        edge_logits = edge_logits.permute(0, 2, 3, 1)  # [batch_size, max_nodes, max_nodes, edge_types]
+        edge_prob = torch.sigmoid(edge_logits)
+
+        # Generate node probabilities
+        node_logits = self.node_output(h)  # [batch_size, node_types, max_nodes]
+        node_logits = node_logits.permute(0, 2, 1)  # [batch_size, max_nodes, node_types]
+        node_prob = torch.sigmoid(node_logits)
+
         return node_prob, edge_prob
-
-
 
 class LatentModel(nn.Module):
     """

@@ -470,9 +470,9 @@ if __name__ == '__main__':
         "layers": eval(str(os.environ.get("layers", '[256, 128]'))),
         "n_embedding": int(os.environ.get("n_embedding", 48)),
         "n_hidden": int(os.environ.get("n_hidden", 128)),
-        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 128)),
-        "n_multi_head": int(os.environ.get("n_multi_head",3)),
-        "ex_embedding_size": int(os.environ.get("ex_embedding_size",36)),
+        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 108)),
+        "n_multi_head": int(os.environ.get("n_multi_head",2)),
+        "ex_embedding_size": int(os.environ.get("ex_embedding_size",42)),
         "ex_embedding_size2": int(os.environ.get("ex_embedding_size2", 54)),
         "k_hop": int(os.environ.get("k_hop", 1)),
         "is_lr_decay": True,
@@ -480,7 +480,7 @@ if __name__ == '__main__':
         "baseline_reset": True,
         "ex_embedding": True,
         "w_representation_learning":True,
-        "z_dim": 108,
+        "z_dim": 128,
         "k_epoch": int(os.environ.get("k_epoch", 1)),
 
     }
