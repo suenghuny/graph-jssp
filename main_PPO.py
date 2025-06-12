@@ -321,7 +321,7 @@ def train_model(params, log_path=None):
         vanila actor critic
         """
         adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - baselines  # baseline(advantage) 구하는 부분
-        cri_loss = F.mse_loss(torch.tensor(real_makespan).to(device), baselines.squeeze(1))
+
         """
 
         1. Loss 구하기
@@ -336,21 +336,25 @@ def train_model(params, log_path=None):
 
 
 
-        k_epoch = 5
+        k_epoch =10
         for k in range(k_epoch):
             for scheduler in scheduler_list:
                 scheduler.reset()
-            _, ll_new, _, _, _, _, _ = act_model(input_data,
+            _, ll_new, _, _, _, _, baselines = act_model(input_data,
                                                  device,
                                                  old_sequence=pred_seq,
                                                  scheduler_list=scheduler_list,
                                                  num_machine=num_machine,
                                                  num_job=num_job,
                                                  )
-            clip_epsilon = 0.2
+            clip_epsilon = 0.5
             ratio = torch.exp(ll_new - ll_old.detach())  # π_new / π_old
+
+            #print(ll_new-ll_old.detach())
             clipped_ratio = torch.clamp(ratio, 1 - clip_epsilon, 1 + clip_epsilon)
             act_loss = -torch.min(ratio * adv.detach(), clipped_ratio * adv.detach()).mean()
+            cri_loss = F.mse_loss(torch.tensor(real_makespan).to(device), baselines.squeeze(1))
+
             if k == 0:
                 latent_loss = edge_loss + node_loss + loss_kld
                 if params['w_representation_learning'] == True:
@@ -362,10 +366,6 @@ def train_model(params, log_path=None):
                 cri_optim.zero_grad()
                 total_loss.backward()
                 nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 5)), norm_type=2)
-                nn.utils.clip_grad_norm_(act_model.all_attention_params, max_norm=float(os.environ.get("grad_clip", 5)),
-                                         norm_type=2)
-                nn.utils.clip_grad_norm_(act_model.critic.parameters(), max_norm=float(os.environ.get("grad_clip", 5)),
-                                         norm_type=2)
                 # 그 후 각 옵티마이저 단계 실행
                 if s <=20000:
                     latent_optim.step()
@@ -373,14 +373,14 @@ def train_model(params, log_path=None):
                 cri_optim.step()
             else:
 
-                total_loss = act_loss
+                total_loss = act_loss + cri_loss
                 latent_optim.zero_grad()
                 act_optim.zero_grad()
                 cri_optim.zero_grad()
                 total_loss.backward()
-                nn.utils.clip_grad_norm_(act_model.all_attention_params, max_norm=float(os.environ.get("grad_clip", 5)),
-                                         norm_type=2)
+                nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 5)), norm_type=2)
                 act_optim.step()
+                cri_optim.step()
 
 
 
