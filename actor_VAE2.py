@@ -176,7 +176,7 @@ class PtrNet1(nn.Module):
 
 
 ####
-    def forward(self, x, device, scheduler_list, num_job, num_machine, old_sequence = None, train = True):
+    def forward(self, x, device, scheduler_list, num_job, num_machine, old_sequence = None, train = True, old_sequence_in_ops=None):
 
         node_features, heterogeneous_edges = x
         node_features = torch.tensor(node_features).to(device).float()
@@ -303,8 +303,11 @@ class PtrNet1(nn.Module):
 
             if old_sequence == None:
                 next_operation_index = self.job_selecter(log_p)
+                #print("old", i, next_operation_index)
             else:
-                next_operation_index = old_sequence[:, i]
+                #print(torch.tensor(old_sequence_in_ops).to(device).long().shape)
+                next_operation_index = torch.tensor(old_sequence_in_ops).to(device).long()[i, :]
+                #print("new", i, next_operation_index)
 
 
             log_probabilities.append(log_p.gather(1, next_operation_index.unsqueeze(1)))

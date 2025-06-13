@@ -303,7 +303,7 @@ def train_model(params, log_path=None):
         input_data = (node_features, heterogeneous_edges)
         act_model.train()
 
-        pred_seq, ll_old, _, edge_loss, node_loss, loss_kld, baselines = act_model(input_data,
+        pred_seq, ll_old, pred_seq_in_ops, edge_loss, node_loss, loss_kld, baselines = act_model(input_data,
                                         device,
                                         scheduler_list=scheduler_list,
                                         num_machine=num_machine,
@@ -320,7 +320,7 @@ def train_model(params, log_path=None):
         """
         vanila actor critic
         """
-        adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - baselines  # baseline(advantage) 구하는 부분
+
 
         """
 
@@ -336,25 +336,25 @@ def train_model(params, log_path=None):
 
 
 
-        k_epoch =10
+        k_epoch =3
         for k in range(k_epoch):
             for scheduler in scheduler_list:
                 scheduler.reset()
             _, ll_new, _, _, _, _, baselines = act_model(input_data,
                                                  device,
                                                  old_sequence=pred_seq,
+                                                 old_sequence_in_ops=pred_seq_in_ops,
                                                  scheduler_list=scheduler_list,
                                                  num_machine=num_machine,
                                                  num_job=num_job,
                                                  )
-            clip_epsilon = 0.5
+            clip_epsilon = 0.2
             ratio = torch.exp(ll_new - ll_old.detach())  # π_new / π_old
 
-            #print(ll_new-ll_old.detach())
             clipped_ratio = torch.clamp(ratio, 1 - clip_epsilon, 1 + clip_epsilon)
+            adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - baselines  # baseline(advantage) 구하는 부분
+            cri_loss = F.smooth_l1_loss(torch.tensor(real_makespan).to(device), baselines.squeeze(1))
             act_loss = -torch.min(ratio * adv.detach(), clipped_ratio * adv.detach()).mean()
-            cri_loss = F.mse_loss(torch.tensor(real_makespan).to(device), baselines.squeeze(1))
-
             if k == 0:
                 latent_loss = edge_loss + node_loss + loss_kld
                 if params['w_representation_learning'] == True:
@@ -458,17 +458,17 @@ if __name__ == '__main__':
         "beta": float(os.environ.get("beta", 0.65)),
         "alpha": float(os.environ.get("alpha", 0.1)),
         "lr_latent": float(os.environ.get("lr_latent", 5.0e-5)),
-        "lr_critic": float(os.environ.get("lr_critic", 1.0e-4)),
-        "lr": float(os.environ.get("lr", 1.0e-4)),
+        "lr_critic": float(os.environ.get("lr_critic", 7.5e-5)),
+        "lr": float(os.environ.get("lr", 7.5e-5)),
         "lr_decay": float(os.environ.get("lr_decay", 0.95)),
         "lr_decay_step": int(os.environ.get("lr_decay_step",500)),
         "layers": eval(str(os.environ.get("layers", '[256, 128]'))),
         "n_embedding": int(os.environ.get("n_embedding", 48)),
         "n_hidden": int(os.environ.get("n_hidden", 128)),
-        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 108)),
+        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 96)),
         "n_multi_head": int(os.environ.get("n_multi_head",2)),
-        "ex_embedding_size": int(os.environ.get("ex_embedding_size",42)),
-        "ex_embedding_size2": int(os.environ.get("ex_embedding_size2", 54)),
+        "ex_embedding_size": int(os.environ.get("ex_embedding_size",39)),
+        "ex_embedding_size2": int(os.environ.get("ex_embedding_size2", 48)),
         "k_hop": int(os.environ.get("k_hop", 1)),
         "is_lr_decay": True,
         "third_feature": 'first_and_second',  # first_and_second, first_only, second_only
