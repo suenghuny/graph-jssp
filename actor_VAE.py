@@ -12,8 +12,6 @@ from latent import LatentModel
 device = torch.device(cfg.device)
 
 
-
-
 class Categorical(nn.Module):
     def __init__(self):
         super().__init__()
@@ -192,8 +190,8 @@ class PtrNet1(nn.Module):
         scheduler.check_avail_ops(avail_nodes_indices)
 
     ####
-    def forward(self, x, device, scheduler_list, num_job, num_machine, old_sequence=None, train=True):
-
+    def forward(self, x, device, scheduler_list, num_job, num_machine, old_sequence=None, train=True,
+                old_sequence_in_ops=None, old_representation = None):
         node_features, heterogeneous_edges = x
         node_features = torch.tensor(node_features).to(device).float()
         pi_list, log_ps = [], []
@@ -202,10 +200,19 @@ class PtrNet1(nn.Module):
 
         sample_space = [[j for i in range(num_machine)] for j in range(num_job)]
         sample_space = torch.tensor(sample_space).view(-1)
-
-        edge_loss, node_loss, loss_kld, mean_feature, features, z = self.Latent.calculate_loss(node_features,
+        if old_representation == None:
+            edge_loss, node_loss, loss_kld, mean_feature, features, z = self.Latent.calculate_loss(node_features,
                                                                                                heterogeneous_edges,
                                                                                                train)
+        else:
+            edge_loss, node_loss, loss_kld, mean_feature, features, z = old_representation
+            edge_loss = edge_loss.detach()
+            node_loss = node_loss.detach()
+            loss_kld  = loss_kld.detach()
+            mean_feature = mean_feature.detach()
+            features = features.detach()
+            z = z.detach()
+        representations = (edge_loss, node_loss, loss_kld, mean_feature, features, z)
         if self.params['w_representation_learning'] == True:
             baselines = self.critic(z.detach())
         else:
@@ -219,12 +226,11 @@ class PtrNet1(nn.Module):
 
         """
 
-        h_pi_t_minus_one = self.v_1.unsqueeze(0).repeat(batch, 1).unsqueeze(0).to(
-            device)  # 이녀석이 s.o.s(start of singal)에 해당
+        h_pi_t_minus_one = self.v_1.unsqueeze(0).repeat(batch, 1).unsqueeze(0).to(device)  # 이녀석이 s.o.s(start of singal)에 해당
         mask1_debug, mask2_debug = self.init_mask()
 
         batch_size = h_pi_t_minus_one.shape[1]
-
+        #print(z[0])
         if old_sequence != None:
             old_sequence = torch.tensor(old_sequence).long().to(device)
         next_operation_indices = list()
@@ -269,12 +275,15 @@ class PtrNet1(nn.Module):
 
                 """
                 cp_list = []
+                next_b_list = list()
+
                 for nb in range(batch_size):
                     if old_sequence != None:
-                        # print(old_sequence.shape)
-                        next_b = old_sequence[nb, i].item()
+                        next_b = old_sequence[nb, i-1].item()
+
                     else:
                         next_b = next_job[nb].item()
+                    next_b_list.append(next_b)
                     c_max, est, fin, critical_path, critical_path2 = scheduler_list[nb].adaptive_run(
                         est_placeholder[nb], fin_placeholder[nb],
                         i=next_b)  # next_b는 이전 스텝에서 선택된 Job이고, Adaptive Run이라는 것은 선택된 Job에 따라 update한 다음에 EST, EFIN을 구하라는 의미
@@ -288,14 +297,14 @@ class PtrNet1(nn.Module):
                     모두 다 masking 처리할 수도 있으므로, 모두다 masking할 경우에는 mask로 복원 (if 1 not in mask)
 
                     """
-
             est_placeholder = est_placeholder.reshape(batch_size, -1).unsqueeze(2)
             fin_placeholder = fin_placeholder.reshape(batch_size, -1).unsqueeze(2)
             empty_zero = empty_zero.unsqueeze(2)
             empty_zero2 = empty_zero2.unsqueeze(2)
 
-            r_temp = torch.concat([est_placeholder, fin_placeholder, empty_zero, empty_zero2],
-                                  dim=2)  # extended node embedding을 만드는 부분(z_t_i에 해당)
+            r_temp = torch.concat([est_placeholder, fin_placeholder, empty_zero, empty_zero2],dim=2)  # extended node embedding을 만드는 부분(z_t_i에 해당)
+            r_t = r_temp
+            #print(r_temp.shape)
             r_temp = r_temp.reshape([batch * num_operations, -1])
             r_temp = self.ex_embedding(r_temp)
             r_temp = r_temp.reshape([batch, num_operations, -1])
@@ -322,8 +331,13 @@ class PtrNet1(nn.Module):
 
             if old_sequence == None:
                 next_operation_index = self.job_selecter(log_p)
+                #print("old", i, r_t[0][0])
+                #print("old", i, next_operation_index, log_p.gather(1, next_operation_index.unsqueeze(1)))
             else:
-                next_operation_index = old_sequence[:, i]
+                #print("new", i, r_t[0][0])
+                # print(torch.tensor(old_sequence_in_ops).to(device).long().shape)
+                next_operation_index = torch.tensor(old_sequence_in_ops).to(device).long()[i, :]
+                #print("new", i, next_operation_index,log_p.gather(1, next_operation_index.unsqueeze(1)))
 
             log_probabilities.append(log_p.gather(1, next_operation_index.unsqueeze(1)))
             sample_space = sample_space.to(device)
@@ -341,7 +355,7 @@ class PtrNet1(nn.Module):
         log_probabilities = torch.stack(log_probabilities, dim=1)
         ll = log_probabilities.sum(dim=1)  # 각 solution element의 log probability를 더하는 방식
 
-        return pi, ll, next_operation_indices, edge_loss, node_loss, loss_kld, baselines
+        return pi, ll, next_operation_indices, edge_loss, node_loss, loss_kld, baselines, representations
 
     def glimpse(self, query, ref, mask0):
         """

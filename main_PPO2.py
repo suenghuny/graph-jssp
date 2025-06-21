@@ -309,6 +309,7 @@ def train_model(params, log_path=None):
                                         num_machine=num_machine,
                                         num_job=num_job,
                                         )
+
         real_makespan = list()
         for n in range(pred_seq.shape[0]):  # act_model(agent)가 산출한 해를 평가하는 부분
             sequence = pred_seq[n]
@@ -351,10 +352,14 @@ def train_model(params, log_path=None):
                                                  )
             clip_epsilon = 0.2
             ratio = torch.exp(ll_new - ll_old.detach())  # π_new / π_old
-            print(k, ratio, torch.exp(ll_new), torch.exp(ll_old.detach()) )
 
+            entropy = -ll_new  # entropy = -E[log(p)]
+            entropy_coeff = 0.001  # entropy coefficient (hyperparameter)
+            entropy = entropy_coeff * entropy
             clipped_ratio = torch.clamp(ratio, 1 - clip_epsilon, 1 + clip_epsilon)
-            adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - baselines  # baseline(advantage) 구하는 부분
+            adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - baselines + entropy
+
+
             cri_loss = F.smooth_l1_loss(torch.tensor(real_makespan).to(device), baselines.squeeze(1))
             act_loss = -torch.min(ratio * adv.detach(), clipped_ratio * adv.detach()).mean()
             if k == 0:
@@ -367,7 +372,7 @@ def train_model(params, log_path=None):
                 act_optim.zero_grad()
                 cri_optim.zero_grad()
                 total_loss.backward()
-                nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 10)), norm_type=2)
+                nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 5)), norm_type=2)
                 # 그 후 각 옵티마이저 단계 실행
                 if s <=20000:
                     latent_optim.step()
@@ -380,7 +385,7 @@ def train_model(params, log_path=None):
                 act_optim.zero_grad()
                 cri_optim.zero_grad()
                 total_loss.backward()
-                nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 10)), norm_type=2)
+                nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 5)), norm_type=2)
                 act_optim.step()
                 cri_optim.step()
 
@@ -460,13 +465,13 @@ if __name__ == '__main__':
         "beta": float(os.environ.get("beta", 0.65)),
         "alpha": float(os.environ.get("alpha", 0.1)),
         "lr_latent": float(os.environ.get("lr_latent", 5.0e-5)),
-        "lr_critic": float(os.environ.get("lr_critic", 7.5e-5)),
-        "lr": float(os.environ.get("lr", 7.5e-5)),
+        "lr_critic": float(os.environ.get("lr_critic", 1e-4)),
+        "lr": float(os.environ.get("lr", 1e-4)),
         "lr_decay": float(os.environ.get("lr_decay", 0.95)),
         "lr_decay_step": int(os.environ.get("lr_decay_step",500)),
         "layers": eval(str(os.environ.get("layers", '[256, 128]'))),
         "n_embedding": int(os.environ.get("n_embedding", 48)),
-        "n_hidden": int(os.environ.get("n_hidden", 128)),
+        "n_hidden": int(os.environ.get("n_hidden", 108)),
         "graph_embedding_size": int(os.environ.get("graph_embedding_size", 96)),
         "n_multi_head": int(os.environ.get("n_multi_head",2)),
         "ex_embedding_size": int(os.environ.get("ex_embedding_size",39)),
