@@ -354,20 +354,24 @@ def train_model(params, log_path=None):
             ratio = torch.exp(ll_new - ll_old.detach())  # π_new / π_old
 
             entropy = -ll_new  # entropy = -E[log(p)]
-            entropy_coeff = 0.001  # entropy coefficient (hyperparameter)
-            entropy = entropy_coeff * entropy
+            entropy_coeff = 0.0001  # entropy coefficient (hyperparameter)
+            entropy_loss = entropy_coeff * entropy
             clipped_ratio = torch.clamp(ratio, 1 - clip_epsilon, 1 + clip_epsilon)
-            adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - baselines + entropy
 
+            adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - baselines  # baseline(advantage) 구하는 부분
 
-            cri_loss = F.smooth_l1_loss(torch.tensor(real_makespan).to(device), baselines.squeeze(1))
+            cri_loss = F.smooth_l1_loss(torch.tensor(real_makespan).to(device)+entropy_loss.detach().squeeze(1), baselines.squeeze(1))
             act_loss = -torch.min(ratio * adv.detach(), clipped_ratio * adv.detach()).mean()
+
+
+            entropy_loss = -torch.min(ratio * entropy_loss, clipped_ratio * entropy_loss).mean()
+
             if k == 0:
                 latent_loss = edge_loss + node_loss + loss_kld
                 if params['w_representation_learning'] == True:
-                    total_loss = latent_loss + act_loss + cri_loss
+                    total_loss = latent_loss + act_loss + cri_loss+entropy_loss
                 else:
-                    total_loss = act_loss + cri_loss
+                    total_loss = act_loss + cri_loss+entropy_loss
                 latent_optim.zero_grad()
                 act_optim.zero_grad()
                 cri_optim.zero_grad()
@@ -380,7 +384,7 @@ def train_model(params, log_path=None):
                 cri_optim.step()
             else:
 
-                total_loss = act_loss + cri_loss
+                total_loss = act_loss + cri_loss+entropy_loss
                 latent_optim.zero_grad()
                 act_optim.zero_grad()
                 cri_optim.zero_grad()
