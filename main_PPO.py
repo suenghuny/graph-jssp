@@ -12,7 +12,7 @@ import sys
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 from time import time
 from datetime import datetime
-from actor_VAE import PtrNet1
+from actor_VAE2 import PtrNet1
 from jssp2 import AdaptiveScheduler
 from cfg import get_cfg
 import random
@@ -104,7 +104,7 @@ def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=Non
     heterogeneous_edges = (edge_precedence, edge_antiprecedence, edge_machine_sharing)
     heterogeneous_edges = [heterogeneous_edges for _ in range(eval_number)]
     input_data = (node_feature, heterogeneous_edges)
-    pred_seq, ll_old, _, _, _, _, _,_ = act_model(input_data,
+    pred_seq, ll_old, _, _, _, _, _ = act_model(input_data,
                                     device,
                                     scheduler_list=scheduler_list_val,
                                     num_machine=num_machine,
@@ -271,7 +271,13 @@ def train_model(params, log_path=None):
             jobs_datas, scheduler_list = generate_jssp_instance(num_jobs=num_job, num_machine=num_machine,
                                                                 batch_size=params['batch_size'])
             act_model.Latent.current_num_edges = num_machine*num_job
+
+            # print(jobs_datas)
+            # print("======================")
+            makespan_list_for_upperbound = list()
             for scheduler in scheduler_list:
+                c_max_heu = scheduler.heuristic_run()
+                makespan_list_for_upperbound.append(c_max_heu)
                 scheduler.reset()
         else:
             for scheduler in scheduler_list:
@@ -302,94 +308,77 @@ def train_model(params, log_path=None):
             heterogeneous_edges.append(heterogeneous_edge)
         input_data = (node_features, heterogeneous_edges)
         act_model.train()
+        if cfg.algo == 'reinforce':
 
-        pred_seq, ll_old, pred_seq_in_ops, edge_loss, node_loss, loss_kld, baselines, old_representation = act_model(input_data,
-                                        device,
-                                        scheduler_list=scheduler_list,
-                                        num_machine=num_machine,
-                                        num_job=num_job,
-                                        )
-        real_makespan = list()
-        for n in range(pred_seq.shape[0]):  # act_model(agent)가 산출한 해를 평가하는 부분
-            sequence = pred_seq[n]
-            scheduler = AdaptiveScheduler(jobs_datas[n])
-            makespan = -scheduler.run(sequence.tolist()) / params['reward_scaler']
-            real_makespan.append(makespan)
-            c_max.append(makespan)
-        ave_makespan += sum(real_makespan) / (params["batch_size"] * params["log_step"])
-        """
-        vanila actor critic
-        """
+            pred_seq, ll_old, _, edge_loss, node_loss, loss_kld, baselines = act_model(input_data,
+                                            device,
+                                            scheduler_list=scheduler_list,
+                                            num_machine=num_machine,
+                                            num_job=num_job
+                                            )
+            real_makespan = list()
+            for n in range(pred_seq.shape[0]):  # act_model(agent)가 산출한 해를 평가하는 부분
+                sequence = pred_seq[n]
+                scheduler = AdaptiveScheduler(jobs_datas[n])
+                makespan = -scheduler.run(sequence.tolist()) / params['reward_scaler']
+                real_makespan.append(makespan)
+                c_max.append(makespan)
+            ave_makespan += sum(real_makespan) / (params["batch_size"] * params["log_step"])
+            """
+            vanila actor critic
+            """
 
-
-        """
-
-        1. Loss 구하기
-        2. Gradient 구하기 (loss.backward)
-        3. Update 하기(act_optim.step)
-
-        """
+            entropy = -ll_old  # entropy = -E[log(p)]
+            entropy_coeff = 0.01  # entropy coefficient (hyperparameter)
+            entropy_loss = entropy_coeff * entropy
 
 
-
-
-
-
-
-        k_epoch =2
-        for k in range(k_epoch):
-            for scheduler in scheduler_list:
-                scheduler.reset()
-            _, ll_new, _, _, _, _, baselines, _ = act_model(input_data,
-                                                 device,
-                                                 old_sequence=pred_seq,
-                                                 old_sequence_in_ops=pred_seq_in_ops,
-                                                 scheduler_list=scheduler_list,
-                                                 num_machine=num_machine,
-                                                 num_job=num_job,
-                                                 old_representation = old_representation
-                                                 )
-            clip_epsilon = 0.2
-            ratio = torch.exp(ll_new - ll_old.detach())  # π_new / π_old
-            print(k, ratio, torch.exp(ll_new), torch.exp(ll_old.detach()) )
-
-            clipped_ratio = torch.clamp(ratio, 1 - clip_epsilon, 1 + clip_epsilon)
             adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - baselines  # baseline(advantage) 구하는 부분
-            cri_loss = F.smooth_l1_loss(torch.tensor(real_makespan).to(device), baselines.squeeze(1))
-            act_loss = -torch.min(ratio * adv.detach(), clipped_ratio * adv.detach()).mean()
-            if k == 0:
-                latent_loss = edge_loss + node_loss + loss_kld
-                if params['w_representation_learning'] == True:
-                    total_loss = latent_loss + act_loss + cri_loss
-                else:
-                    total_loss = act_loss + cri_loss
-                latent_optim.zero_grad()
-                act_optim.zero_grad()
-                cri_optim.zero_grad()
-                total_loss.backward()
-                nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 10)), norm_type=2)
-                # 그 후 각 옵티마이저 단계 실행
-                if s <=20000:
-                    latent_optim.step()
-                act_optim.step()
-                cri_optim.step()
+            cri_loss = F.mse_loss(torch.tensor(real_makespan).to(device)+entropy_loss.detach().squeeze(1), baselines.squeeze(1))
+            #print(torch.tensor(real_makespan).detach().unsqueeze(1).to(device).shape, baselines.shape, ll_old.shape)
+            """
+
+            1. Loss 구하기
+            2. Gradient 구하기 (loss.backward)
+            3. Update 하기(act_optim.step)
+
+            """
+            latent_loss = edge_loss+node_loss+loss_kld
+            #print(ll_old.shape, adv.shape, entropy_loss.shape)
+            act_loss = -(ll_old * adv.detach()+entropy_loss).mean()  # loss 구하는 부분 /  ll_old의 의미 log_theta (pi | s)
+
+            if params['w_representation_learning'] == True:
+                total_loss = latent_loss + act_loss + cri_loss
             else:
-
                 total_loss = act_loss + cri_loss
-                latent_optim.zero_grad()
-                act_optim.zero_grad()
-                cri_optim.zero_grad()
-                total_loss.backward()
-                nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 10)), norm_type=2)
-                act_optim.step()
-                cri_optim.step()
+            latent_optim.zero_grad()
+            act_optim.zero_grad()
+            cri_optim.zero_grad()
+            total_loss.backward()
+
+            #print("critic loss : ", np.round(cri_loss.detach().cpu().numpy().tolist(), 2), " q : ", np.round(q.detach().mean().cpu().numpy().tolist(), 2), " act loss : ",np.round(act_loss.detach().cpu().numpy().tolist(), 2), " sample makespan : ", np.round(torch.tensor(sampled_makespans).float().to(device).mean().detach().cpu().numpy().tolist(), 2))
 
 
 
-        #act_lr_scheduler.step()
+
+            nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 5)), norm_type=2)
+
+
+
+            # 그 후 각 옵티마이저 단계 실행
+            if s <=20000:
+                latent_optim.step()
+            act_optim.step()
+            cri_optim.step()
+            #act_lr_scheduler.step()
+
+            if params['w_representation_learning'] == True:
+                if latent_lr_scheduler.get_last_lr()[0] >=  float(os.environ.get("lr_decay_min", 5.0e-5)):
+                    latent_lr_scheduler.step()
+
 
         ave_act_loss += act_loss.item()
-        if (s % 10 == 0) or (s % 100 == 1):
+        if s % params["log_step"] == 0:
             t2 = time()
             if params['w_representation_learning'] == True:
                 print('with representation learning step:%d/%d, actic loss:%1.3f, crictic loss:%1.3f, L:%1.3f, %dmin%dsec' % (
@@ -460,17 +449,17 @@ if __name__ == '__main__':
         "beta": float(os.environ.get("beta", 0.65)),
         "alpha": float(os.environ.get("alpha", 0.1)),
         "lr_latent": float(os.environ.get("lr_latent", 5.0e-5)),
-        "lr_critic": float(os.environ.get("lr_critic", 7.5e-5)),
-        "lr": float(os.environ.get("lr", 7.5e-5)),
+        "lr_critic": float(os.environ.get("lr_critic", 1.0e-4)),
+        "lr": float(os.environ.get("lr", 1.0e-4)),
         "lr_decay": float(os.environ.get("lr_decay", 0.95)),
         "lr_decay_step": int(os.environ.get("lr_decay_step",500)),
         "layers": eval(str(os.environ.get("layers", '[256, 128]'))),
         "n_embedding": int(os.environ.get("n_embedding", 48)),
         "n_hidden": int(os.environ.get("n_hidden", 128)),
-        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 96)),
+        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 108)),
         "n_multi_head": int(os.environ.get("n_multi_head",2)),
-        "ex_embedding_size": int(os.environ.get("ex_embedding_size",39)),
-        "ex_embedding_size2": int(os.environ.get("ex_embedding_size2", 48)),
+        "ex_embedding_size": int(os.environ.get("ex_embedding_size",42)),
+        "ex_embedding_size2": int(os.environ.get("ex_embedding_size2", 54)),
         "k_hop": int(os.environ.get("k_hop", 1)),
         "is_lr_decay": True,
         "third_feature": 'first_and_second',  # first_and_second, first_only, second_only

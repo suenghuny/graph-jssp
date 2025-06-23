@@ -350,7 +350,7 @@ def train_model(params, log_path=None):
                                                  num_job=num_job,
                                                  old_representation = old_representation
                                                  )
-            clip_epsilon = 0.2
+            clip_epsilon = 0.3
             ratio = torch.exp(ll_new - ll_old.detach())  # π_new / π_old
 
             entropy = -ll_new  # entropy = -E[log(p)]
