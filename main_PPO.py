@@ -161,6 +161,7 @@ def train_model(params, log_path=None):
     validation_records_min = [[] for _ in problem_list]
     validation_records_mean = [[] for _ in problem_list]
     empty_records = [[], []]
+
     for s in range(epoch + 1, params["step"]):
 
         """
@@ -232,7 +233,7 @@ def train_model(params, log_path=None):
                                 params['k_hop'],
                                 params['n_multi_head'],
                                 params['n_hidden'],
-                                entropy_coeff
+                                params['entropy_coeff']
                             ))
 
                     else:
@@ -331,8 +332,8 @@ def train_model(params, log_path=None):
             """
 
             entropy = -ll_old  # entropy = -E[log(p)]
-            entropy_coeff = 0.00001  # entropy coefficient (hyperparameter)
-            entropy_loss = entropy_coeff * entropy
+
+            entropy_loss = params['entropy_coeff'] * entropy
 
 
             adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - baselines  # baseline(advantage) 구하는 부분
@@ -443,7 +444,7 @@ if __name__ == '__main__':
         "n_process": cfg.n_process,
         "lr_decay_step_critic": cfg.lr_decay_step_critic,
         "load_model": load_model,
-        "entropy_weight": cfg.entropy_weight,
+        "entropy_coeff": float(os.environ.get("entropy_loss", 0.00001)),
         "dot_product": cfg.dot_product,
         "lr_critic": cfg.lr_critic,
 
@@ -476,7 +477,7 @@ if __name__ == '__main__':
 
     wandb.login()
     if params['w_representation_learning'] == True:
-        wandb.init(project="Graph JSSP", name="W_REP GES_{} EXEMB_{}_{}  KHOP_{} NMH_{} NH_{} LR_{} LR CRI_{} LR LAT_{}".format(params['graph_embedding_size'],
+        wandb.init(project="Graph JSSP", name="W_REP GES_{} EXEMB_{}_{}  KHOP_{} NMH_{} NH_{} LR_{} LR CRI_{} LR LAT_{} EC_{}".format(params['graph_embedding_size'],
                                                                            params['ex_embedding_size'],
                                                                            params['ex_embedding_size2'],
                                                                            params['k_hop'],
@@ -485,10 +486,12 @@ if __name__ == '__main__':
                                                                            params['n_hidden'],
                                                                                                                       params['lr'],
                                                                                                                       params['lr_critic'],
-                                                                                                                                params['lr_latent']
+                                                                                                                                params['lr_latent'],
+                                                                                                                                params[
+                                                                                                                                    'entropy_coeff']
                                                                                                                                 ))
     else:
-        wandb.init(project="Graph JSSP", name="WO_REP GES_{} EXEMB_{}_{} KHOP_{} NMH_{} NH_{} LR_{} LR CRI_{} LR LAT_{}".format(params['graph_embedding_size'],
+        wandb.init(project="Graph JSSP", name="WO_REP GES_{} EXEMB_{}_{} KHOP_{} NMH_{} NH_{} LR_{} LR CRI_{} LR LAT_{} EC_{}".format(params['graph_embedding_size'],
                                                                            params['ex_embedding_size'],
                                                                            params['ex_embedding_size2'],
                                                                            params['k_hop'],
@@ -496,6 +499,8 @@ if __name__ == '__main__':
                                                                            params['n_hidden'],
                                                                                                                       params['lr'],
                                                                                                                       params['lr_critic'],
-                                                                                                                                params['lr_latent']
+                                                                                                                                params['lr_latent'],
+                                                                                                                                params[
+                                                                                                                                    'entropy_coeff']
                                                                                                                                 ))
     train_model(params)
