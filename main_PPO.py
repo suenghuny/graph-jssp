@@ -225,16 +225,18 @@ def train_model(params, log_path=None):
                     params['n_multi_head'],
                     params['n_hidden']))
                         mean_m.to_csv(
-                            'w_rep_mean_makespan_GES_{} EXEMB_{}_{} KHOP_{} NMH_{} NH_{}.csv'.format(
+                            'w_rep_mean_makespan_GES_{} EXEMB_{}_{} KHOP_{} NMH_{} NH_{} Alpha_{}.csv'.format(
                                 params['graph_embedding_size'],
                                 params['ex_embedding_size'],
                                 params['ex_embedding_size2'],
                                 params['k_hop'],
                                 params['n_multi_head'],
-                                params['n_hidden']))
+                                params['n_hidden'],
+                                entropy_coeff
+                            ))
 
                     else:
-                        min_m.to_csv('wo_rep_min_makespan_GES_{} EXEMB_{}_{} KHOP_{} NMH_{} NH_{}.csv'.format(
+                        min_m.to_csv('wo_rep_min_makespan_GES_{} EXEMB_{}_{} KHOP_{} NMH_{} NH_{} Alpha_{}.csv'.format(
                             params['graph_embedding_size'],
                             params['ex_embedding_size'],
                             params['ex_embedding_size2'],
@@ -329,7 +331,7 @@ def train_model(params, log_path=None):
             """
 
             entropy = -ll_old  # entropy = -E[log(p)]
-            entropy_coeff = 0.01  # entropy coefficient (hyperparameter)
+            entropy_coeff = 0.00001  # entropy coefficient (hyperparameter)
             entropy_loss = entropy_coeff * entropy
 
 
@@ -455,11 +457,11 @@ if __name__ == '__main__':
         "lr_decay_step": int(os.environ.get("lr_decay_step",500)),
         "layers": eval(str(os.environ.get("layers", '[256, 128]'))),
         "n_embedding": int(os.environ.get("n_embedding", 48)),
-        "n_hidden": int(os.environ.get("n_hidden", 128)),
-        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 108)),
-        "n_multi_head": int(os.environ.get("n_multi_head",2)),
-        "ex_embedding_size": int(os.environ.get("ex_embedding_size",42)),
-        "ex_embedding_size2": int(os.environ.get("ex_embedding_size2", 54)),
+        "n_hidden": int(os.environ.get("n_hidden", 108)),
+        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 96)),
+        "n_multi_head": int(os.environ.get("n_multi_head",3)),
+        "ex_embedding_size": int(os.environ.get("ex_embedding_size",36)),
+        "ex_embedding_size2": int(os.environ.get("ex_embedding_size2", 48)),
         "k_hop": int(os.environ.get("k_hop", 1)),
         "is_lr_decay": True,
         "third_feature": 'first_and_second',  # first_and_second, first_only, second_only
