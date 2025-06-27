@@ -356,6 +356,7 @@ def train_model(params, log_path=None):
             latent_optim.zero_grad()
             act_optim.zero_grad()
             cri_optim.zero_grad()
+            entropy_coeff_optim.zero_grad()
             total_loss.backward()
 
             #print("critic loss : ", np.round(cri_loss.detach().cpu().numpy().tolist(), 2), " q : ", np.round(q.detach().mean().cpu().numpy().tolist(), 2), " act loss : ",np.round(act_loss.detach().cpu().numpy().tolist(), 2), " sample makespan : ", np.round(torch.tensor(sampled_makespans).float().to(device).mean().detach().cpu().numpy().tolist(), 2))
@@ -471,7 +472,7 @@ if __name__ == '__main__':
         "w_representation_learning":True,
         "z_dim": 128,
         "k_epoch": int(os.environ.get("k_epoch", 1)),
-        "target_entropy": int(os.environ.get("target_entropy", 1)),
+        "target_entropy": int(os.environ.get("target_entropy", 20)),
 
     }
 
