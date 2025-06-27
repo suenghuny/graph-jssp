@@ -141,6 +141,7 @@ def train_model(params, log_path=None):
         act_lr_scheduler = optim.lr_scheduler.StepLR(act_optim, step_size=params["lr_decay_step"], gamma=params["lr_decay"])
         latent_lr_scheduler = optim.lr_scheduler.StepLR(latent_optim, step_size=params["lr_decay_step"],
                                                      gamma=params["lr_decay"])
+        entropy_coeff_optim = optim.Adam([act_model.log_alpha], lr=params['lr'])
         """
         act_model이라는 신경망 뭉치에 파라미터(가중치, 편향)을 업데이트 할꺼야.
 
@@ -332,13 +333,12 @@ def train_model(params, log_path=None):
             """
 
             entropy = -ll_old  # entropy = -E[log(p)]
-
-            entropy_loss = params['entropy_coeff'] * entropy
-
-
+            entropy_loss = act_model.log_alpha.detach() * entropy
+            target_entropy = -3
+            log_alpha_loss = -act_model.log_alpha * (ll_old.detach() + target_entropy).mean()
             adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - baselines  # baseline(advantage) 구하는 부분
             cri_loss = F.mse_loss(torch.tensor(real_makespan).to(device)+entropy_loss.detach().squeeze(1), baselines.squeeze(1))
-            #print(torch.tensor(real_makespan).detach().unsqueeze(1).to(device).shape, baselines.shape, ll_old.shape)
+
             """
 
             1. Loss 구하기
@@ -347,11 +347,10 @@ def train_model(params, log_path=None):
 
             """
             latent_loss = edge_loss+node_loss+loss_kld
-            #print(ll_old.shape, adv.shape, entropy_loss.shape)
             act_loss = -(ll_old * adv.detach()+entropy_loss).mean()  # loss 구하는 부분 /  ll_old의 의미 log_theta (pi | s)
 
             if params['w_representation_learning'] == True:
-                total_loss = latent_loss + act_loss + cri_loss
+                total_loss = latent_loss + act_loss + cri_loss+log_alpha_loss
             else:
                 total_loss = act_loss + cri_loss
             latent_optim.zero_grad()
@@ -373,6 +372,7 @@ def train_model(params, log_path=None):
                 latent_optim.step()
             act_optim.step()
             cri_optim.step()
+            entropy_coeff_optim.step()
             #act_lr_scheduler.step()
 
             if params['w_representation_learning'] == True:

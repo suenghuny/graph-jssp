@@ -100,7 +100,6 @@ class PtrNet1(nn.Module):
         self.all_attention_params = list(
             self.ex_embedding.parameters()) + attention_params_1 + pointer_params
 
-
         self._initialize_weights(params["init_min"], params["init_max"])
         self.use_logit_clipping = params["use_logit_clipping"]
         self.C = params["C"]
@@ -109,6 +108,7 @@ class PtrNet1(nn.Module):
         self.job_selecter = Categorical()
         self.lb_records = [[],[],[],[],[],[]]
         self.makespan_records = []
+        self.log_alpha = nn.Parameter(torch.tensor(0.01))
 
 
 
@@ -216,6 +216,7 @@ class PtrNet1(nn.Module):
         for i in range(num_operations):
             est_placeholder = mask2_debug.clone().to(device)
             fin_placeholder = mask2_debug.clone().to(device)
+            mwkr_placeholder = mask2_debug.clone().to(device)
 
             mask1_debug = mask1_debug.reshape(batch_size, -1)
             mask2_debug = mask2_debug.reshape(batch_size, -1)
@@ -259,7 +260,7 @@ class PtrNet1(nn.Module):
                         next_b = old_sequence[nb, i].item()
                     else:
                         next_b = next_job[nb].item()
-                    c_max, est, fin, critical_path, critical_path2 = scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb], i = next_b) # next_b는 이전 스텝에서 선택된 Job이고, Adaptive Run이라는 것은 선택된 Job에 따라 update한 다음에 EST, EFIN을 구하라는 의미
+                    c_max, est, fin, critical_path, critical_path2 = scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb],i = next_b) # next_b는 이전 스텝에서 선택된 Job이고, Adaptive Run이라는 것은 선택된 Job에 따라 update한 다음에 EST, EFIN을 구하라는 의미
                     empty_zero[nb, :]  = torch.tensor(critical_path.reshape(-1)).to(device)
                     empty_zero2[nb, :] = torch.tensor(critical_path2.reshape(-1)).to(device)  # 안중요
                     est_placeholder[nb] = est
