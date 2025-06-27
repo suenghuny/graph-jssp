@@ -334,7 +334,7 @@ def train_model(params, log_path=None):
 
             entropy = -ll_old  # entropy = -E[log(p)]
             entropy_loss = act_model.log_alpha.detach() * entropy
-            target_entropy = 6
+            target_entropy = params["target_entropy"]
             log_alpha_loss = -act_model.log_alpha * (ll_old.detach() + target_entropy).mean()
             adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - baselines  # baseline(advantage) 구하는 부분
             cri_loss = F.mse_loss(torch.tensor(real_makespan).to(device)+entropy_loss.detach().squeeze(1), baselines.squeeze(1))
@@ -471,6 +471,7 @@ if __name__ == '__main__':
         "w_representation_learning":True,
         "z_dim": 128,
         "k_epoch": int(os.environ.get("k_epoch", 1)),
+        "target_entropy": int(os.environ.get("target_entropy", 1)),
 
     }
 
