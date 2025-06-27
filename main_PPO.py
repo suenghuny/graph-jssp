@@ -141,7 +141,7 @@ def train_model(params, log_path=None):
         act_lr_scheduler = optim.lr_scheduler.StepLR(act_optim, step_size=params["lr_decay_step"], gamma=params["lr_decay"])
         latent_lr_scheduler = optim.lr_scheduler.StepLR(latent_optim, step_size=params["lr_decay_step"],
                                                      gamma=params["lr_decay"])
-        entropy_coeff_optim = optim.Adam([act_model.log_alpha], lr=params['lr'])
+        entropy_coeff_optim = optim.Adam([act_model.log_alpha], 1e-5)
         """
         act_model이라는 신경망 뭉치에 파라미터(가중치, 편향)을 업데이트 할꺼야.
 
@@ -334,7 +334,7 @@ def train_model(params, log_path=None):
 
             entropy = -ll_old  # entropy = -E[log(p)]
             entropy_loss = act_model.log_alpha.detach() * entropy
-            target_entropy = -3
+            target_entropy = 6
             log_alpha_loss = -act_model.log_alpha * (ll_old.detach() + target_entropy).mean()
             adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - baselines  # baseline(advantage) 구하는 부분
             cri_loss = F.mse_loss(torch.tensor(real_makespan).to(device)+entropy_loss.detach().squeeze(1), baselines.squeeze(1))

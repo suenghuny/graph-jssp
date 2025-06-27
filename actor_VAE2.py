@@ -108,7 +108,7 @@ class PtrNet1(nn.Module):
         self.job_selecter = Categorical()
         self.lb_records = [[],[],[],[],[],[]]
         self.makespan_records = []
-        self.log_alpha = nn.Parameter(torch.tensor(0.01))
+        self.log_alpha = nn.Parameter(torch.tensor(0.0001))
 
 
 
