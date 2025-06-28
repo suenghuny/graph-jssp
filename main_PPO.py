@@ -145,8 +145,7 @@ def train_model(params, selected_param, log_path=None):
         cri_optim = optim.Adam(act_model.critic.parameters(), lr=params['lr'])
         act_lr_scheduler = optim.lr_scheduler.StepLR(act_optim, step_size=params["lr_decay_step"], gamma=params["lr_decay"])
         cri_lr_scheduler = optim.lr_scheduler.StepLR(cri_optim, step_size=params["lr_decay_step"], gamma=params["lr_decay"])
-        latent_lr_scheduler = optim.lr_scheduler.StepLR(latent_optim, step_size=params["lr_decay_step"],
-                                                     gamma=params["lr_decay"])
+        latent_lr_scheduler = optim.lr_scheduler.StepLR(latent_optim, step_size=params["lr_decay_step"], gamma=params["lr_decay"])
         entropy_coeff_optim = optim.Adam([act_model.log_alpha], 1e-5)
         """
         act_model이라는 신경망 뭉치에 파라미터(가중치, 편향)을 업데이트 할꺼야.

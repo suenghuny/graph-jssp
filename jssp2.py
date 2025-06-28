@@ -1,122 +1,119 @@
 import numpy as np
-import matplotlib.pyplot as plt
 from copy import deepcopy
 import pandas as pd
-
-import networkx as nx
 pt_tmp = pd.read_excel("JSP_dataset.xlsx", sheet_name="Processing Time", index_col=[0], engine = 'openpyxl')
 ms_tmp = pd.read_excel(
          "JSP_dataset.xlsx", sheet_name="Machines Sequence", index_col=[0], engine = 'openpyxl')
 
-
-class GraphVisualizer:
-    def __init__(self, instance_data):
-        self.processing_time, self.machine_sequence = instance_data
-        self.G = nx.DiGraph()
-        self.pos = {}
-        self.edge_labels = None
-        self._create_disjunctive_graph()
-
-    def _create_disjunctive_graph(self):
-        dummy_start = 'Start'
-        dummy_end = 'End'
-        self.G.add_node(dummy_start)
-        self.G.add_node(dummy_end)
-        self.flattend_processing_time_dict = dict()
-        k = 0
-        num_machine = np.max(np.array(self.machine_sequence))
-        self.flattend_machine_sequence_list = [[] for _ in range(num_machine)]
-        self.flattend_machine_allocation_dict = dict()
-        for j, machine_sequence_list in enumerate(self.machine_sequence):
-            for i in range(len(machine_sequence_list)):
-                m = machine_sequence_list[i]
-                self.flattend_machine_sequence_list[m-1].append(k)
-                self.flattend_machine_allocation_dict[k] = m-1
-                k += 1
-        k = 0
-        for j, processing_time_list in enumerate(self.processing_time):
-            for i in range(len(processing_time_list)):
-                self.G.add_node(k)
-                self.pos[k] = (i+1, j)  # 노드 위치 설정 (x: 노드 인덱스, y: 고정)
-                self.flattend_processing_time_dict[k] = processing_time_list[i]
-                if i == 0:
-                    self.G.add_edge(dummy_start, k, weight=0)
-                if i < len(processing_time_list) - 1:
-                    self.G.add_edge(k, k+1,
-                                    weight=-1* processing_time_list[i])
-                if i == len(processing_time_list) - 1:
-                    self.G.add_edge(k, dummy_end, weight=-1* processing_time_list[i])
-                k+=1
-        self.pos[dummy_start] = (0, len(processing_time_list)/2)
-        self.pos[dummy_end] = (len(self.processing_time)+2, len(processing_time_list)/2)
-        self.edge_labels = {(u, v): d['weight'] for u, v, d in self.G.edges(data=True)}
-
-
-    def get_earliest_start_and_finish_time(self, available_operations):
-        avail_nodes = np.array(available_operations)
-        avail_nodes_indices = np.where(avail_nodes == 1)[0]
-        earliest_start_time = np.zeros(len(self.processing_time)*len(self.machine_sequence)) # 여기는 검토해봐야함
-        earliest_finish_time = np.zeros(len(self.processing_time)*len(self.machine_sequence)) # 여기는 검토해봐야함
-        est_list = list()
-        fin_list = list()
-        for operation in avail_nodes_indices:
-            est = -1*self.get_longest_path(fm = 'Start', to = operation)
-            efin = est + self.flattend_processing_time_dict[operation]
-            earliest_start_time[operation] = est
-            earliest_finish_time[operation] = efin
-            est_list.append(est)
-            fin_list.append(efin)
-        if np.max(est_list) == 0:
-            earliest_start_time = np.zeros(len(self.processing_time)*len(self.machine_sequence)) # 여기는 검토해봐야함
-        else:
-            earliest_start_time = earliest_start_time / np.max(est_list)
-        earliest_finish_time = earliest_finish_time / np.max(fin_list)
-
-        return earliest_start_time, earliest_finish_time
-
-
-
-
-    def get_longest_path(self, fm, to):
-        shortest_path_length = nx.bellman_ford_path_length(self.G, source=fm, target=to, weight='weight')
-        return shortest_path_length
-
-
-
-
-    def add_selected_operation(self, k):
-        m = self.flattend_machine_allocation_dict[k]
-        machine_sharing_operation = self.flattend_machine_sequence_list[m]
-        processing_time = self.flattend_processing_time_dict[k]
-        for k_prime in machine_sharing_operation:
-            if k != k_prime:
-                self.G.add_edge(k, k_prime, weight=-1*processing_time)
-        if k in self.flattend_machine_sequence_list[m]:
-            self.flattend_machine_sequence_list[m].remove(k)
-
-    def get_lower_bound(self, k):
-        m = self.flattend_machine_allocation_dict[k]
-        machine_sharing_operation = self.flattend_machine_sequence_list[m]
-        processing_time = self.flattend_processing_time_dict[k]
-        for k_prime in machine_sharing_operation:
-            if k != k_prime:
-                self.G.add_edge(k, k_prime, weight=-1*processing_time)
-
-
-        longest_path = -1*self.get_longest_path('Start', 'End')
-        for k_prime in machine_sharing_operation:
-            if k != k_prime:
-                self.G.remove_edge(k, k_prime)
-        return longest_path
-
-
-    def show(self):
-        fig, ax = plt.subplots(figsize=(25, 15))  # 명시적으로 Figure와 Axes 객체 생성
-        nx.draw(self.G, self.pos, with_labels=True, node_size=700, node_color='lightblue', font_size=10,
-                font_weight='bold', arrowsize=20, ax=ax)  # Axes 객체를 명시적으로 전달
-        nx.draw_networkx_edge_labels(self.G, self.pos, edge_labels=self.edge_labels, ax=ax)  # Axes 객체를 명시적으로 전달
-        plt.title('Graph Representation of the Given Lists')
-        plt.show()
+#
+# class GraphVisualizer:
+#     def __init__(self, instance_data):
+#         self.processing_time, self.machine_sequence = instance_data
+#         self.G = nx.DiGraph()
+#         self.pos = {}
+#         self.edge_labels = None
+#         self._create_disjunctive_graph()
+#
+#     def _create_disjunctive_graph(self):
+#         dummy_start = 'Start'
+#         dummy_end = 'End'
+#         self.G.add_node(dummy_start)
+#         self.G.add_node(dummy_end)
+#         self.flattend_processing_time_dict = dict()
+#         k = 0
+#         num_machine = np.max(np.array(self.machine_sequence))
+#         self.flattend_machine_sequence_list = [[] for _ in range(num_machine)]
+#         self.flattend_machine_allocation_dict = dict()
+#         for j, machine_sequence_list in enumerate(self.machine_sequence):
+#             for i in range(len(machine_sequence_list)):
+#                 m = machine_sequence_list[i]
+#                 self.flattend_machine_sequence_list[m-1].append(k)
+#                 self.flattend_machine_allocation_dict[k] = m-1
+#                 k += 1
+#         k = 0
+#         for j, processing_time_list in enumerate(self.processing_time):
+#             for i in range(len(processing_time_list)):
+#                 self.G.add_node(k)
+#                 self.pos[k] = (i+1, j)  # 노드 위치 설정 (x: 노드 인덱스, y: 고정)
+#                 self.flattend_processing_time_dict[k] = processing_time_list[i]
+#                 if i == 0:
+#                     self.G.add_edge(dummy_start, k, weight=0)
+#                 if i < len(processing_time_list) - 1:
+#                     self.G.add_edge(k, k+1,
+#                                     weight=-1* processing_time_list[i])
+#                 if i == len(processing_time_list) - 1:
+#                     self.G.add_edge(k, dummy_end, weight=-1* processing_time_list[i])
+#                 k+=1
+#         self.pos[dummy_start] = (0, len(processing_time_list)/2)
+#         self.pos[dummy_end] = (len(self.processing_time)+2, len(processing_time_list)/2)
+#         self.edge_labels = {(u, v): d['weight'] for u, v, d in self.G.edges(data=True)}
+#
+#
+#     def get_earliest_start_and_finish_time(self, available_operations):
+#         avail_nodes = np.array(available_operations)
+#         avail_nodes_indices = np.where(avail_nodes == 1)[0]
+#         earliest_start_time = np.zeros(len(self.processing_time)*len(self.machine_sequence)) # 여기는 검토해봐야함
+#         earliest_finish_time = np.zeros(len(self.processing_time)*len(self.machine_sequence)) # 여기는 검토해봐야함
+#         est_list = list()
+#         fin_list = list()
+#         for operation in avail_nodes_indices:
+#             est = -1*self.get_longest_path(fm = 'Start', to = operation)
+#             efin = est + self.flattend_processing_time_dict[operation]
+#             earliest_start_time[operation] = est
+#             earliest_finish_time[operation] = efin
+#             est_list.append(est)
+#             fin_list.append(efin)
+#         if np.max(est_list) == 0:
+#             earliest_start_time = np.zeros(len(self.processing_time)*len(self.machine_sequence)) # 여기는 검토해봐야함
+#         else:
+#             earliest_start_time = earliest_start_time / np.max(est_list)
+#         earliest_finish_time = earliest_finish_time / np.max(fin_list)
+#
+#         return earliest_start_time, earliest_finish_time
+#
+#
+#
+#
+#     def get_longest_path(self, fm, to):
+#         shortest_path_length = nx.bellman_ford_path_length(self.G, source=fm, target=to, weight='weight')
+#         return shortest_path_length
+#
+#
+#
+#
+#     def add_selected_operation(self, k):
+#         m = self.flattend_machine_allocation_dict[k]
+#         machine_sharing_operation = self.flattend_machine_sequence_list[m]
+#         processing_time = self.flattend_processing_time_dict[k]
+#         for k_prime in machine_sharing_operation:
+#             if k != k_prime:
+#                 self.G.add_edge(k, k_prime, weight=-1*processing_time)
+#         if k in self.flattend_machine_sequence_list[m]:
+#             self.flattend_machine_sequence_list[m].remove(k)
+#
+#     def get_lower_bound(self, k):
+#         m = self.flattend_machine_allocation_dict[k]
+#         machine_sharing_operation = self.flattend_machine_sequence_list[m]
+#         processing_time = self.flattend_processing_time_dict[k]
+#         for k_prime in machine_sharing_operation:
+#             if k != k_prime:
+#                 self.G.add_edge(k, k_prime, weight=-1*processing_time)
+#
+#
+#         longest_path = -1*self.get_longest_path('Start', 'End')
+#         for k_prime in machine_sharing_operation:
+#             if k != k_prime:
+#                 self.G.remove_edge(k, k_prime)
+#         return longest_path
+#
+#
+#     def show(self):
+#         fig, ax = plt.subplots(figsize=(25, 15))  # 명시적으로 Figure와 Axes 객체 생성
+#         nx.draw(self.G, self.pos, with_labels=True, node_size=700, node_color='lightblue', font_size=10,
+#                 font_weight='bold', arrowsize=20, ax=ax)  # Axes 객체를 명시적으로 전달
+#         nx.draw_networkx_edge_labels(self.G, self.pos, edge_labels=self.edge_labels, ax=ax)  # Axes 객체를 명시적으로 전달
+#         plt.title('Graph Representation of the Given Lists')
+#         plt.show()
 
 class AdaptiveScheduler:
     def __init__(self, input_data):
