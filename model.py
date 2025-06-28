@@ -9,7 +9,7 @@ from collections import OrderedDict
 import sys
 
 sys.path.append("..")  # 상위 폴더를 import할 수 있도록 경로 추가
-device =torch.device(cfg.device)
+device =torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print(device)
 
 def glorot(tensor):

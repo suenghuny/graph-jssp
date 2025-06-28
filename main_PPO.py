@@ -30,6 +30,11 @@ if cfg.vessl == True:
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
+def step_with_min(scheduler, optimizer, min_lr=1e-6):
+    scheduler.step()
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = max(param_group['lr'], min_lr)
+
 
 def set_seed(seed):
     random.seed(seed)
@@ -118,8 +123,8 @@ def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=Non
     return np.min(val_makespan), np.mean(val_makespan)
 
 
-def train_model(params, log_path=None):
-    device = torch.device(cfg.device)
+def train_model(params, selected_param, log_path=None):
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     date = datetime.now().strftime('%m%d_%H_%M')
     param_path = params["log_dir"] + '/ppo' + '/%s_%s_param.csv' % (date, "train")
     print(f'generate {param_path}')
@@ -139,6 +144,7 @@ def train_model(params, log_path=None):
         act_optim = optim.Adam(act_model.all_attention_params, lr=params["lr_critic"])
         cri_optim = optim.Adam(act_model.critic.parameters(), lr=params['lr'])
         act_lr_scheduler = optim.lr_scheduler.StepLR(act_optim, step_size=params["lr_decay_step"], gamma=params["lr_decay"])
+        cri_lr_scheduler = optim.lr_scheduler.StepLR(cri_optim, step_size=params["lr_decay_step"], gamma=params["lr_decay"])
         latent_lr_scheduler = optim.lr_scheduler.StepLR(latent_optim, step_size=params["lr_decay_step"],
                                                      gamma=params["lr_decay"])
         entropy_coeff_optim = optim.Adam([act_model.log_alpha], 1e-5)
@@ -220,39 +226,11 @@ def train_model(params, log_path=None):
                     t1 = time()
 
                     if params['w_representation_learning'] == True:
-                        min_m.to_csv('w_rep_min_makespan_GES_{} EXEMB_{}_{} KHOP_{} NMH_{} NH_{}.csv'.format(params['graph_embedding_size'],
-                    params['ex_embedding_size'],
-                    params[                                           'ex_embedding_size2'],
-                    params['k_hop'],
-                    params['n_multi_head'],
-                    params['n_hidden']))
-                        mean_m.to_csv(
-                            'w_rep_mean_makespan_GES_{} EXEMB_{}_{} KHOP_{} NMH_{} NH_{} Alpha_{}.csv'.format(
-                                params['graph_embedding_size'],
-                                params['ex_embedding_size'],
-                                params['ex_embedding_size2'],
-                                params['k_hop'],
-                                params['n_multi_head'],
-                                params['n_hidden'],
-                                params['entropy_coeff']
-                            ))
-
+                        min_m.to_csv('w_rep_min_makespan_{}.csv'.format(selected_param))
+                        mean_m.to_csv('w_rep_mean_makespan_{}.csv'.format(selected_param))
                     else:
-                        min_m.to_csv('wo_rep_min_makespan_GES_{} EXEMB_{}_{} KHOP_{} NMH_{} NH_{} Alpha_{}.csv'.format(
-                            params['graph_embedding_size'],
-                            params['ex_embedding_size'],
-                            params['ex_embedding_size2'],
-                            params['k_hop'],
-                            params['n_multi_head'],
-                            params['n_hidden']))
-                        mean_m.to_csv(
-                            'wo_rep_mean_makespan_GES_{} EXEMB_{}_{} KHOP_{} NMH_{} NH_{}.csv'.format(
-                                params['graph_embedding_size'],
-                                params['ex_embedding_size'],
-                                params['ex_embedding_size2'],
-                                params['k_hop'],
-                                params['n_multi_head'],
-                                params['n_hidden']))
+                        min_m.to_csv('wo_rep_min_makespan_{}.csv'.format(selected_param))
+                        mean_m.to_csv('wo_rep_mean_makespan_{}.csv'.format(selected_param))
             wandb.log({
                 "episode": s,
                 "71 mean_makespan": mean_makespan71,
@@ -333,9 +311,9 @@ def train_model(params, log_path=None):
             """
 
             entropy = -ll_old  # entropy = -E[log(p)]
-            entropy_loss = act_model.log_alpha.detach() * entropy
-            target_entropy = params["target_entropy"]
-            log_alpha_loss = -act_model.log_alpha * (ll_old.detach() + target_entropy).mean()
+            entropy_loss = params['entropy_coeff'] * entropy
+            # target_entropy = params["target_entropy"]
+            # log_alpha_loss = -act_model.log_alpha * (ll_old.detach() + target_entropy).mean()
             adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - baselines  # baseline(advantage) 구하는 부분
             cri_loss = F.mse_loss(torch.tensor(real_makespan).to(device)+entropy_loss.detach().squeeze(1), baselines.squeeze(1))
 
@@ -350,7 +328,7 @@ def train_model(params, log_path=None):
             act_loss = -(ll_old * adv.detach()+entropy_loss).mean()  # loss 구하는 부분 /  ll_old의 의미 log_theta (pi | s)
 
             if params['w_representation_learning'] == True:
-                total_loss = latent_loss + act_loss + cri_loss+log_alpha_loss
+                total_loss = latent_loss + act_loss + cri_loss#+log_alpha_loss
             else:
                 total_loss = act_loss + cri_loss
             latent_optim.zero_grad()
@@ -373,8 +351,8 @@ def train_model(params, log_path=None):
                 latent_optim.step()
             act_optim.step()
             cri_optim.step()
-            entropy_coeff_optim.step()
-            #act_lr_scheduler.step()
+            step_with_min(act_lr_scheduler, act_optim, min_lr=params['lr_decay_min'])
+            step_with_min(cri_lr_scheduler, cri_optim, min_lr=params['lr_decay_min'])
 
             if params['w_representation_learning'] == True:
                 if latent_lr_scheduler.get_last_lr()[0] >=  float(os.environ.get("lr_decay_min", 5.0e-5)):
@@ -411,98 +389,99 @@ def train_model(params, log_path=None):
                             'ave_makespan': ave_makespan},
                            params["model_dir"] + '/%s_step%d_act_wo_rep.pt' % (date, s))
 
-
-
-if __name__ == '__main__':
-
-    load_model = False
-
-    log_dir = "./result/log"
-    if not os.path.exists(log_dir + "/ppo"):
-        os.makedirs(log_dir + "/ppo")
-
-    model_dir = "./result/model"
-    if not os.path.exists(model_dir + "/ppo_w_third_feature"):
-        os.makedirs(model_dir + "/ppo_w_third_feature")
-
-    params = {
-        "num_of_process": 6,
-        "step": cfg.step,
-        "log_step": cfg.log_step,
-        "log_dir": log_dir,
-        "save_step": cfg.save_step,
-        "model_dir": model_dir,
-        "batch_size": cfg.batch_size,
-        "init_min": -0.08,
-        "init_max": 0.08,
-        "use_logit_clipping": True,
-        "C": cfg.C,
-        "T": cfg.T,
-        "iteration": cfg.iteration,
-        "epsilon": float(os.environ.get("epsilon", 0.2)),
-        "optimizer": "Adam",
-        "n_glimpse": cfg.n_glimpse,
-        "n_process": cfg.n_process,
-        "lr_decay_step_critic": cfg.lr_decay_step_critic,
-        "load_model": load_model,
-        "entropy_coeff": float(os.environ.get("entropy_loss", 0.00001)),
-        "dot_product": cfg.dot_product,
-        "lr_critic": cfg.lr_critic,
-
-        "reward_scaler": cfg.reward_scaler,
-        "beta": float(os.environ.get("beta", 0.65)),
-        "alpha": float(os.environ.get("alpha", 0.1)),
-        "lr_latent": float(os.environ.get("lr_latent", 5.0e-5)),
-        "lr_critic": float(os.environ.get("lr_critic", 1.0e-4)),
-        "lr": float(os.environ.get("lr", 1.0e-4)),
-        "lr_decay": float(os.environ.get("lr_decay", 0.95)),
-        "lr_decay_step": int(os.environ.get("lr_decay_step",500)),
-        "layers": eval(str(os.environ.get("layers", '[256, 128]'))),
-        "n_embedding": int(os.environ.get("n_embedding", 48)),
-        "n_hidden": int(os.environ.get("n_hidden", 108)),
-        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 96)),
-        "n_multi_head": int(os.environ.get("n_multi_head",3)),
-        "ex_embedding_size": int(os.environ.get("ex_embedding_size",36)),
-        "ex_embedding_size2": int(os.environ.get("ex_embedding_size2", 48)),
-        "k_hop": int(os.environ.get("k_hop", 1)),
-        "is_lr_decay": True,
-        "third_feature": 'first_and_second',  # first_and_second, first_only, second_only
-        "baseline_reset": True,
-        "ex_embedding": True,
-        "w_representation_learning":True,
-        "z_dim": 128,
-        "k_epoch": int(os.environ.get("k_epoch", 1)),
-        "target_entropy": int(os.environ.get("target_entropy", 20)),
-
-    }
-
-
-    wandb.login()
-    if params['w_representation_learning'] == True:
-        wandb.init(project="Graph JSSP", name="W_REP GES_{} EXEMB_{}_{}  KHOP_{} NMH_{} NH_{} LR_{} LR CRI_{} LR LAT_{} EC_{}".format(params['graph_embedding_size'],
-                                                                           params['ex_embedding_size'],
-                                                                           params['ex_embedding_size2'],
-                                                                           params['k_hop'],
-
-                                                                           params['n_multi_head'],
-                                                                           params['n_hidden'],
-                                                                                                                      params['lr'],
-                                                                                                                      params['lr_critic'],
-                                                                                                                                params['lr_latent'],
-                                                                                                                                params[
-                                                                                                                                    'entropy_coeff']
-                                                                                                                                ))
-    else:
-        wandb.init(project="Graph JSSP", name="WO_REP GES_{} EXEMB_{}_{} KHOP_{} NMH_{} NH_{} LR_{} LR CRI_{} LR LAT_{} EC_{}".format(params['graph_embedding_size'],
-                                                                           params['ex_embedding_size'],
-                                                                           params['ex_embedding_size2'],
-                                                                           params['k_hop'],
-                                                                           params['n_multi_head'],
-                                                                           params['n_hidden'],
-                                                                                                                      params['lr'],
-                                                                                                                      params['lr_critic'],
-                                                                                                                                params['lr_latent'],
-                                                                                                                                params[
-                                                                                                                                    'entropy_coeff']
-                                                                                                                                ))
-    train_model(params)
+#
+#
+# if __name__ == '__main__':
+#
+#     load_model = False
+#
+#     log_dir = "./result/log"
+#     if not os.path.exists(log_dir + "/ppo"):
+#         os.makedirs(log_dir + "/ppo")
+#
+#     model_dir = "./result/model"
+#     if not os.path.exists(model_dir + "/ppo_w_third_feature"):
+#         os.makedirs(model_dir + "/ppo_w_third_feature")
+#
+#     param_group = 1
+#     params = {
+#         "num_of_process": 6,
+#         "step": cfg.step,
+#         "log_step": cfg.log_step,
+#         "log_dir": log_dir,
+#         "save_step": cfg.save_step,
+#         "model_dir": model_dir,
+#         "batch_size": cfg.batch_size,
+#         "init_min": -0.08,
+#         "init_max": 0.08,
+#         "use_logit_clipping": True,
+#         "C": cfg.C,
+#         "T": cfg.T,
+#         "iteration": cfg.iteration,
+#         "epsilon": float(os.environ.get("epsilon", 0.2)),
+#         "optimizer": "Adam",
+#         "n_glimpse": cfg.n_glimpse,
+#         "n_process": cfg.n_process,
+#         "lr_decay_step_critic": cfg.lr_decay_step_critic,
+#         "load_model": load_model,
+#         "entropy_coeff": float(os.environ.get("entropy_loss", 0.00001)),
+#         "dot_product": cfg.dot_product,
+#         "lr_critic": cfg.lr_critic,
+#
+#         "reward_scaler": cfg.reward_scaler,
+#         "beta": float(os.environ.get("beta", 0.65)),
+#         "alpha": float(os.environ.get("alpha", 0.1)),
+#         "lr_latent": float(os.environ.get("lr_latent", 5.0e-5)),
+#         "lr_critic": float(os.environ.get("lr_critic", 1.0e-4)),
+#         "lr": float(os.environ.get("lr", 1.0e-4)),
+#         "lr_decay": float(os.environ.get("lr_decay", 0.95)),
+#         "lr_decay_step": int(os.environ.get("lr_decay_step",500)),
+#         "layers": eval(str(os.environ.get("layers", '[256, 128]'))),
+#         "n_embedding": int(os.environ.get("n_embedding", 48)),
+#         "n_hidden": int(os.environ.get("n_hidden", 108)),
+#         "graph_embedding_size": int(os.environ.get("graph_embedding_size", 96)),
+#         "n_multi_head": int(os.environ.get("n_multi_head",2)),
+#         "ex_embedding_size": int(os.environ.get("ex_embedding_size",36)),
+#         "ex_embedding_size2": int(os.environ.get("ex_embedding_size2", 48)),
+#         "k_hop": int(os.environ.get("k_hop", 1)),
+#         "is_lr_decay": True,
+#         "third_feature": 'first_and_second',  # first_and_second, first_only, second_only
+#         "baseline_reset": True,
+#         "ex_embedding": True,
+#         "w_representation_learning":True,
+#         "z_dim": 128,
+#         "k_epoch": int(os.environ.get("k_epoch", 1)),
+#         "target_entropy": int(os.environ.get("target_entropy", -2)),
+#     }
+#
+#
+#
+#     wandb.login()
+#     if params['w_representation_learning'] == True:
+#         wandb.init(project="Graph JSSP", name="W_REP GES_{} EXEMB_{}_{}  KHOP_{} NMH_{} NH_{} LR_{} LR CRI_{} LR LAT_{} EC_{}".format(params['graph_embedding_size'],
+#                                                                            params['ex_embedding_size'],
+#                                                                            params['ex_embedding_size2'],
+#                                                                            params['k_hop'],
+#
+#                                                                            params['n_multi_head'],
+#                                                                            params['n_hidden'],
+#                                                                                                                       params['lr'],
+#                                                                                                                       params['lr_critic'],
+#                                                                                                                                 params['lr_latent'],
+#                                                                                                                                 params[
+#                                                                                                                                     'entropy_coeff']
+#                                                                                                                                 ))
+#     else:
+#         wandb.init(project="Graph JSSP", name="WO_REP GES_{} EXEMB_{}_{} KHOP_{} NMH_{} NH_{} LR_{} LR CRI_{} LR LAT_{} EC_{}".format(params['graph_embedding_size'],
+#                                                                            params['ex_embedding_size'],
+#                                                                            params['ex_embedding_size2'],
+#                                                                            params['k_hop'],
+#                                                                            params['n_multi_head'],
+#                                                                            params['n_hidden'],
+#                                                                                                                       params['lr'],
+#                                                                                                                       params['lr_critic'],
+#                                                                                                                                 params['lr_latent'],
+#                                                                                                                                 params[
+#                                                                                                                                     'entropy_coeff']
+#                                                                                                                                 ))
+#     train_model(params)
