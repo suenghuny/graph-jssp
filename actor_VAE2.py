@@ -50,7 +50,7 @@ class Critic(nn.Module):
 class PtrNet1(nn.Module):
     def __init__(self, params):
         super().__init__()
-        device = torch.device(cfg.device)
+        device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.n_multi_head = params["n_multi_head"]
         self.params = params
         self.k_hop = params["k_hop"]
