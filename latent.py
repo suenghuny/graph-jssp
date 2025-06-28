@@ -51,7 +51,7 @@ class Gaussian(nn.Module):
 class Encoder(nn.Module):
     def __init__(self, params):
         super().__init__()
-        device = torch.device(cfg.device)
+        device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.n_multi_head = params["n_multi_head"]
         self.Embedding = nn.Linear(params["num_of_process"],params["n_hidden"], bias=False).to(device)  # 그림 상에서 Encoder에 FF(feedforward)라고 써져있는 부분
         self.params = params
