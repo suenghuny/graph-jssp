@@ -113,6 +113,7 @@ if __name__ == '__main__':
                    "param1": param1,
                    "param2": param2,
                    "param3": param3,
+                   "param4": param4,
                    }
     param = param_group[selected_param]
 
