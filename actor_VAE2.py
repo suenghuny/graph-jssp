@@ -284,11 +284,9 @@ class PtrNet1(nn.Module):
             ref = torch.concat([features, r_temp], dim=2)
 
             if self.params['w_representation_learning'] == True:
-                h_c = self.decoder(z.reshape(1, batch_size, -1).detach(),
-                                   h_pi_t_minus_one.reshape(1, batch_size, -1))  # decoding 만드는 부분
+                h_c = self.decoder(z.reshape(1, batch_size, -1).detach(), h_pi_t_minus_one.reshape(1, batch_size, -1))  # decoding 만드는 부분
             else:
-                h_c = self.decoder(z.reshape(1, batch_size, -1),
-                                   h_pi_t_minus_one.reshape(1, batch_size, -1))  # decoding 만드는 부분
+                h_c = self.decoder(z.reshape(1, batch_size, -1), h_pi_t_minus_one.reshape(1, batch_size, -1))  # decoding 만드는 부분
             query = h_c.squeeze(0)
             """
             Query를 만들때에는 이전 단계의 query와 extended node embedding을 가지고 만든다
@@ -304,11 +302,9 @@ class PtrNet1(nn.Module):
 
             if old_sequence == None:
                 next_operation_index = self.job_selecter(log_p)
-                #print("old", i, next_operation_index)
             else:
-                #print(torch.tensor(old_sequence_in_ops).to(device).long().shape)
                 next_operation_index = torch.tensor(old_sequence_in_ops).to(device).long()[i, :]
-                #print("new", i, next_operation_index)
+
 
 
             log_probabilities.append(log_p.gather(1, next_operation_index.unsqueeze(1)))

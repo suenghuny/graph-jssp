@@ -89,7 +89,7 @@ if __name__ == '__main__':
              "lr_decay_step": 700,
              "lr_decay": 0.995,
              "lr_decay_min": 2.5e-5
-             }
+             } #나가리
 
     param4 ={
              "alpha": 0.1,
@@ -108,12 +108,31 @@ if __name__ == '__main__':
              "lr_decay_min": 2.5e-5
              }
 
+
+    param5 ={
+             "alpha": 0.1,
+             "n_hidden": 196,
+             "ex_embedding_size": 36,
+             "ex_embedding_size2": 64,
+             "n_multi_head": 3,
+             "k_hop": 1,
+             "lr_latent": 5.0e-5,
+             "lr_critic": 1.0e-4,
+             "lr": 1.0e-4,
+             "entropy_coeff": 0.0005,
+             "layers": eval('[196, 128]'),
+             "lr_decay_step": 1000,
+             "lr_decay": 0.95,
+             "lr_decay_min": 2.5e-5
+             } #나가리
+
     selected_param = str(os.environ.get("selected_param", "param0"))
     param_group = {"param0": param0,
                    "param1": param1,
                    "param2": param2,
                    "param3": param3,
                    "param4": param4,
+                   "param5": param5,
                    }
     print("입력된 파라미터 :", selected_param)
     param = param_group[selected_param]
@@ -171,4 +190,4 @@ if __name__ == '__main__':
 
     wandb.login()
     wandb.init(project="Graph JSSP", name=selected_param)
-    train_model(params, selected_param)  #
+    train_model(params, selected_param)  #f
