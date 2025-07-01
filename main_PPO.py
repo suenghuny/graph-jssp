@@ -238,6 +238,22 @@ def train_model(params, selected_param, log_path=None):
                 "72 min_makespan": min_makespan72,
 
             })
+            if params['w_representation_learning'] == True:
+                torch.save({'epoch': s,
+                            'model_state_dict_actor': act_model.state_dict(),
+                            'optimizer_state_dict_actor': act_optim.state_dict(),
+                            'ave_act_loss': ave_act_loss,
+                            'ave_cri_loss': 0,
+                            'ave_makespan': ave_makespan},
+                           params["model_dir"] + '/{}_step_{}_mean_makespan_{}_w_rep.pt' % (selected_param, s, mean_makespan72))
+            else:
+                torch.save({'epoch': s,
+                            'model_state_dict_actor': act_model.state_dict(),
+                            'optimizer_state_dict_actor': act_optim.state_dict(),
+                            'ave_act_loss': ave_act_loss,
+                            'ave_cri_loss': 0,
+                            'ave_makespan': ave_makespan},
+                           params["model_dir"] + '/%s_step%d_act_wo_rep.pt' % (date, s))
         act_model.block_indices = []
         baseline_model.block_indices = []
 
@@ -368,23 +384,7 @@ def train_model(params, selected_param, log_path=None):
                     s, params["step"], ave_act_loss / ((s + 1) * params["iteration"]),
                     ave_cri_loss / ((s + 1) * params["iteration"]), ave_makespan, (t2 - t1) // 60, (t2 - t1) % 60))
 
-        if mean_makespan72<=1910:
-            if params['w_representation_learning'] == True:
-                torch.save({'epoch': s,
-                            'model_state_dict_actor': act_model.state_dict(),
-                            'optimizer_state_dict_actor': act_optim.state_dict(),
-                            'ave_act_loss': ave_act_loss,
-                            'ave_cri_loss': 0,
-                            'ave_makespan': ave_makespan},
-                           params["model_dir"] + '/%s_step%d_act_w_rep.pt' % (date, s))
-            else:
-                torch.save({'epoch': s,
-                            'model_state_dict_actor': act_model.state_dict(),
-                            'optimizer_state_dict_actor': act_optim.state_dict(),
-                            'ave_act_loss': ave_act_loss,
-                            'ave_cri_loss': 0,
-                            'ave_makespan': ave_makespan},
-                           params["model_dir"] + '/%s_step%d_act_wo_rep.pt' % (date, s))
+
 
 
 

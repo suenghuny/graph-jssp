@@ -381,7 +381,7 @@ class GCRN(nn.Module):
             H = self.BN1((1 - self.alpha)*H + self.alpha*X)
 
         Z = self.Embedding2(H)
-        #Z = self.BN2(H + Z.clone())
+        Z = self.BN2(H + Z)
 
         # 추가 수정 제안
 
