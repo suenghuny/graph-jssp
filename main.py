@@ -85,7 +85,7 @@ if __name__ == '__main__':
              "lr_critic": 1.0e-4,
              "lr": 1.0e-4,
              "entropy_coeff": 0.0005,
-             "layers": eval('[512, 256, 128]'),
+             "layers": eval('[256, 128]'),
              "lr_decay_step": 700,
              "lr_decay": 0.995,
              "lr_decay_min": 2.5e-5
