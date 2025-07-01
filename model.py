@@ -314,7 +314,6 @@ class GCRN(nn.Module):
         self.m = [nn.ReLU() for _ in range(num_edge_cat)]
         self.leakyrelu = [nn.LeakyReLU() for _ in range(num_edge_cat)]
         self.Embedding1 = nn.Linear(self.n_multi_head*graph_embedding_size*num_edge_cat, feature_size, bias = False)
-
         self.Embedding1_mean = nn.Linear(graph_embedding_size * num_edge_cat, feature_size, bias = False)
         self.Embedding2 = NodeEmbedding(feature_size, feature_size, layers = layers)
         self.BN1 = nn.BatchNorm1d(feature_size)
@@ -371,13 +370,9 @@ class GCRN(nn.Module):
         if final == False:
             H = placeholder_for_multi_head.reshape(batch_size, num_nodes, self.n_multi_head * self.num_edge_cat * self.graph_embedding_size)
             H = H.reshape(batch_size*num_nodes, -1)
-            #print("1", H.shape, self.graph_embedding_size, self.feature_size)
             H = self.Embedding1(H)
-            #print("2", H.shape)
             X = X.reshape(batch_size*num_nodes, -1)
-            #print("3", X.shape)
-            H = (1 - self.alpha)*H + self.alpha*X
-            #print("4", X.shape)
+            H = self.BN1((1 - self.alpha)*H + self.alpha*X)
         else:
             H = empty.reshape(batch_size, num_nodes, self.num_edge_cat * self.graph_embedding_size)
             H = H.reshape(batch_size * num_nodes, -1)
@@ -386,7 +381,7 @@ class GCRN(nn.Module):
             H = self.BN1((1 - self.alpha)*H + self.alpha*X)
 
         Z = self.Embedding2(H)
-        Z = self.BN2(H + Z.clone())
+        #Z = self.BN2(H + Z.clone())
 
         # 추가 수정 제안
 

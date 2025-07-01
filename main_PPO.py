@@ -185,7 +185,7 @@ def train_model(params, selected_param, log_path=None):
 
             for p in problem_list:
                 min_makespan = heuristic_eval(p)
-                eval_number = 5
+                eval_number = 2
                 with torch.no_grad():
                     min_makespan_list = [min_makespan] * eval_number
                     min_makespan1, mean_makespan1 = evaluation(act_model, baseline_model, p, eval_number, device,
@@ -249,12 +249,10 @@ def train_model(params, selected_param, log_path=None):
             num_job = np.random.randint(num_machine, 10)
 
 
-            jobs_datas, scheduler_list = generate_jssp_instance(num_jobs=num_job, num_machine=num_machine,
+            jobs_datas, scheduler_list = generate_jssp_instance(num_jobs=num_job,
+                                                                num_machine=num_machine,
                                                                 batch_size=params['batch_size'])
             act_model.Latent.current_num_edges = num_machine*num_job
-
-            # print(jobs_datas)
-            # print("======================")
             makespan_list_for_upperbound = list()
             for scheduler in scheduler_list:
                 c_max_heu = scheduler.heuristic_run()
