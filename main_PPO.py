@@ -121,7 +121,7 @@ def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=Non
         val_makespan.append(makespan)
     # print("크크크", val_makespan)
     return np.min(val_makespan), np.mean(val_makespan)
-
+#0628_20_59_step86000_act_w_rep
 
 def train_model(params, selected_param, log_path=None):
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -387,6 +387,109 @@ def train_model(params, selected_param, log_path=None):
                             'ave_cri_loss': 0,
                             'ave_makespan': ave_makespan},
                            params["model_dir"] + '/%s_step%d_act_wo_rep.pt' % (date, s))
+
+
+
+def test_model(params, selected_param, log_path=None):
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    date = datetime.now().strftime('%m%d_%H_%M')
+    param_path = params["log_dir"] + '/ppo' + '/%s_%s_param.csv' % (date, "train")
+    print(f'generate {param_path}')
+    with open(param_path, 'w') as f:
+        f.write(''.join('%s,%s\n' % item for item in params.items()))
+
+    epoch = 0
+    ave_act_loss = 0.0
+    ave_cri_loss = 0.0
+
+    act_model = PtrNet1(params).to(device)
+    file_name = '0628_20_59_step86000_act_w_rep'
+    checkpoint = torch.load('result/model/' + '{}.pt'.format(file_name))
+    act_model.load_state_dict(checkpoint['model_state_dict_actor'])
+
+
+    t1 = time()
+    ave_makespan = 0
+
+    c_max = list()
+    b = 0
+    problem_list = [1, 2]
+    validation_records_min = [[] for _ in problem_list]
+    validation_records_mean = [[] for _ in problem_list]
+    empty_records = [[], []]
+
+    for s in range(epoch + 1, params["step"]):
+
+        """
+
+        변수별 shape 
+        inputs : batch_size X number_of_blocks X number_of_process
+        pred_seq : batch_size X number_of_blocks
+
+        """
+        b += 1
+
+        if s % 100 == 1:  # Evaluation 수행
+
+
+
+            for p in problem_list:
+                min_makespan = heuristic_eval(p)
+                eval_number = 5
+                with torch.no_grad():
+                    min_makespan_list = [min_makespan] * eval_number
+                    min_makespan1, mean_makespan1 = evaluation(act_model, baseline_model, p, eval_number, device,
+                                                               upperbound=min_makespan_list)
+
+
+
+                min_makespan = min_makespan1
+                mean_makespan = mean_makespan1
+                if p == 1:
+                    mean_makespan71 = mean_makespan1
+                    min_makespan71 = min_makespan1
+                else:
+                    mean_makespan72 = mean_makespan1
+                    min_makespan72 = min_makespan1
+
+                print("TA{}".format(problem_list[p - 1]), min_makespan, mean_makespan)
+                empty_records[p - 1].append(mean_makespan)
+                #
+                # if len(empty_records[1]) > 35 and np.mean(empty_records[1][-30:]) >= 3300:
+                #     sys.exit()
+
+                if cfg.vessl == True:
+                    vessl.log(step=s, payload={'minmakespan{}'.format(str(problem_list[p - 1])): min_makespan})
+                    vessl.log(step=s, payload={'meanmakespan{}'.format(str(problem_list[p - 1])): mean_makespan})
+                else:
+                    validation_records_min[p - 1].append(min_makespan)
+                    validation_records_mean[p - 1].append(mean_makespan)
+                    min_m = pd.DataFrame(validation_records_min)
+                    mean_m = pd.DataFrame(validation_records_mean)
+                    min_m = min_m.transpose()
+                    mean_m = mean_m.transpose()
+                    min_m.columns = problem_list
+                    mean_m.columns = problem_list
+
+
+                    t1 = time()
+
+                    if params['w_representation_learning'] == True:
+                        min_m.to_csv('w_rep_min_makespan_{}.csv'.format(selected_param))
+                        mean_m.to_csv('w_rep_mean_makespan_{}.csv'.format(selected_param))
+                    else:
+                        min_m.to_csv('wo_rep_min_makespan_{}.csv'.format(selected_param))
+                        mean_m.to_csv('wo_rep_mean_makespan_{}.csv'.format(selected_param))
+            wandb.log({
+                "episode": s,
+                "71 mean_makespan": mean_makespan71,
+                "72 mean_makespan": mean_makespan72,
+                "71 min_makespan": min_makespan71,
+                "72 min_makespan": min_makespan72,
+
+            })
+
+
 
 #
 #

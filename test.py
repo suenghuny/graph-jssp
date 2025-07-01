@@ -126,7 +126,7 @@ if __name__ == '__main__':
              "lr_decay_min": 2.5e-5
              }
 
-    selected_param = str(os.environ.get("selected_param", "param0"))
+    selected_param = str(os.environ.get("selected_param", "param4"))
     param_group = {"param0": param0,
                    "param1": param1,
                    "param2": param2,
@@ -190,4 +190,4 @@ if __name__ == '__main__':
 
     wandb.login()
     wandb.init(project="Graph JSSP", name=selected_param)
-    train_model(params, selected_param)  #f
+    test_model(params, selected_param)  #f
