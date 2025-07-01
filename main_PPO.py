@@ -51,7 +51,7 @@ def set_seed(seed):
 set_seed(int(os.environ.get("seed", 30)))  # 30 했었음
 opt_list = [1059, 888, 1005, 1005, 887, 1010, 397, 899, 934, 944]
 orb_list = []
-for i in ["71", "72"]:
+for i in ["61", "62"]:
     df = pd.read_excel("ta.xlsx", sheet_name=i, engine='openpyxl')
     orb_data = list()  #
     for row, column in df.iterrows():
@@ -405,7 +405,7 @@ def test_model(params, selected_param, log_path=None):
     act_model = PtrNet1(params).to(device)
     baseline_model = PtrNet1(params).to(device)  # baseline_model 불필요
     baseline_model.load_state_dict(act_model.state_dict())  # baseline_model 불필요
-    file_name = '0628_20_59_step86000_act_w_rep'
+    file_name = '0628_20_59_step79900_act_w_rep'
     checkpoint = torch.load('result/model/' + '{}.pt'.format(file_name))
     act_model.load_state_dict(checkpoint['model_state_dict_actor'])
 
