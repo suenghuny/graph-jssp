@@ -188,6 +188,4 @@ if __name__ == '__main__':
 
     }
 
-    wandb.login()
-    wandb.init(project="Graph JSSP", name=selected_param)
     test_model(params, selected_param)  #f

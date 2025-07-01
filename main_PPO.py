@@ -403,6 +403,8 @@ def test_model(params, selected_param, log_path=None):
     ave_cri_loss = 0.0
 
     act_model = PtrNet1(params).to(device)
+    baseline_model = PtrNet1(params).to(device)  # baseline_model 불필요
+    baseline_model.load_state_dict(act_model.state_dict())  # baseline_model 불필요
     file_name = '0628_20_59_step86000_act_w_rep'
     checkpoint = torch.load('result/model/' + '{}.pt'.format(file_name))
     act_model.load_state_dict(checkpoint['model_state_dict_actor'])
