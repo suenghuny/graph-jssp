@@ -51,7 +51,7 @@ def set_seed(seed):
 set_seed(int(os.environ.get("seed", 30)))  # 30 했었음
 opt_list = [1059, 888, 1005, 1005, 887, 1010, 397, 899, 934, 944]
 orb_list = []
-for i in ["21", "22"]:
+for i in ["71", "72"]:
     df = pd.read_excel("ta.xlsx", sheet_name=i, engine='openpyxl')
     orb_data = list()  #
     for row, column in df.iterrows():
