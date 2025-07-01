@@ -405,7 +405,7 @@ def test_model(params, selected_param, log_path=None):
     act_model = PtrNet1(params).to(device)
     baseline_model = PtrNet1(params).to(device)  # baseline_model 불필요
     baseline_model.load_state_dict(act_model.state_dict())  # baseline_model 불필요
-    file_name = '0628_20_59_step74900_act_w_rep'
+    file_name = '0628_20_59_step86900_act_w_rep'
     checkpoint = torch.load('result/model/' + '{}.pt'.format(file_name))
     act_model.load_state_dict(checkpoint['model_state_dict_actor'])
 
