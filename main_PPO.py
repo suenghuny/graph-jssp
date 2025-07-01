@@ -253,8 +253,7 @@ def train_model(params, selected_param, log_path=None):
                             'ave_act_loss': ave_act_loss,
                             'ave_cri_loss': 0,
                             'ave_makespan': ave_makespan},
-                           params["model_dir"] + '/{}_step_{}_mean_makespan_{}_wo_rep.pt'.format(selected_param, s,
-                                                                                                mean_makespan72))
+                           params["model_dir"] + '/{}_step_{}_mean_makespan_{}_wo_rep.pt'.format(selected_param, s, mean_makespan72))
         act_model.block_indices = []
         baseline_model.block_indices = []
 
