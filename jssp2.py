@@ -247,10 +247,10 @@ class AdaptiveScheduler:
                 else:  # 첫번째 operation에 대해서는 1로 처리한다.
                     if np.max(estI_list) == 0: pass
                 """
+                
                 ES, EF
-
+                
                 """
-                #
                 key_count = deepcopy(self.key_count)
                 j_count = deepcopy(self.j_count)
                 m_count = deepcopy(self.m_count)
