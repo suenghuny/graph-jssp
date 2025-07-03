@@ -324,7 +324,12 @@ def train_model(params, selected_param, log_path=None):
             """
 
             entropy = -ll_old  # entropy = -E[log(p)]
-            entropy_loss = params['entropy_coeff'] * entropy
+            initial_coeff = params['entropy_coeff']
+            anneal_step = 30000
+            entrop_coeff = max(0.0, initial_coeff * (1 - s / anneal_step))
+            entropy_loss = entrop_coeff * entropy
+
+
             # target_entropy = params["target_entropy"]
             # log_alpha_loss = -act_model.log_alpha * (ll_old.detach() + target_entropy).mean()
             adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - baselines  # baseline(advantage) 구하는 부분
@@ -360,7 +365,7 @@ def train_model(params, selected_param, log_path=None):
 
 
             # 그 후 각 옵티마이저 단계 실행
-            if s <=20000:
+            if s <=anneal_step:
                 latent_optim.step()
             act_optim.step()
             cri_optim.step()

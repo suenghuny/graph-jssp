@@ -263,7 +263,7 @@ class LatentModel(nn.Module):
 
         self.current_num_edges = 100
         # p(z) = N(0, I)
-        self.z_prior = FixedGaussian(z_dim, 0.01)
+        self.z_prior = FixedGaussian(z_dim, 0.1)
 
         # x = encoder(G)
         self.encoder = Encoder(params)
