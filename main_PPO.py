@@ -123,6 +123,41 @@ def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=Non
     return np.min(val_makespan), np.mean(val_makespan)
 #0628_20_59_step86000_act_w_rep
 
+def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=None):
+    scheduler_list_val = [AdaptiveScheduler(orb_list[p - 1]) for _ in range(eval_number)]
+    val_makespan = list()
+    act_model.get_jssp_instance(scheduler_list_val)
+    baseline_model.get_jssp_instance(scheduler_list_val)
+
+    act_model.eval()
+
+    scheduler = AdaptiveScheduler(orb_list[p - 1])  # scheduler는 validation(ORB set)에 대해 수행
+
+    num_job = scheduler.num_job
+    num_machine = scheduler.num_mc
+    # print(num_job, num_machine)
+
+    node_feature = scheduler.get_node_feature()
+    node_feature = [node_feature for _ in range(int(eval_number))]
+    edge_precedence = scheduler.get_edge_index_precedence()
+    edge_antiprecedence = scheduler.get_edge_index_antiprecedence()
+    edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
+    heterogeneous_edges = (edge_precedence, edge_antiprecedence, edge_machine_sharing)
+    heterogeneous_edges = [heterogeneous_edges for _ in range(eval_number)]
+    input_data = (node_feature, heterogeneous_edges)
+    pred_seq, ll_old, _, _, _, _, _ = act_model(input_data,
+                                    device,
+                                    scheduler_list=scheduler_list_val,
+                                    num_machine=num_machine,
+                                    num_job=num_job,
+                                    train = False)
+    for sequence in pred_seq:
+        scheduler = AdaptiveScheduler(orb_list[p - 1])
+        makespan = scheduler.run(sequence.tolist())
+        val_makespan.append(makespan)
+    # print("크크크", val_makespan)
+    return np.min(val_makespan), np.mean(val_makespan)
+
 def train_model(params, selected_param, log_path=None):
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     date = datetime.now().strftime('%m%d_%H_%M')
@@ -185,7 +220,7 @@ def train_model(params, selected_param, log_path=None):
 
             for p in problem_list:
                 min_makespan = heuristic_eval(p)
-                eval_number = 2
+                eval_number = 1
                 with torch.no_grad():
                     min_makespan_list = [min_makespan] * eval_number
                     min_makespan1, mean_makespan1 = evaluation(act_model, baseline_model, p, eval_number, device,

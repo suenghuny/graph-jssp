@@ -299,7 +299,7 @@ class AdaptiveScheduler:
 
         return makespan, est_holder, fin_holder, critical_path_list, critical_path_ij_list
 
-    def adaptive_run(self, est_holder, fin_holder, i= None):
+    def adaptive_run(self, est_holder, fin_holder, mwkr_holder1, mwkr_holder2,i= None):
 
         if i != None:
             """
@@ -360,6 +360,13 @@ class AdaptiveScheduler:
                 if len(estI_list)>0 and np.max(estI_list)!=0:
                     est_holder[I][self.key_count[I]] = estI/np.max(estI_list)
                     fin_holder[I][self.key_count[I]] = (estI+gen_tI)/np.max(gentI_list)
+                    copied_key_count = deepcopy(self.key_count)
+
+                    copied_key_count[I] = copied_key_count[I] + 1
+                    #print(copied_key_count)
+                    #print(copied_key_count.values())
+                    mwkr_holder1[I][self.key_count[I]] = np.max(list(copied_key_count.values())) / self.num_mc
+                    mwkr_holder2[I][self.key_count[I]] = np.mean(list(copied_key_count.values())) / self.num_mc
                 else: # 첫번째 operation에 대해서는 1로 처리한다.
                     if np.max(estI_list)==0:pass
                 """
@@ -446,7 +453,7 @@ class AdaptiveScheduler:
         #
         #     makespan = max(self.j_count.values())
         ##########################################################################################
-        return makespan, est_holder, fin_holder, critical_path_list, critical_path_ij_list
+        return makespan, est_holder, fin_holder, critical_path_list, critical_path_ij_list, mwkr_holder1, mwkr_holder2
 
     def check_avail_ops(self, avail_ops):
         empty2 = list()

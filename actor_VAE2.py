@@ -17,6 +17,13 @@ class Categorical(nn.Module):
     def forward(self, log_p):
         return torch.multinomial(log_p.exp(), 1).long().squeeze(1)
 
+class Greedy(nn.Module):
+    def __init__(self):
+        super().__init__()
+    def forward(self, log_p):
+        #print(log_p.shape)
+        return torch.argmax(log_p, -1)#.long().squeeze(1)
+
 
 class ExEmbedding(nn.Module):
     def __init__(self, raw_feature_size, feature_size):
@@ -61,7 +68,7 @@ class PtrNet1(nn.Module):
         self.Latent = LatentModel(z_dim=z_dim, params = params).to(device)
         augmented_hidden_size = params["n_hidden"]
 
-        self.ex_embedding = ExEmbedding(raw_feature_size=4, feature_size= params["n_hidden"])
+        self.ex_embedding = ExEmbedding(raw_feature_size=6, feature_size= params["n_hidden"])
 
         # Vec 파라미터 리스트 생성 (문제 없음)
         self.W_v = nn.ParameterList([nn.Parameter(torch.FloatTensor(2 * params["n_hidden"], 2 * params["n_hidden"]))for _ in range(self.n_multi_head)])
@@ -106,6 +113,7 @@ class PtrNet1(nn.Module):
         self.T = params["T"]
         self.n_glimpse = params["n_glimpse"]
         self.job_selecter = Categorical()
+        self.job_selecter_greedy = Greedy()
         self.lb_records = [[],[],[],[],[],[]]
         self.makespan_records = []
         self.log_alpha = nn.Parameter(torch.tensor(0.0001))
@@ -216,7 +224,8 @@ class PtrNet1(nn.Module):
         for i in range(num_operations):
             est_placeholder = mask2_debug.clone().to(device)
             fin_placeholder = mask2_debug.clone().to(device)
-            mwkr_placeholder = mask2_debug.clone().to(device)
+            mwkr_placeholder1 = mask2_debug.clone().to(device)
+            mwkr_placeholder2 = mask2_debug.clone().to(device)
 
             mask1_debug = mask1_debug.reshape(batch_size, -1)
             mask2_debug = mask2_debug.reshape(batch_size, -1)
@@ -236,12 +245,18 @@ class PtrNet1(nn.Module):
 
 
                 for nb in range(batch_size):
-                    c_max, est, fin, critical_path, critical_path2 = scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb])
+                    c_max, est, fin, critical_path, critical_path2,mwkr1,mwkr2 = scheduler_list[nb].adaptive_run(est_placeholder[nb],
+                                                                                                     fin_placeholder[nb],
+                                                                                                     mwkr_placeholder1[nb],
+                                                                                                     mwkr_placeholder2[nb],
+                                                                                                     )
                     #print(empty_zero.shape, critical_path.shape)
                     empty_zero[nb, :] = torch.tensor(critical_path.reshape(-1)).to(device)# 안중요
                     empty_zero2[nb, :] = torch.tensor(critical_path2.reshape(-1)).to(device)  # 안중요
                     est_placeholder[nb] = est
                     fin_placeholder[nb] = fin
+                    mwkr_placeholder1[nb] = mwkr1
+                    mwkr_placeholder2[nb] = mwkr2
 
 
 
@@ -260,11 +275,21 @@ class PtrNet1(nn.Module):
                         next_b = old_sequence[nb, i].item()
                     else:
                         next_b = next_job[nb].item()
-                    c_max, est, fin, critical_path, critical_path2 = scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb],i = next_b) # next_b는 이전 스텝에서 선택된 Job이고, Adaptive Run이라는 것은 선택된 Job에 따라 update한 다음에 EST, EFIN을 구하라는 의미
+                    c_max, est, fin, critical_path, critical_path2,mwkr1,mwkr2  = scheduler_list[nb].adaptive_run(
+                        est_placeholder[nb], fin_placeholder[nb],
+                        mwkr_placeholder1[nb],
+                        mwkr_placeholder2[nb],
+                        i = next_b) # next_b는 이전 스텝에서 선택된 Job이고, Adaptive Run이라는 것은 선택된 Job에 따라 update한 다음에 EST, EFIN을 구하라는 의미
+
                     empty_zero[nb, :]  = torch.tensor(critical_path.reshape(-1)).to(device)
                     empty_zero2[nb, :] = torch.tensor(critical_path2.reshape(-1)).to(device)  # 안중요
                     est_placeholder[nb] = est
                     fin_placeholder[nb] = fin
+                    # print("전",est[0])
+                    # print("후",est_placeholder[nb][0])
+                    # print('====================')
+                    mwkr_placeholder1[nb] = mwkr1
+                    mwkr_placeholder2[nb] = mwkr2
                     """
                     
                     Branch and Cut 로직에 따라 masking을 수행함
@@ -274,10 +299,13 @@ class PtrNet1(nn.Module):
 
             est_placeholder = est_placeholder.reshape(batch_size, -1).unsqueeze(2)
             fin_placeholder = fin_placeholder.reshape(batch_size, -1).unsqueeze(2)
+            mwkr_placeholder1 = mwkr_placeholder1.reshape(batch_size, -1).unsqueeze(2)
+            mwkr_placeholder2 = mwkr_placeholder2.reshape(batch_size, -1).unsqueeze(2)
             empty_zero = empty_zero.unsqueeze(2)
             empty_zero2 = empty_zero2.unsqueeze(2)
+           # print(est_placeholder.shape, mwkr_placeholder2.shape)
+            r_temp = torch.concat([est_placeholder, fin_placeholder, empty_zero, empty_zero2, mwkr_placeholder1,mwkr_placeholder2], dim=2)  # extended node embedding을 만드는 부분(z_t_i에 해당)
 
-            r_temp = torch.concat([est_placeholder, fin_placeholder, empty_zero, empty_zero2], dim=2)  # extended node embedding을 만드는 부분(z_t_i에 해당)
             r_temp = r_temp.reshape([batch*num_operations, -1])
             r_temp = self.ex_embedding(r_temp)
             r_temp = r_temp.reshape([batch, num_operations, -1])
@@ -301,7 +329,10 @@ class PtrNet1(nn.Module):
             log_p = torch.log_softmax(logits / self.T, dim=-1) # log_softmax로 구하는 부분
 
             if old_sequence == None:
-                next_operation_index = self.job_selecter(log_p)
+                if train == True:
+                    next_operation_index = self.job_selecter(log_p)
+                else:
+                    next_operation_index = self.job_selecter_greedy(log_p)
             else:
                 next_operation_index = torch.tensor(old_sequence_in_ops).to(device).long()[i, :]
 

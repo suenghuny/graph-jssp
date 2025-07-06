@@ -33,7 +33,7 @@ if __name__ == '__main__':
              "lr_latent": 5.0e-5,
              "lr_critic": 1.0e-4,
              "lr": 1.0e-4,
-             "entropy_coeff": 0.0001,
+             "entropy_coeff": 0.001,
              "layers": eval('[256, 128]'),
              "lr_decay_step": 500,
              "lr_decay": 0.95,
@@ -89,7 +89,7 @@ if __name__ == '__main__':
              "lr_decay_step": 700,
              "lr_decay": 0.995,
              "lr_decay_min": 2.5e-5
-             } #나가리
+             }
 
     param4 ={
              "alpha": 0.1,
