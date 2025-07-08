@@ -109,21 +109,21 @@ if __name__ == '__main__':
              }
 
 
-    param5 ={
+    param5 = {
              "alpha": 0.1,
-             "n_hidden": 196,
-             "ex_embedding_size": 36,
+             "n_hidden": 128,
+             "ex_embedding_size": 42,
              "ex_embedding_size2": 64,
              "n_multi_head": 3,
              "k_hop": 1,
              "lr_latent": 5.0e-5,
              "lr_critic": 1.0e-4,
              "lr": 1.0e-4,
-             "entropy_coeff": 0.0005,
+             "entropy_coeff": 0.003,
              "layers": eval('[196, 128]'),
-             "lr_decay_step": 1000,
-             "lr_decay": 0.95,
-             "lr_decay_min": 2.5e-5
+             "lr_decay_step": 600,
+             "lr_decay": 0.975,
+             "lr_decay_min": 5e-5
              }
 
     selected_param = str(os.environ.get("selected_param", "param0"))
