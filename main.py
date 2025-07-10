@@ -200,7 +200,7 @@ if __name__ == '__main__':
         "third_feature": 'first_and_second',  # first_and_second, first_only, second_only
         "baseline_reset": True,
         "ex_embedding": True,
-        "w_representation_learning": bool(os.environ.get("w_representation_learning", True)),
+        "w_representation_learning": os.environ.get("w_representation_learning", "True") != "False",
         "z_dim": 128,
         "k_epoch": int(os.environ.get("k_epoch", 1)),
         "target_entropy": int(os.environ.get("target_entropy", -2)),
@@ -209,7 +209,7 @@ if __name__ == '__main__':
 
     wandb.login()
     if params["w_representation_learning"] == True:
-        wandb.init(project="Graph JSSP", name=selected_param +'w_rep')
+        wandb.init(project="Graph JSSP", name=selected_param + 'w_rep')
     else:
         wandb.init(project="Graph JSSP", name=selected_param + 'wo_rep'.format())
     train_model(params, selected_param)  #f
