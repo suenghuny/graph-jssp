@@ -208,5 +208,5 @@ if __name__ == '__main__':
     }
 
     wandb.login()
-    wandb.init(project="Graph JSSP", name=selected_param)
+    wandb.init(project="Graph JSSP", name=selected_param +'{}'.format(param["w_representation_learning"]))
     train_model(params, selected_param)  #f
