@@ -38,7 +38,7 @@ if __name__ == '__main__':
              "lr_decay_step": 500,
              "lr_decay": 0.95,
              "lr_decay_min": 5e-5
-             }
+             } # not good
 
     param1 ={
              "alpha": 0.05,
@@ -106,7 +106,7 @@ if __name__ == '__main__':
              "lr_decay_step": 500,
              "lr_decay": 0.975,
              "lr_decay_min": 2.5e-5
-             }
+             } # not good
 
 
     param5 = {
