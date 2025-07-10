@@ -360,7 +360,7 @@ def train_model(params, selected_param, log_path=None):
 
             entropy = -ll_old  # entropy = -E[log(p)]
             initial_coeff = params['entropy_coeff']
-            anneal_step = 30000
+            anneal_step = params['rep_anneal']
             entrop_coeff = max(0.0, initial_coeff * (1 - s / anneal_step))
             entropy_loss = entrop_coeff * entropy
 
@@ -406,10 +406,6 @@ def train_model(params, selected_param, log_path=None):
             cri_optim.step()
             step_with_min(act_lr_scheduler, act_optim, min_lr=params['lr_decay_min'])
             step_with_min(cri_lr_scheduler, cri_optim, min_lr=params['lr_decay_min'])
-
-            if params['w_representation_learning'] == True:
-                if latent_lr_scheduler.get_last_lr()[0] >=  float(os.environ.get("lr_decay_min", 5.0e-5)):
-                    latent_lr_scheduler.step()
 
 
         ave_act_loss += act_loss.item()
