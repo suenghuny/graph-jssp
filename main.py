@@ -200,7 +200,7 @@ if __name__ == '__main__':
         "third_feature": 'first_and_second',  # first_and_second, first_only, second_only
         "baseline_reset": True,
         "ex_embedding": True,
-        "w_representation_learning": False,
+        "w_representation_learning": bool(os.environ.get("w_representation_learning", True)),
         "z_dim": 128,
         "k_epoch": int(os.environ.get("k_epoch", 1)),
         "target_entropy": int(os.environ.get("target_entropy", -2)),
