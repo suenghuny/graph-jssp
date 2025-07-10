@@ -144,7 +144,8 @@ if __name__ == '__main__':
              }
 
     selected_param = str(os.environ.get("selected_param", "param0"))
-    param_group = {"param0": param0,
+    param_group = {
+                   "param0": param0,
                    "param1": param1,
                    "param2": param2,
                    "param3": param3,
