@@ -201,7 +201,7 @@ if __name__ == '__main__':
         "ex_embedding_size": param["ex_embedding_size"],
         "ex_embedding_size2": param["ex_embedding_size2"],
         "entropy_coeff": param["entropy_coeff"],
-
+        "rep_anneal": param["rep_anneal"],
         "k_hop": int(os.environ.get("k_hop", 1)),
         "is_lr_decay": True,
         "third_feature": 'first_and_second',  # first_and_second, first_only, second_only
