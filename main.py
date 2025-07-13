@@ -33,17 +33,17 @@ if __name__ == '__main__':
              "lr_latent": 5.0e-5,
              "lr_critic": 1.0e-4,
              "lr": 1.0e-4,
-             "entropy_coeff": 0.001,
-             "layers": eval('[256, 128]'),
+             "entropy_coeff": 0.0005,
+             "layers": eval('[128, 96]'),
              "lr_decay_step": 500,
              "lr_decay": 0.95,
              "lr_decay_min": 5e-5,
-            'rep_anneal': 10000
+            'rep_anneal': 40000
              } # not good
 
     param1 ={
              "alpha": 0.05,
-             "n_hidden": 128,
+             "n_hidden": 96,
              "ex_embedding_size": 32,
              "ex_embedding_size2": 54,
              "n_multi_head": 1,
@@ -52,8 +52,8 @@ if __name__ == '__main__':
              "lr_critic": 1.0e-4,
              "lr": 1.0e-4,
              "entropy_coeff": 0.001,
-             "layers": eval('[196, 96]'),
-             "lr_decay_step": 400,
+             "layers": eval('[196, 128]'),
+             "lr_decay_step": 600,
              "lr_decay": 0.99,
              "lr_decay_min": 5e-5,
             'rep_anneal': 30000
@@ -97,7 +97,7 @@ if __name__ == '__main__':
 
     param4 ={
              "alpha": 0.1,
-             "n_hidden": 256,
+             "n_hidden": 128,
              "ex_embedding_size": 42,
              "ex_embedding_size2": 56,
              "n_multi_head": 3,
@@ -105,12 +105,12 @@ if __name__ == '__main__':
              "lr_latent": 5.0e-5,
              "lr_critic": 1.0e-4,
              "lr": 1.0e-4,
-             "entropy_coeff": 0.00005,
+             "entropy_coeff": 0.0001,
              "layers": eval('[128, 64]'),
              "lr_decay_step": 500,
              "lr_decay": 0.975,
              "lr_decay_min": 2.5e-5,
-            'rep_anneal': 10000
+            'rep_anneal': 20000
              } # not good
 
 

@@ -305,8 +305,8 @@ class LatentModel(nn.Module):
 
         if train == True:
             node_pred, edge_pred = self.decoder(z)
-
-
+            node_pred = node_pred[:,:self.current_num_edges, :]
+            edge_pred = edge_pred[:,:self.current_num_edges, :self.current_num_edges,:]
             edge_loss = edge_cats*torch.log(edge_pred)+(1-edge_cats)*torch.log(1-edge_pred)
             node_loss = X*torch.log(node_pred)+(1-X)*torch.log(1-node_pred)
             edge_loss = -edge_loss.mean()

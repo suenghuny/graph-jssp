@@ -176,12 +176,9 @@ def train_model(params, selected_param, log_path=None):
     baseline_model.load_state_dict(act_model.state_dict())  # baseline_model 불필요
     if params["w_representation_learning"] == True:
         latent_optim = optim.Adam(act_model.Latent.parameters(), lr=params["lr_latent"])
-        act_optim = optim.Adam(act_model.all_attention_params, lr=params["lr"])
-        cri_optim = optim.Adam(act_model.critic.parameters(), lr=params['lr_critic'])
+        act_optim = optim.Adam(list(act_model.all_attention_params) + list(act_model.critic.parameters()), lr=params["lr"])
         act_lr_scheduler = optim.lr_scheduler.StepLR(act_optim, step_size=params["lr_decay_step"], gamma=params["lr_decay"])
-        cri_lr_scheduler = optim.lr_scheduler.StepLR(cri_optim, step_size=params["lr_decay_step"], gamma=params["lr_decay"])
         latent_lr_scheduler = optim.lr_scheduler.StepLR(latent_optim, step_size=params["lr_decay_step"], gamma=params["lr_decay"])
-        entropy_coeff_optim = optim.Adam([act_model.log_alpha], 1e-5)
         """
         act_model이라는 신경망 뭉치에 파라미터(가중치, 편향)을 업데이트 할꺼야.
 
@@ -307,7 +304,7 @@ def train_model(params, selected_param, log_path=None):
                                                                 num_machine=num_machine,
                                                                 batch_size=params['batch_size'])
             act_model.Latent.current_num_edges = num_machine*num_job
-            act_model.Latent.decoder.max_nodes = num_machine * num_job
+           # act_model.Latent.decoder.max_nodes = num_machine * num_job
             makespan_list_for_upperbound = list()
             for scheduler in scheduler_list:
                 c_max_heu = scheduler.heuristic_run()
@@ -389,16 +386,11 @@ def train_model(params, selected_param, log_path=None):
                 total_loss = latent_loss + act_loss + cri_loss#+log_alpha_loss
                 latent_optim.zero_grad()
                 act_optim.zero_grad()
-                cri_optim.zero_grad()
-                entropy_coeff_optim.zero_grad()
                 total_loss.backward()
-                nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 5)),
-                                         norm_type=2)
+                nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 5)),norm_type=2)
                 latent_optim.step()
                 act_optim.step()
-                cri_optim.step()
                 step_with_min(act_lr_scheduler, act_optim, min_lr=params['lr_decay_min'])
-                step_with_min(cri_lr_scheduler, cri_optim, min_lr=params['lr_decay_min'])
                 step_with_min(latent_lr_scheduler, latent_optim, min_lr=1e-5)
             else:
                 total_loss = act_loss + cri_loss
