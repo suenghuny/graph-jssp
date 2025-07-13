@@ -307,6 +307,7 @@ def train_model(params, selected_param, log_path=None):
                                                                 num_machine=num_machine,
                                                                 batch_size=params['batch_size'])
             act_model.Latent.current_num_edges = num_machine*num_job
+            act_model.Latent.decoder.max_nodes = num_machine * num_job
             makespan_list_for_upperbound = list()
             for scheduler in scheduler_list:
                 c_max_heu = scheduler.heuristic_run()
