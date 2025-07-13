@@ -201,7 +201,7 @@ class PtrNet1(nn.Module):
         if self.params['w_representation_learning'] == True:
             baselines = self.critic(z.detach())
         else:
-            baselines = self.critic(z)
+            baselines = self.critic(z.detach())
 
         batch = features.shape[0]
         num_operations = features.shape[1]

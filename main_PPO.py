@@ -174,10 +174,10 @@ def train_model(params, selected_param, log_path=None):
 
     baseline_model = PtrNet1(params).to(device)  # baseline_model 불필요
     baseline_model.load_state_dict(act_model.state_dict())  # baseline_model 불필요
-    if params["optimizer"] == 'Adam':
+    if params["w_representation_learning"] == True:
         latent_optim = optim.Adam(act_model.Latent.parameters(), lr=params["lr_latent"])
-        act_optim = optim.Adam(act_model.all_attention_params, lr=params["lr_critic"])
-        cri_optim = optim.Adam(act_model.critic.parameters(), lr=params['lr'])
+        act_optim = optim.Adam(act_model.all_attention_params, lr=params["lr"])
+        cri_optim = optim.Adam(act_model.critic.parameters(), lr=params['lr_critic'])
         act_lr_scheduler = optim.lr_scheduler.StepLR(act_optim, step_size=params["lr_decay_step"], gamma=params["lr_decay"])
         cri_lr_scheduler = optim.lr_scheduler.StepLR(cri_optim, step_size=params["lr_decay_step"], gamma=params["lr_decay"])
         latent_lr_scheduler = optim.lr_scheduler.StepLR(latent_optim, step_size=params["lr_decay_step"], gamma=params["lr_decay"])
@@ -187,8 +187,10 @@ def train_model(params, selected_param, log_path=None):
 
         """
 
-    elif params["optimizer"] == "RMSProp":
-        act_optim = optim.RMSprop(act_model.parameters(), lr=params["lr"])
+    else:
+        act_optim = optim.Adam(act_model.parameters(), lr=params["lr"])
+        act_lr_scheduler = optim.lr_scheduler.StepLR(act_optim, step_size=params["lr_decay_step"], gamma=params["lr_decay"])
+
     # if params["is_lr_decay"]:
     #     act_lr_scheduler = optim.lr_scheduler.StepLR(act_optim, step_size=params["lr_decay_step"],
     #                                                  gamma=params["lr_decay"])
@@ -273,6 +275,7 @@ def train_model(params, selected_param, log_path=None):
                 "72 min_makespan": min_makespan72,
 
             })
+            print(s, "save")
             if params['w_representation_learning'] == True:
                 torch.save({'epoch': s,
                             'model_state_dict_actor': act_model.state_dict(),
@@ -379,33 +382,31 @@ def train_model(params, selected_param, log_path=None):
             """
             latent_loss = edge_loss+node_loss+loss_kld
             act_loss = -(ll_old * adv.detach()+entropy_loss).mean()  # loss 구하는 부분 /  ll_old의 의미 log_theta (pi | s)
+            #print(latent_loss, act_loss)
 
             if params['w_representation_learning'] == True:
                 total_loss = latent_loss + act_loss + cri_loss#+log_alpha_loss
+                latent_optim.zero_grad()
+                act_optim.zero_grad()
+                cri_optim.zero_grad()
+                entropy_coeff_optim.zero_grad()
+                total_loss.backward()
+                nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 5)),
+                                         norm_type=2)
+                latent_optim.step()
+                act_optim.step()
+                cri_optim.step()
+                step_with_min(act_lr_scheduler, act_optim, min_lr=params['lr_decay_min'])
+                step_with_min(cri_lr_scheduler, cri_optim, min_lr=params['lr_decay_min'])
+                step_with_min(latent_lr_scheduler, latent_optim, min_lr=1e-5)
             else:
                 total_loss = act_loss + cri_loss
-            latent_optim.zero_grad()
-            act_optim.zero_grad()
-            cri_optim.zero_grad()
-            entropy_coeff_optim.zero_grad()
-            total_loss.backward()
+                act_optim.zero_grad()
+                total_loss.backward()
+                nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 5)),norm_type=2)
+                act_optim.step()
+                step_with_min(act_lr_scheduler, act_optim, min_lr=params['lr_decay_min'])
 
-            #print("critic loss : ", np.round(cri_loss.detach().cpu().numpy().tolist(), 2), " q : ", np.round(q.detach().mean().cpu().numpy().tolist(), 2), " act loss : ",np.round(act_loss.detach().cpu().numpy().tolist(), 2), " sample makespan : ", np.round(torch.tensor(sampled_makespans).float().to(device).mean().detach().cpu().numpy().tolist(), 2))
-
-
-
-
-            nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 5)), norm_type=2)
-
-
-
-            # 그 후 각 옵티마이저 단계 실행
-            if s <=anneal_step:
-                latent_optim.step()
-            act_optim.step()
-            cri_optim.step()
-            step_with_min(act_lr_scheduler, act_optim, min_lr=params['lr_decay_min'])
-            step_with_min(cri_lr_scheduler, cri_optim, min_lr=params['lr_decay_min'])
 
 
         ave_act_loss += act_loss.item()
