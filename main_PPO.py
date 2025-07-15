@@ -281,14 +281,23 @@ def train_model(params, selected_param, log_path=None):
 
             })
             print(s, "save")
-            if params['w_representation_learning'] == True:
-                torch.save({'epoch': s,
-                            'model_state_dict_actor': act_model.state_dict(),
-                            'optimizer_state_dict_actor': act_optim.state_dict(),
-                            'ave_act_loss': ave_act_loss,
-                            'ave_cri_loss': 0,
-                            'ave_makespan': ave_makespan},
-                           params["model_dir"] + '/w_rep_{}_step_{}_mean_makespan_{}.pt'.format(selected_param, s, mean_makespan72))
+            if cfg.algo == 'reinforce':
+                if params['w_representation_learning'] == True:
+                    torch.save({'epoch': s,
+                                'model_state_dict_actor': act_model.state_dict(),
+                                'optimizer_state_dict_actor': act_optim.state_dict(),
+                                'ave_act_loss': ave_act_loss,
+                                'ave_cri_loss': 0,
+                                'ave_makespan': ave_makespan},
+                               params["model_dir"] + '/w_rep_{}_step_{}_mean_makespan_{}.pt'.format(selected_param, s, mean_makespan72))
+                else:
+                    torch.save({'epoch': s,
+                                'model_state_dict_actor': act_model.state_dict(),
+                                'optimizer_state_dict_actor': act_optim.state_dict(),
+                                'ave_act_loss': ave_act_loss,
+                                'ave_cri_loss': 0,
+                                'ave_makespan': ave_makespan},
+                               params["model_dir"] + '/wo_rep_{}_step_{}_mean_makespan_{}.pt'.format(selected_param, s, mean_makespan72))
             else:
                 torch.save({'epoch': s,
                             'model_state_dict_actor': act_model.state_dict(),
@@ -296,7 +305,11 @@ def train_model(params, selected_param, log_path=None):
                             'ave_act_loss': ave_act_loss,
                             'ave_cri_loss': 0,
                             'ave_makespan': ave_makespan},
-                           params["model_dir"] + '/wo_rep_{}_step_{}_mean_makespan_{}.pt'.format(selected_param, s, mean_makespan72))
+
+                params["model_dir"] + '/after_rep_{}_step_{}_mean_makespan_{}.pt'.format(selected_param, s,
+                                                                                      mean_makespan72))
+
+
         act_model.block_indices = []
         baseline_model.block_indices = []
 
