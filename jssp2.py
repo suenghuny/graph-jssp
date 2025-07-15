@@ -453,6 +453,7 @@ class AdaptiveScheduler:
         #
         #     makespan = max(self.j_count.values())
         ##########################################################################################
+       # print(mwkr_holder1)
         return makespan, est_holder, fin_holder, critical_path_list, critical_path_ij_list, mwkr_holder1, mwkr_holder2
 
     def check_avail_ops(self, avail_ops):

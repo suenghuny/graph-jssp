@@ -184,20 +184,27 @@ class PtrNet1(nn.Module):
 
 
 ####
-    def forward(self, x, device, scheduler_list, num_job, num_machine, old_sequence = None, train = True, old_sequence_in_ops=None):
-
+    def forward_latent(self, x, device, scheduler_list, num_job, num_machine, old_sequence=None, train=True,
+                old_sequence_in_ops=None):
         node_features, heterogeneous_edges = x
         node_features = torch.tensor(node_features).to(device).float()
         pi_list, log_ps = [], []
-
         log_probabilities = list()
+        #sample_space = [[j for i in range(num_machine)
+        edge_loss, node_loss, loss_kld, mean_feature, features, z = self.Latent.calculate_loss(node_features,
+                                                                                               heterogeneous_edges  ,
+        train)
+        return edge_loss,node_loss,loss_kld
 
-
+    def forward(self, x, device, scheduler_list, num_job, num_machine, old_sequence = None, train = True, old_sequence_in_ops=None):
+        node_features, heterogeneous_edges = x
+        node_features = torch.tensor(node_features).to(device).float()
+        pi_list, log_ps = [], []
+        log_probabilities = list()
         sample_space = [[j for i in range(num_machine)] for j in range(num_job)]
         sample_space = torch.tensor(sample_space).view(-1)
-
-
         edge_loss, node_loss, loss_kld, mean_feature, features, z = self.Latent.calculate_loss(node_features, heterogeneous_edges, train)
+
         if self.params['w_representation_learning'] == True:
             baselines = self.critic(z.detach())
         else:

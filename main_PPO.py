@@ -258,12 +258,20 @@ def train_model(params, selected_param, log_path=None):
 
                     t1 = time()
 
-                    if params['w_representation_learning'] == True:
-                        min_m.to_csv('w_rep_min_makespan_{}.csv'.format(selected_param))
-                        mean_m.to_csv('w_rep_mean_makespan_{}.csv'.format(selected_param))
+                    if cfg.algo =='reinforce':
+                        if params['w_representation_learning'] == True:
+                            min_m.to_csv('w_rep_min_makespan_{}.csv'.format(selected_param))
+                            mean_m.to_csv('w_rep_mean_makespan_{}.csv'.format(selected_param))
+                        else:
+                            min_m.to_csv('wo_rep_min_makespan_{}.csv'.format(selected_param))
+                            mean_m.to_csv('wo_rep_mean_makespan_{}.csv'.format(selected_param))
                     else:
-                        min_m.to_csv('wo_rep_min_makespan_{}.csv'.format(selected_param))
-                        mean_m.to_csv('wo_rep_mean_makespan_{}.csv'.format(selected_param))
+                        if params['w_representation_learning'] == True:
+                            min_m.to_csv('rep_min_makespan_{}.csv'.format(selected_param))
+                            mean_m.to_csv('rep_mean_makespan_{}.csv'.format(selected_param))
+                        else:
+                            min_m.to_csv('wo_rep_min_makespan_{}.csv'.format(selected_param))
+                            mean_m.to_csv('wo_rep_mean_makespan_{}.csv'.format(selected_param))
             wandb.log({
                 "episode": s,
                 "71 mean_makespan": mean_makespan71,
@@ -380,7 +388,6 @@ def train_model(params, selected_param, log_path=None):
             """
             latent_loss = edge_loss+node_loss+loss_kld
             act_loss = -(ll_old * adv.detach()+entropy_loss).mean()  # loss 구하는 부분 /  ll_old의 의미 log_theta (pi | s)
-            #print(latent_loss, act_loss)
 
             if params['w_representation_learning'] == True:
                 total_loss = latent_loss + act_loss + cri_loss#+log_alpha_loss
@@ -399,20 +406,101 @@ def train_model(params, selected_param, log_path=None):
                 nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 5)),norm_type=2)
                 act_optim.step()
                 step_with_min(act_lr_scheduler, act_optim, min_lr=params['lr_decay_min'])
-
-
-
-        ave_act_loss += act_loss.item()
-        if s % params["log_step"] == 0:
-            t2 = time()
-            if params['w_representation_learning'] == True:
-                print('with representation learning step:%d/%d, actic loss:%1.3f, crictic loss:%1.3f, L:%1.3f, %dmin%dsec' % (
+            ave_act_loss += act_loss.item()
+            if s % params["log_step"] == 0:
+                t2 = time()
+                if params['w_representation_learning'] == True:
+                    print('with representation learning step:%d/%d, actic loss:%1.3f, crictic loss:%1.3f, L:%1.3f, %dmin%dsec' % (
                     s, params["step"], ave_act_loss / ((s + 1) * params["iteration"]),
                     ave_cri_loss / ((s + 1) * params["iteration"]), ave_makespan, (t2 - t1) // 60, (t2 - t1) % 60))
+                else:
+                    print('without representation learning step:%d/%d, actic loss:%1.3f, crictic loss:%1.3f, L:%1.3f, %dmin%dsec' % (
+                    s, params["step"], ave_act_loss / ((s + 1) * params["iteration"]),
+                    ave_cri_loss / ((s + 1) * params["iteration"]), ave_makespan, (t2 - t1) // 60, (t2 - t1) % 60))
+        else:
+            if s <=20000:
+                edge_loss, node_loss, loss_kld = act_model.forward_latent(input_data,
+                                                device,
+                                                scheduler_list=scheduler_list,
+                                                num_machine=num_machine,
+                                                num_job=num_job
+                                                )
+
+                latent_loss = edge_loss+node_loss+loss_kld
+                total_loss = latent_loss
+                latent_optim.zero_grad()
+                total_loss.backward()
+                nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 5)),
+                                         norm_type=2)
+                latent_optim.step()
+                step_with_min(latent_lr_scheduler, latent_optim, min_lr=5e-5)
+                print("representation_learning {}".format(s))
             else:
-                print('without representation learning step:%d/%d, actic loss:%1.3f, crictic loss:%1.3f, L:%1.3f, %dmin%dsec' % (
-                    s, params["step"], ave_act_loss / ((s + 1) * params["iteration"]),
-                    ave_cri_loss / ((s + 1) * params["iteration"]), ave_makespan, (t2 - t1) // 60, (t2 - t1) % 60))
+                pred_seq, ll_old, _, edge_loss, node_loss, loss_kld, baselines = act_model(input_data,
+                                                                                           device,
+                                                                                           scheduler_list=scheduler_list,
+                                                                                           num_machine=num_machine,
+                                                                                           num_job=num_job
+                                                                                           )
+                real_makespan = list()
+                for n in range(pred_seq.shape[0]):  # act_model(agent)가 산출한 해를 평가하는 부분
+                    sequence = pred_seq[n]
+                    scheduler = AdaptiveScheduler(jobs_datas[n])
+                    makespan = -scheduler.run(sequence.tolist()) / params['reward_scaler']
+                    real_makespan.append(makespan)
+                    c_max.append(makespan)
+                ave_makespan += sum(real_makespan) / (params["batch_size"] * params["log_step"])
+                """
+                vanila actor critic
+                """
+
+                entropy = -ll_old  # entropy = -E[log(p)]
+                initial_coeff = params['entropy_coeff']
+                anneal_step = params['rep_anneal']
+                entrop_coeff = max(0.0, initial_coeff * (1 - s / anneal_step))
+                entropy_loss = entrop_coeff * entropy
+
+                # target_entropy = params["target_entropy"]
+                # log_alpha_loss = -act_model.log_alpha * (ll_old.detach() + target_entropy).mean()
+                adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(
+                    device) - baselines  # baseline(advantage) 구하는 부분
+                cri_loss = F.mse_loss(torch.tensor(real_makespan).to(device) + entropy_loss.detach().squeeze(1),
+                                      baselines.squeeze(1))
+
+                """
+
+                1. Loss 구하기
+                2. Gradient 구하기 (loss.backward)
+                3. Update 하기(act_optim.step)
+
+                """
+                act_loss = -(ll_old * adv.detach() + entropy_loss).mean()  # loss 구하는 부분 /  ll_old의 의미 log_theta (pi | s)
+
+                total_loss = act_loss + cri_loss  # +log_alpha_loss
+                act_optim.zero_grad()
+                total_loss.backward()
+                nn.utils.clip_grad_norm_(act_model.parameters(),
+                                         max_norm=float(os.environ.get("grad_clip", 5)),
+                                         norm_type=2)
+                act_optim.step()
+                step_with_min(act_lr_scheduler, act_optim, min_lr=params['lr_decay_min'])
+
+                ave_act_loss += act_loss.item()
+                if s % params["log_step"] == 0:
+                    t2 = time()
+                    if params['w_representation_learning'] == True:
+                        print(
+                            'with representation learning step:%d/%d, actic loss:%1.3f, crictic loss:%1.3f, L:%1.3f, %dmin%dsec' % (
+                                s, params["step"], ave_act_loss / ((s + 1) * params["iteration"]),
+                                ave_cri_loss / ((s + 1) * params["iteration"]), ave_makespan, (t2 - t1) // 60,
+                                (t2 - t1) % 60))
+                    else:
+                        print(
+                            'without representation learning step:%d/%d, actic loss:%1.3f, crictic loss:%1.3f, L:%1.3f, %dmin%dsec' % (
+                                s, params["step"], ave_act_loss / ((s + 1) * params["iteration"]),
+                                ave_cri_loss / ((s + 1) * params["iteration"]), ave_makespan, (t2 - t1) // 60,
+                                (t2 - t1) % 60))
+
 
 
 
@@ -503,13 +591,20 @@ def test_model(params, selected_param, log_path=None):
 
 
                     t1 = time()
-
-                    if params['w_representation_learning'] == True:
-                        min_m.to_csv('w_rep_min_makespan_{}.csv'.format(selected_param))
-                        mean_m.to_csv('w_rep_mean_makespan_{}.csv'.format(selected_param))
+                    if cfg.algo =='reinforce':
+                        if params['w_representation_learning'] == True:
+                            min_m.to_csv('w_rep_min_makespan_{}.csv'.format(selected_param))
+                            mean_m.to_csv('w_rep_mean_makespan_{}.csv'.format(selected_param))
+                        else:
+                            min_m.to_csv('wo_rep_min_makespan_{}.csv'.format(selected_param))
+                            mean_m.to_csv('wo_rep_mean_makespan_{}.csv'.format(selected_param))
                     else:
-                        min_m.to_csv('wo_rep_min_makespan_{}.csv'.format(selected_param))
-                        mean_m.to_csv('wo_rep_mean_makespan_{}.csv'.format(selected_param))
+                        if params['w_representation_learning'] == True:
+                            min_m.to_csv('rep_min_makespan_{}.csv'.format(selected_param))
+                            mean_m.to_csv('rep_mean_makespan_{}.csv'.format(selected_param))
+                        else:
+                            min_m.to_csv('wo_rep_min_makespan_{}.csv'.format(selected_param))
+                            mean_m.to_csv('wo_rep_mean_makespan_{}.csv'.format(selected_param))
             wandb.log({
                 "episode": s,
                 "71 mean_makespan": mean_makespan71,
