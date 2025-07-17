@@ -160,7 +160,7 @@ def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=Non
 
 def train_model(params, selected_param, log_path=None):
     wandb.login()
-    s_latent = 40000
+    s_latent = 20000
     if cfg.algo == 'reinforce':
         if params["w_representation_learning"] == True:
             wandb.init(project="Graph JSSP", name=selected_param + 'w_rep')
