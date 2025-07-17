@@ -159,6 +159,15 @@ def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=Non
     return np.min(val_makespan), np.mean(val_makespan)
 
 def train_model(params, selected_param, log_path=None):
+    wandb.login()
+    s_latent = 40000
+    if cfg.algo == 'reinforce':
+        if params["w_representation_learning"] == True:
+            wandb.init(project="Graph JSSP", name=selected_param + 'w_rep')
+        else:
+            wandb.init(project="Graph JSSP", name=selected_param + 'wo_rep')
+    else:
+        wandb.init(project="Graph JSSP", name=selected_param + 's_latent_{}_wo_rep'.format(s_latent))
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     date = datetime.now().strftime('%m%d_%H_%M')
     param_path = params["log_dir"] + '/ppo' + '/%s_%s_param.csv' % (date, "train")
@@ -203,6 +212,7 @@ def train_model(params, selected_param, log_path=None):
     empty_records = [[], []]
 
     for s in range(epoch + 1, params["step"]):
+
 
         """
 
@@ -266,12 +276,10 @@ def train_model(params, selected_param, log_path=None):
                             min_m.to_csv('wo_rep_min_makespan_{}.csv'.format(selected_param))
                             mean_m.to_csv('wo_rep_mean_makespan_{}.csv'.format(selected_param))
                     else:
-                        if params['w_representation_learning'] == True:
-                            min_m.to_csv('rep_min_makespan_{}.csv'.format(selected_param))
-                            mean_m.to_csv('rep_mean_makespan_{}.csv'.format(selected_param))
-                        else:
-                            min_m.to_csv('wo_rep_min_makespan_{}.csv'.format(selected_param))
-                            mean_m.to_csv('wo_rep_mean_makespan_{}.csv'.format(selected_param))
+
+                        min_m.to_csv('s_latent_{}_rep_min_makespan_{}.csv'.format(selected_param, s_latent))
+                        mean_m.to_csv('s_latent_{}_rep_mean_makespan_{}.csv'.format(selected_param, s_latent))
+
             wandb.log({
                 "episode": s,
                 "71 mean_makespan": mean_makespan71,
@@ -306,7 +314,7 @@ def train_model(params, selected_param, log_path=None):
                             'ave_cri_loss': 0,
                             'ave_makespan': ave_makespan},
 
-                params["model_dir"] + '/after_rep_{}_step_{}_mean_makespan_{}.pt'.format(selected_param, s,
+                params["model_dir"] + '/after_rep_{}_{}_step_{}_mean_makespan_{}.pt'.format(s_latent, selected_param, s,
                                                                                       mean_makespan72))
 
 
@@ -431,7 +439,7 @@ def train_model(params, selected_param, log_path=None):
                     s, params["step"], ave_act_loss / ((s + 1) * params["iteration"]),
                     ave_cri_loss / ((s + 1) * params["iteration"]), ave_makespan, (t2 - t1) // 60, (t2 - t1) % 60))
         else:
-            if s <=20000:
+            if s <=s_latent:
                 edge_loss, node_loss, loss_kld = act_model.forward_latent(input_data,
                                                 device,
                                                 scheduler_list=scheduler_list,
