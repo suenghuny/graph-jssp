@@ -390,8 +390,9 @@ def train_model(params, selected_param, log_path=None):
 
             entropy = -ll_old  # entropy = -E[log(p)]
             initial_coeff = params['entropy_coeff']
+            target_coeff = params['entropy_min']
             anneal_step = params['rep_anneal']
-            entrop_coeff = max(0.0, initial_coeff * (1 - s / anneal_step))
+            entrop_coeff = max(target_coeff, initial_coeff-(initial_coeff - target_coeff)*s/anneal_step)
             entropy_loss = entrop_coeff * entropy
 
 

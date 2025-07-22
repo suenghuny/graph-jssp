@@ -34,11 +34,13 @@ if __name__ == '__main__':
              "lr_critic": 1.0e-4,
              "lr": 1.0e-4,
              "entropy_coeff": 0.0005,
+        "entropy_min": 0.00,
              "layers": eval('[128, 96]'),
              "lr_decay_step": 500,
              "lr_decay": 0.95,
              "lr_decay_min": 5e-5,
-            'rep_anneal': 40000
+            'rep_anneal': 40000,
+        "graph_embedding_size": 96,
              } # not good
 
     param1 ={
@@ -52,11 +54,13 @@ if __name__ == '__main__':
              "lr_critic": 1.0e-4,
              "lr": 1.0e-4,
              "entropy_coeff": 0.001,
+        "entropy_min": 0.0,
              "layers": eval('[196, 128]'),
              "lr_decay_step": 600,
              "lr_decay": 0.99,
              "lr_decay_min": 5e-5,
-            'rep_anneal': 30000
+            'rep_anneal': 30000,
+        "graph_embedding_size": 96,
              }
 
     param2 ={
@@ -70,11 +74,13 @@ if __name__ == '__main__':
              "lr_critic": 1.0e-4,
              "lr": 1.0e-4,
              "entropy_coeff": 0.00001,
+        "entropy_min": 0.00,
              "layers": eval('[196, 96]'),
              "lr_decay_step": 1000,
              "lr_decay": 0.99,
              "lr_decay_min": 5e-5,
-            'rep_anneal': 10000
+            'rep_anneal': 10000,
+        "graph_embedding_size": 96,
              }
 
     param3 ={
@@ -88,11 +94,13 @@ if __name__ == '__main__':
              "lr_critic": 1.0e-4,
              "lr": 1.0e-4,
              "entropy_coeff": 0.0005,
+        "entropy_min": 0.00001,
              "layers": eval('[256, 128]'),
              "lr_decay_step": 700,
              "lr_decay": 0.995,
              "lr_decay_min": 2.5e-5,
-            'rep_anneal': 15000
+            'rep_anneal': 25000,
+        "graph_embedding_size": 108,
              }
 
     param4 ={
@@ -106,11 +114,13 @@ if __name__ == '__main__':
              "lr_critic": 1.0e-4,
              "lr": 1.0e-4,
              "entropy_coeff": 0.0001,
+        "entropy_min": 0.00001,
              "layers": eval('[128, 64]'),
              "lr_decay_step": 500,
              "lr_decay": 0.975,
              "lr_decay_min": 2.5e-5,
-            'rep_anneal': 20000
+            'rep_anneal': 20000,
+        "graph_embedding_size": 128,
              } # not good
 
 
@@ -124,12 +134,14 @@ if __name__ == '__main__':
              "lr_latent": 5.0e-5,
              "lr_critic": 1.0e-4,
              "lr": 1.0e-4,
-             "entropy_coeff": 0.0005,
+             "entropy_coeff": 0.005,
+        "entropy_min": 0.00001,
              "layers": eval('[196, 128]'),
              "lr_decay_step": 600,
              "lr_decay": 0.975,
              "lr_decay_min": 5e-5,
-            'rep_anneal': 15000
+            'rep_anneal': 15000,
+        "graph_embedding_size": 84,
              }
 
     param6 ={
@@ -143,14 +155,16 @@ if __name__ == '__main__':
              "lr_critic": 1.0e-4,
              "lr": 1.0e-4,
              "entropy_coeff": 0.005,
+        "entropy_min": 0.000001,
              "layers": eval('[128, 64]'),
              "lr_decay_step": 1000,
              "lr_decay": 0.995,
              "lr_decay_min": 2.5e-5,
-            'rep_anneal': 10000
+            'rep_anneal': 10000,
+        "graph_embedding_size": 108,
              }
 
-    selected_param = str(os.environ.get("selected_param", "param0"))
+    selected_param = str(os.environ.get("selected_param", "param2"))
     param_group = {
                    "param0": param0,
                    "param1": param1,
@@ -196,11 +210,12 @@ if __name__ == '__main__':
         "layers": param['layers'],
         "n_embedding": 48,
         "n_hidden": param["n_hidden"],
-        "graph_embedding_size": int(os.environ.get("graph_embedding_size", 96)),
+        "graph_embedding_size": param["graph_embedding_size"],
         "n_multi_head": param["n_multi_head"],
         "ex_embedding_size": param["ex_embedding_size"],
         "ex_embedding_size2": param["ex_embedding_size2"],
         "entropy_coeff": param["entropy_coeff"],
+        "entropy_min": param["entropy_min"],
         "rep_anneal": param["rep_anneal"],
         "k_hop": int(os.environ.get("k_hop", 1)),
         "is_lr_decay": True,
