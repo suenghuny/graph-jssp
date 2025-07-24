@@ -202,6 +202,7 @@ class GraphVAEDecoder(nn.Module):
         remaining_layers = []
         while temp_length < max_nodes * max_nodes:
             next_length = min(temp_length * 2, max_nodes * max_nodes)
+            #print(next_length)
             remaining_layers.extend([
                 nn.ConvTranspose1d(64, 64, kernel_size=4, stride=2, padding=1),
                 nn.BatchNorm1d(64),
@@ -225,26 +226,34 @@ class GraphVAEDecoder(nn.Module):
         h = self.fc_initial(z).unsqueeze(-1)  # [batch_size, 512, 1]
 
         # Apply 1D transposed convolutions
-        h = self.conv1d_layers(h)
+        print("before conv1d_layeres", h.shape)
+        #h = self.conv1d_layers(h)
+       # print("0", h.shape)
         h = self.additional_conv1d(h)
 
         # Adjust sequence length for edges
         edge_seq_len = self.max_nodes * self.max_nodes
+        #print("1", h.shape)
         if h.size(-1) != edge_seq_len:
             h_edges = F.interpolate(h, size=edge_seq_len, mode='linear', align_corners=False)
         else:
             h_edges = h
+        # print("2_edges", h_edges.shape)
+        # print("2_nodes", h.shape)
 
         # Generate edge probabilities
         edge_logits = self.edge_output(h_edges)  # [batch_size, edge_types, max_nodes*max_nodes]
+        #print("3_edge", edge_logits.shape)
         edge_logits = edge_logits.view(batch_size, self.edge_types, self.max_nodes, self.max_nodes)
         edge_logits = edge_logits.permute(0, 2, 3, 1)  # [batch_size, max_nodes, max_nodes, edge_types]
         edge_prob = torch.sigmoid(edge_logits)
 
         # Generate node probabilities
         node_logits = self.node_output(h)  # [batch_size, node_types, max_nodes]
+        #print("3_node", node_logits.shape)
         node_logits = node_logits.permute(0, 2, 1)  # [batch_size, max_nodes, node_types]
         node_prob = torch.sigmoid(node_logits)
+        #print("==================================================")
 
         return node_prob, edge_prob
 
