@@ -225,8 +225,11 @@ class GraphVAEDecoder(nn.Module):
         h = self.fc_initial(z).unsqueeze(-1)  # [batch_size, 512, 1]
 
         # Apply 1D transposed convolutions
+        #print('1', h.shape)
         h = self.conv1d_layers(h)
+        #print('2', h.shape)
         h = self.additional_conv1d(h)
+        #print('3', h.shape)
 
         # Adjust sequence length for edges
         edge_seq_len = self.max_nodes * self.max_nodes
@@ -235,8 +238,9 @@ class GraphVAEDecoder(nn.Module):
         else:
             h_edges = h
 
-        # Generate edge probabilities
+        #print('4', h_edges.shape)
         edge_logits = self.edge_output(h_edges)  # [batch_size, edge_types, max_nodes*max_nodes]
+        #print('5', edge_logits.shape)
         edge_logits = edge_logits.view(batch_size, self.edge_types, self.max_nodes, self.max_nodes)
         edge_logits = edge_logits.permute(0, 2, 3, 1)  # [batch_size, max_nodes, max_nodes, edge_types]
         edge_prob = torch.sigmoid(edge_logits)
@@ -299,10 +303,7 @@ class LatentModel(nn.Module):
         edge_cats = edge_cats.to(device)[:, :-2, :-2, :]
         z_mean_pri, z_std_pri = self.sample_prior(mean_feature)
         z_mean_post, z_std_post, z = self.sample_posterior(mean_feature) # q(|G
-
-
         loss_kld = calculate_kl_divergence(z_mean_post, z_std_post, z_mean_pri, z_std_pri).mean(dim=0).sum()
-
         if train == True:
             node_pred, edge_pred = self.decoder(z)
             node_pred = node_pred[:,:self.current_num_edges, :]
