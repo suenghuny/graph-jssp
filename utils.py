@@ -9,6 +9,107 @@ def initialize_weight(m):
         if m.bias is not None:
             nn.init.constant_(m.bias, 0)
 
+
+def calculate_bottleneck_index(scheduler):
+    """
+    Bottleneck Index (Ib) 계산
+
+    논문 공식:
+    Ib_ik = (m_ik - 1) / (n - 1)
+    Ib = (1/m) * Σ_k Σ_i Ib_ik
+
+    여기서 m_ik는 k번째 operation position에서 machine i를 사용하는 job의 수
+
+    Args:
+        scheduler: AdaptiveScheduler 객체
+
+    Returns:
+        float: Bottleneck Index (0 ≤ Ib ≤ 1)
+    """
+    n = scheduler.num_job  # number of jobs
+    m = scheduler.num_mc  # number of machines
+
+    if n <= 1:
+        return 0.0
+
+    # 각 position k에서 각 machine i가 사용되는 횟수 계산
+    total_ib = 0.0
+
+    # 각 operation position k에 대해 (최대 operation 수는 machine 수와 같음)
+    for k in range(m):
+        for i in range(m):
+            m_ik = 0  # k번째 position에서 machine i를 사용하는 job 수
+
+            # 각 job에 대해 k번째 operation의 machine 확인
+            for job_idx in range(n):
+                if k < len(scheduler.ms[job_idx]):  # job에 k번째 operation이 존재하는 경우
+                    # machine sequence는 1-based이므로 1을 빼서 0-based로 변환
+                    machine_at_k = scheduler.ms[job_idx][k] - 1
+                    if machine_at_k == i:
+                        m_ik += 1
+
+            # Ib_ik 계산
+            if m_ik > 0:
+                ib_ik = (m_ik - 1) / (n - 1)
+                total_ib += ib_ik
+
+    # 전체 Bottleneck Index 계산
+    ib = total_ib / m
+    return ib
+
+
+def calculate_flow_shop_index(scheduler):
+    """
+    Flow Shop Index (If) 계산
+
+    논문 공식:
+    If_ik = (n_ik - 1) / (n - 1)
+    If = (1/(m-1)) * Σ_i Σ_k If_ik
+
+    여기서 n_ik는 machine i에서 처리된 후 바로 machine k로 이동하는 job의 수
+
+    Args:
+        scheduler: AdaptiveScheduler 객체
+
+    Returns:
+        float: Flow Shop Index (0 ≤ If ≤ 1)
+    """
+    n = scheduler.num_job  # number of jobs
+    m = scheduler.num_mc  # number of machines
+
+    if n <= 1 or m <= 1:
+        return 0.0
+
+    # machine i에서 machine k로 바로 이동하는 job 수를 저장하는 matrix
+    transition_count = [[0 for _ in range(m)] for _ in range(m)]
+
+    # 각 job의 machine sequence를 분석하여 transition 계산
+    for job_idx in range(n):
+        machine_sequence = scheduler.ms[job_idx]
+
+        # 연속된 operation 간의 transition 계산
+        for op_idx in range(len(machine_sequence) - 1):
+            # machine sequence는 1-based이므로 1을 빼서 0-based로 변환
+            current_machine = machine_sequence[op_idx] - 1
+            next_machine = machine_sequence[op_idx + 1] - 1
+
+            transition_count[current_machine][next_machine] += 1
+
+    # Flow Shop Index 계산
+    total_if = 0.0
+
+    for i in range(m):
+        for k in range(m):
+            if i != k:  # 같은 machine으로의 transition은 제외
+                n_ik = transition_count[i][k]
+                if n_ik > 0:
+                    if_ik = (n_ik - 1) / (n - 1)
+                    total_if += if_ik
+
+    # 전체 Flow Shop Index 계산
+    if_index = total_if / (m - 1) if m > 1 else 0.0
+    return if_index
+
 def create_feature_actions(feature_, action_):
     N = feature_.size(0)
     # Flatten sequence of features.

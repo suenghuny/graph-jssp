@@ -45,13 +45,21 @@ class Critic(nn.Module):
         self.fcn3 = nn.Linear(64, 32)
         self.fcn4 = nn.Linear(32, 16)
         self.fcn5 = nn.Linear(16, 1)
-    def forward(self, x):
+    def forward(self, x, visualize = False):
         x = F.elu(self.fcn1(x))
         x = F.elu(self.fcn2(x))
-        x = F.elu(self.fcn3(x))
-        x = F.elu(self.fcn4(x))
-        x = self.fcn5(x)
-        return x
+
+        if visualize == False:
+            x = F.elu(self.fcn3(x))
+            x = F.elu(self.fcn4(x))
+            x = self.fcn5(x)
+            return x
+        else:
+            x = F.elu(self.fcn3(x))
+            h = F.elu(self.fcn4(x))
+            x = self.fcn5(h)
+            return x, h
+
 
 
 class PtrNet1(nn.Module):
@@ -185,16 +193,183 @@ class PtrNet1(nn.Module):
 
 ####
     def forward_latent(self, x, device, scheduler_list, num_job, num_machine, old_sequence=None, train=True,
-                old_sequence_in_ops=None):
+                old_sequence_in_ops=None, visualize = False):
         node_features, heterogeneous_edges = x
         node_features = torch.tensor(node_features).to(device).float()
         pi_list, log_ps = [], []
         log_probabilities = list()
         #sample_space = [[j for i in range(num_machine)
         edge_loss, node_loss, loss_kld, mean_feature, features, z = self.Latent.calculate_loss(node_features,
-                                                                                               heterogeneous_edges  ,
-        train)
-        return edge_loss,node_loss,loss_kld
+                                                                                               heterogeneous_edges,
+                                                                                               train)
+        if visualize == False:
+            return edge_loss,node_loss,loss_kld
+        else:
+            baselines, h = self.critic(z, visualize = True)
+            return z, baselines, h
+
+    def forward_visualize(self, x, device, scheduler_list, num_job, num_machine, old_sequence=None, train=True, old_sequence_in_ops=None):
+        node_features, heterogeneous_edges = x
+        node_features = torch.tensor(node_features).to(device).float()
+        pi_list, log_ps = [], []
+        log_probabilities = list()
+        sample_space = [[j for i in range(num_machine)] for j in range(num_job)]
+        sample_space = torch.tensor(sample_space).view(-1)
+        edge_loss, node_loss, loss_kld, mean_feature, features, z = self.Latent.calculate_loss(node_features,
+                                                                                               heterogeneous_edges,
+                                                                                               train=False)
+
+        baselines, h = self.critic(z.detach(), visualize = True)
+        batch = features.shape[0]
+        num_operations = features.shape[1]
+        """
+        이 위에 까지가 Encoder
+        이 아래 부터는 Decoder
+        """
+
+        h_pi_t_minus_one = self.v_1.unsqueeze(0).repeat(batch, 1).unsqueeze(0).to(
+            device)  # 이녀석이 s.o.s(start of singal)에 해당
+        mask1_debug, mask2_debug = self.init_mask()
+
+        batch_size = h_pi_t_minus_one.shape[1]
+
+        if old_sequence != None:
+            old_sequence = torch.tensor(old_sequence).long().to(device)
+        next_operation_indices = list()
+        lb_records = [[], [], [], [], [], []]
+
+        for i in range(num_operations):
+            est_placeholder = mask2_debug.clone().to(device)
+            fin_placeholder = mask2_debug.clone().to(device)
+            mwkr_placeholder1 = mask2_debug.clone().to(device)
+            mwkr_placeholder2 = mask2_debug.clone().to(device)
+
+            mask1_debug = mask1_debug.reshape(batch_size, -1)
+            mask2_debug = mask2_debug.reshape(batch_size, -1)
+            empty_zero = torch.zeros(batch_size, num_operations).to(device)
+            empty_zero2 = torch.zeros(batch_size, num_operations).to(device)
+
+            if i == 0:
+                """
+                Earliest Start Time (est_placeholder)
+                Earliest Finish Time (fin_placeholder) 확인하는 로직
+                i == 0일 때는 아직 선택된 operation이 없으므로,
+                adaptive_run에 선택된 변수(i)에 대한 정보가 없음
+
+                """
+                cp_list = []
+
+                for nb in range(batch_size):
+                    c_max, est, fin, critical_path, critical_path2, mwkr1, mwkr2 = scheduler_list[nb].adaptive_run(
+                        est_placeholder[nb],
+                        fin_placeholder[nb],
+                        mwkr_placeholder1[nb],
+                        mwkr_placeholder2[nb],
+                        )
+                    # print(empty_zero.shape, critical_path.shape)
+                    empty_zero[nb, :] = torch.tensor(critical_path.reshape(-1)).to(device)  # 안중요
+                    empty_zero2[nb, :] = torch.tensor(critical_path2.reshape(-1)).to(device)  # 안중요
+                    est_placeholder[nb] = est
+                    fin_placeholder[nb] = fin
+                    mwkr_placeholder1[nb] = mwkr1
+                    mwkr_placeholder2[nb] = mwkr2
+
+
+
+            else:
+                """
+                Earliest Start Time (est_placeholder)
+                Earliest Finish Time (fin_placeholder) 확인하는 로직
+                i == 0일 때는 아직 선택된 operation이 없으므로,
+                adaptive_run에 선택된 변수(i)에 대한 정보는 이전에 선택된 index(next_operation_index)에서 추출
+
+                """
+                cp_list = []
+                for nb in range(batch_size):
+                    if old_sequence != None:
+                        # print(old_sequence.shape)
+                        next_b = old_sequence[nb, i].item()
+                    else:
+                        next_b = next_job[nb].item()
+                    c_max, est, fin, critical_path, critical_path2, mwkr1, mwkr2 = scheduler_list[nb].adaptive_run(
+                        est_placeholder[nb], fin_placeholder[nb],
+                        mwkr_placeholder1[nb],
+                        mwkr_placeholder2[nb],
+                        i=next_b)  # next_b는 이전 스텝에서 선택된 Job이고, Adaptive Run이라는 것은 선택된 Job에 따라 update한 다음에 EST, EFIN을 구하라는 의미
+
+                    empty_zero[nb, :] = torch.tensor(critical_path.reshape(-1)).to(device)
+                    empty_zero2[nb, :] = torch.tensor(critical_path2.reshape(-1)).to(device)  # 안중요
+                    est_placeholder[nb] = est
+                    fin_placeholder[nb] = fin
+                    # print("전",est[0])
+                    # print("후",est_placeholder[nb][0])
+                    # print('====================')
+                    mwkr_placeholder1[nb] = mwkr1
+                    mwkr_placeholder2[nb] = mwkr2
+                    """
+
+                    Branch and Cut 로직에 따라 masking을 수행함
+                    모두 다 masking 처리할 수도 있으므로, 모두다 masking할 경우에는 mask로 복원 (if 1 not in mask)
+
+                    """
+
+            est_placeholder = est_placeholder.reshape(batch_size, -1).unsqueeze(2)
+            fin_placeholder = fin_placeholder.reshape(batch_size, -1).unsqueeze(2)
+            mwkr_placeholder1 = mwkr_placeholder1.reshape(batch_size, -1).unsqueeze(2)
+            mwkr_placeholder2 = mwkr_placeholder2.reshape(batch_size, -1).unsqueeze(2)
+            empty_zero = empty_zero.unsqueeze(2)
+            empty_zero2 = empty_zero2.unsqueeze(2)
+            # print(est_placeholder.shape, mwkr_placeholder2.shape)
+            r_temp = torch.concat(
+                [est_placeholder, fin_placeholder, empty_zero, empty_zero2, mwkr_placeholder1, mwkr_placeholder2],
+                dim=2)  # extended node embedding을 만드는 부분(z_t_i에 해당)
+
+            r_temp = r_temp.reshape([batch * num_operations, -1])
+            r_temp = self.ex_embedding(r_temp)
+            r_temp = r_temp.reshape([batch, num_operations, -1])
+            ref = torch.concat([features, r_temp], dim=2)
+
+            if self.params['w_representation_learning'] == True:
+                h_c = self.decoder(z.reshape(1, batch_size, -1).detach(),
+                                   h_pi_t_minus_one.reshape(1, batch_size, -1))  # decoding 만드는 부분
+            else:
+                h_c = self.decoder(z.reshape(1, batch_size, -1),
+                                   h_pi_t_minus_one.reshape(1, batch_size, -1))  # decoding 만드는 부분
+            query = h_c.squeeze(0)
+            """
+            Query를 만들때에는 이전 단계의 query와 extended node embedding을 가지고 만든다
+
+            """
+            query = self.glimpse(query, ref, mask2_debug)  # 보는 부분 /  multi-head attention 부분 (mask2는 보는 masking)
+            logits = self.pointer(query, ref, mask1_debug)  # 선택하는 부분 / logit 구하는 부분 (#mask1은 선택하는 masking)
+
+            cp_list = torch.tensor(cp_list)
+            # print(cp_list.shape)
+
+            log_p = torch.log_softmax(logits / self.T, dim=-1)  # log_softmax로 구하는 부분
+
+            if old_sequence == None:
+                if train == True:
+                    next_operation_index = self.job_selecter(log_p)
+                else:
+                    next_operation_index = self.job_selecter_greedy(log_p)
+            else:
+                next_operation_index = torch.tensor(old_sequence_in_ops).to(device).long()[i, :]
+
+            log_probabilities.append(log_p.gather(1, next_operation_index.unsqueeze(1)))
+            sample_space = sample_space.to(device)
+            next_job = sample_space[next_operation_index].to(device)
+            mask1_debug, mask2_debug = self.update_mask(next_job.tolist())  # update masking을 수행해주는
+
+            batch_indices = torch.arange(features.size(0))
+            h_pi_t_minus_one = features[batch_indices, next_operation_index]
+
+            # h_pi_t_minus_one = torch.gather(input=features, dim=1, index=next_operation_index.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, mean_feature.shape[2])).squeeze(1).unsqueeze(0)  # 다음 sequence의 input은 encoder의 output 중에서 현재 sequence에 해당하는 embedding이 된다.
+            next_operation_indices.append(next_operation_index.tolist())
+            pi_list.append(next_job)
+
+        pi = torch.stack(pi_list, dim=1)
+        return z, baselines, h, pi
 
     def forward(self, x, device, scheduler_list, num_job, num_machine, old_sequence = None, train = True, old_sequence_in_ops=None):
         node_features, heterogeneous_edges = x

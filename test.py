@@ -189,3 +189,54 @@ if __name__ == '__main__':
     }
 
     test_model(params, selected_param)  #f
+
+
+    flow_shop_index_list = list()
+    bottleneck_index_list = list()
+    h_list = list()
+    z_list = list()
+
+    for i in range(5000):
+        num_machine = np.random.randint(5, 10)
+        num_job = np.random.randint(num_machine, 10)
+        jobs_datas, scheduler_list = generate_jssp_instance(num_jobs=num_job, num_machine=num_machine, batch_size=1)
+        act_model.Latent.current_num_edges = num_machine * num_job
+        flow_shop_index = calculate_flow_shop_index(scheduler_list[0])
+        bottleneck_index = calculate_bottleneck_index(scheduler_list[0])
+        act_model.get_jssp_instance(scheduler_list)
+        scheduler = AdaptiveScheduler(jobs_datas[0])
+        node_features = [scheduler.get_node_feature()]
+        edge_precedence = scheduler.get_edge_index_precedence()
+        edge_antiprecedence = scheduler.get_edge_index_antiprecedence()
+        edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
+        heterogeneous_edges = [(edge_precedence, edge_antiprecedence, edge_machine_sharing)]  # 세종류의 엣지들을 하나의 변수로 참조시킴
+        input_data = (node_features, heterogeneous_edges)
+        z, v, h, pred_seq = act_model.forward_visualize(input_data,
+                                     device,
+                                     scheduler_list=scheduler_list,
+                                     num_machine=num_machine,
+                                     num_job=num_job
+                                     )
+
+
+        sequence = pred_seq[0]
+        scheduler = AdaptiveScheduler(jobs_datas[0])
+        makespan = -scheduler.run(sequence.tolist())
+
+        #print(z.shape)
+        flow_shop_index_list.append(v.squeeze(0).detach().cpu().numpy()[0])
+        bottleneck_index_list.append(makespan)
+        h_list.append(h.squeeze(0).detach().cpu().numpy().tolist())
+        z_list.append(z.squeeze(0).detach().cpu().numpy().tolist())
+        print("data collecting : ", i)
+
+    # numpy 배열로 변환
+    flow_shop_index_list = np.array(flow_shop_index_list)
+    bottleneck_index_list = np.array(bottleneck_index_list)
+    h_array = np.array(h_list)  # z_list를 빈 리스트로 재정의하지 않고 numpy 배열로 변환
+    z_array = np.array(z_list)  # z_list를 빈 리스트로 재정의하지 않고 numpy 배열로 변환
+
+    np.save('flow_shop_index_list.npy', flow_shop_index_list)
+    np.save('bottleneck_index_list.npy', bottleneck_index_list)
+    np.save('h_array.npy', h_array)
+    np.save('z_array.npy', z_array)
