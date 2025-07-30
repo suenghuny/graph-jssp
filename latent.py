@@ -34,7 +34,7 @@ class Gaussian(nn.Module):
     def __init__(self, input_dim, output_dim, hidden_units=(256, 256)):
         super().__init__()
         self.net = build_mlp(
-            input_dim=input_dim,
+            input_dim=input_dim*3,
             output_dim=output_dim,
             hidden_units=hidden_units,
             hidden_activation=nn.LeakyReLU(0.2),
@@ -54,6 +54,7 @@ class Encoder(nn.Module):
         device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.n_multi_head = params["n_multi_head"]
         self.Embedding = nn.Linear(params["num_of_process"],params["n_hidden"], bias=False).to(device)  # 그림 상에서 Encoder에 FF(feedforward)라고 써져있는 부분
+
         self.params = params
         self.k_hop = params["k_hop"]
         num_edge_cat = 3
@@ -89,7 +90,14 @@ class Encoder(nn.Module):
             enc_h, edge_cats = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
             enc_h, edge_cats = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True, final = True)
 
-        h = enc_h.mean(dim = 1) # 모든 node embedding에 대해서(element wise) 평균을 낸다.
+        #h = enc_h.mean(dim = 1) # 모든 node embedding에 대해서(element wise) 평균을 낸다.
+
+        h_mean = enc_h.mean(dim=1)
+        h_max = enc_h.max(dim=1)[0]
+        h_std = enc_h.std(dim=1)
+        h = torch.cat([h_mean, h_max, h_std], dim=-1)
+
+
         enc_h = enc_h[:, :-2]                 # dummy node(source, sink)는 제외한다.
         return h, enc_h, edge_cats
 

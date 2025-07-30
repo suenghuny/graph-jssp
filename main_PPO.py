@@ -165,11 +165,11 @@ def train_model(params, selected_param, log_path=None):
     s_latent = int(os.environ.get("s_latent", 60000))
     if cfg.algo == 'reinforce':
         if params["w_representation_learning"] == True:
-            wandb.init(project="Graph JSSP", name=selected_param + 'w_rep')
+            wandb.init(project="Graph JSSP", name=selected_param + 'm_s_w_rep')
         else:
-            wandb.init(project="Graph JSSP", name=selected_param + 'wo_rep')
+            wandb.init(project="Graph JSSP", name=selected_param + 'm_s_wo_rep')
     else:
-        wandb.init(project="Graph JSSP", name=selected_param + 's_latent_{}_wo_rep'.format(s_latent))
+        wandb.init(project="Graph JSSP", name=selected_param + 'm_s_s_latent_{}_wo_rep'.format(s_latent))
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     date = datetime.now().strftime('%m%d_%H_%M')
     param_path = params["log_dir"] + '/ppo' + '/%s_%s_param.csv' % (date, "train")
@@ -272,15 +272,15 @@ def train_model(params, selected_param, log_path=None):
 
                     if cfg.algo =='reinforce':
                         if params['w_representation_learning'] == True:
-                            min_m.to_csv('w_rep_min_makespan_{}.csv'.format(selected_param))
-                            mean_m.to_csv('w_rep_mean_makespan_{}.csv'.format(selected_param))
+                            min_m.to_csv('multi_scaled_w_rep_min_makespan_{}.csv'.format(selected_param))
+                            mean_m.to_csv('multi_scaled_w_rep_mean_makespan_{}.csv'.format(selected_param))
                         else:
-                            min_m.to_csv('wo_rep_min_makespan_{}.csv'.format(selected_param))
-                            mean_m.to_csv('wo_rep_mean_makespan_{}.csv'.format(selected_param))
+                            min_m.to_csv('multi_scaled_wo_rep_min_makespan_{}.csv'.format(selected_param))
+                            mean_m.to_csv('multi_scaled_wo_rep_mean_makespan_{}.csv'.format(selected_param))
                     else:
 
-                        min_m.to_csv('s_latent_{}_rep_min_makespan_{}.csv'.format(selected_param, s_latent))
-                        mean_m.to_csv('s_latent_{}_rep_mean_makespan_{}.csv'.format(selected_param, s_latent))
+                        min_m.to_csv('multi_scaled_s_latent_{}_rep_min_makespan_{}.csv'.format(selected_param, s_latent))
+                        mean_m.to_csv('multi_scaled_s_latent_{}_rep_mean_makespan_{}.csv'.format(selected_param, s_latent))
 
             wandb.log({
                 "episode": s,
@@ -299,7 +299,7 @@ def train_model(params, selected_param, log_path=None):
                                 'ave_act_loss': ave_act_loss,
                                 'ave_cri_loss': 0,
                                 'ave_makespan': ave_makespan},
-                               params["model_dir"] + '/w_rep_{}_step_{}_mean_makespan_{}.pt'.format(selected_param, s, mean_makespan72))
+                               params["model_dir"] + '/multi_scaled_w_rep_{}_step_{}_mean_makespan_{}.pt'.format(selected_param, s, mean_makespan72))
                 else:
                     torch.save({'epoch': s,
                                 'model_state_dict_actor': act_model.state_dict(),
@@ -307,7 +307,7 @@ def train_model(params, selected_param, log_path=None):
                                 'ave_act_loss': ave_act_loss,
                                 'ave_cri_loss': 0,
                                 'ave_makespan': ave_makespan},
-                               params["model_dir"] + '/wo_rep_{}_step_{}_mean_makespan_{}.pt'.format(selected_param, s, mean_makespan72))
+                               params["model_dir"] + '/multi_scaled_wo_rep_{}_step_{}_mean_makespan_{}.pt'.format(selected_param, s, mean_makespan72))
             else:
                 torch.save({'epoch': s,
                             'model_state_dict_actor': act_model.state_dict(),
@@ -316,7 +316,7 @@ def train_model(params, selected_param, log_path=None):
                             'ave_cri_loss': 0,
                             'ave_makespan': ave_makespan},
 
-                params["model_dir"] + '/after_rep_{}_{}_step_{}_mean_makespan_{}.pt'.format(s_latent, selected_param, s,
+                params["model_dir"] + '/multi_scaled_after_rep_{}_{}_step_{}_mean_makespan_{}.pt'.format(s_latent, selected_param, s,
                                                                                       mean_makespan72))
 
 
@@ -619,18 +619,18 @@ def test_model(params, selected_param, log_path=None):
                     t1 = time()
                     if cfg.algo =='reinforce':
                         if params['w_representation_learning'] == True:
-                            min_m.to_csv('w_rep_min_makespan_{}.csv'.format(selected_param))
-                            mean_m.to_csv('w_rep_mean_makespan_{}.csv'.format(selected_param))
+                            min_m.to_csv('multi_scaled_w_rep_min_makespan_{}.csv'.format(selected_param))
+                            mean_m.to_csv('multi_scaled_w_rep_mean_makespan_{}.csv'.format(selected_param))
                         else:
-                            min_m.to_csv('wo_rep_min_makespan_{}.csv'.format(selected_param))
-                            mean_m.to_csv('wo_rep_mean_makespan_{}.csv'.format(selected_param))
+                            min_m.to_csv('multi_scaled_wo_rep_min_makespan_{}.csv'.format(selected_param))
+                            mean_m.to_csv('multi_scaled_wo_rep_mean_makespan_{}.csv'.format(selected_param))
                     else:
                         if params['w_representation_learning'] == True:
-                            min_m.to_csv('rep_min_makespan_{}.csv'.format(selected_param))
-                            mean_m.to_csv('rep_mean_makespan_{}.csv'.format(selected_param))
+                            min_m.to_csv('multi_scaled_rep_min_makespan_{}.csv'.format(selected_param))
+                            mean_m.to_csv('multi_scaled_rep_mean_makespan_{}.csv'.format(selected_param))
                         else:
-                            min_m.to_csv('wo_rep_min_makespan_{}.csv'.format(selected_param))
-                            mean_m.to_csv('wo_rep_mean_makespan_{}.csv'.format(selected_param))
+                            min_m.to_csv('multi_scaled_wo_rep_min_makespan_{}.csv'.format(selected_param))
+                            mean_m.to_csv('multi_scaled_wo_rep_mean_makespan_{}.csv'.format(selected_param))
             wandb.log({
                 "episode": s,
                 "71 mean_makespan": mean_makespan71,

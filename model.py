@@ -372,20 +372,20 @@ class GCRN(nn.Module):
             H = H.reshape(batch_size*num_nodes, -1)
             H = self.Embedding1(H)
             X = X.reshape(batch_size*num_nodes, -1)
-            H = self.BN1((1 - self.alpha)*H + self.alpha*X)
+            H = (1 - self.alpha)*H + self.alpha*X
         else:
             H = empty.reshape(batch_size, num_nodes, self.num_edge_cat * self.graph_embedding_size)
             H = H.reshape(batch_size * num_nodes, -1)
             H = self.Embedding1_mean(H)
             X = X.reshape(batch_size * num_nodes, -1)
-            H = self.BN1((1 - self.alpha)*H + self.alpha*X)
+            H = (1 - self.alpha)*H + self.alpha*X
 
-        Z = self.Embedding2(H)
-        Z = self.BN2(H + Z)
+        #Z = self.Embedding2(H)
+        #Z = self.BN2(H + Z)
 
         # 추가 수정 제안
 
-        Z = Z.reshape(batch_size, num_nodes, -1)
+        Z = H.reshape(batch_size, num_nodes, -1)
         return Z, edge_cat_tensor
 
 
