@@ -34,7 +34,7 @@ class Gaussian(nn.Module):
     def __init__(self, input_dim, output_dim, hidden_units=(256, 256)):
         super().__init__()
         self.net = build_mlp(
-            input_dim=input_dim*3,
+            input_dim=input_dim*2,
             output_dim=output_dim,
             hidden_units=hidden_units,
             hidden_activation=nn.LeakyReLU(0.2),
@@ -93,9 +93,9 @@ class Encoder(nn.Module):
         #h = enc_h.mean(dim = 1) # 모든 node embedding에 대해서(element wise) 평균을 낸다.
 
         h_mean = enc_h.mean(dim=1)
-        h_max = enc_h.max(dim=1)[0]
+        #h_max = enc_h.max(dim=1)[0]
         h_std = enc_h.std(dim=1)
-        h = torch.cat([h_mean, h_max, h_std], dim=-1)
+        h = torch.cat([h_mean, h_std], dim=-1)
 
 
         enc_h = enc_h[:, :-2]                 # dummy node(source, sink)는 제외한다.
