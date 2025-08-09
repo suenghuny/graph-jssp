@@ -228,7 +228,7 @@ class GraphVAEDecoder(nn.Module):
 
     def forward(self, z):
         batch_size = z.size(0)
-
+        #print('0', z.shape)
         # Initial transformation
         h = self.fc_initial(z).unsqueeze(-1)  # [batch_size, 512, 1]
 
@@ -310,7 +310,8 @@ class LatentModel(nn.Module):
         X = X.to(device)[:, :-2, :]
         edge_cats = edge_cats.to(device)[:, :-2, :-2, :]
         z_mean_pri, z_std_pri = self.sample_prior(mean_feature)
-        #print(features[0][2][6])
+        #print(mean_feature.shape)
+        #print(mean_feature[0][252])
         z_mean_post, z_std_post, z = self.sample_posterior(mean_feature) # q(|G
         loss_kld = calculate_kl_divergence(z_mean_post, z_std_post, z_mean_pri, z_std_pri).mean(dim=0).sum()
         if train == True:
@@ -327,3 +328,9 @@ class LatentModel(nn.Module):
 
 
         return edge_loss, node_loss, loss_kld, mean_feature, features, z
+
+    def calculate_feature_embedding(self, X, A, train = False):
+        # Calculate the sequence of features.
+        mean_feature, features, edge_cats = self.encoder(X, A)
+        z_mean_post, z_std_post, z = self.sample_posterior(mean_feature) # q(|G
+        return mean_feature, features, z, z_mean_post

@@ -215,7 +215,7 @@ class PtrNet1(nn.Module):
         log_probabilities = list()
         sample_space = [[j for i in range(num_machine)] for j in range(num_job)]
         sample_space = torch.tensor(sample_space).view(-1)
-        edge_loss, node_loss, loss_kld, mean_feature, features, z = self.Latent.calculate_loss(node_features,
+        mean_feature, features, z, z_mean_post = self.Latent.calculate_feature_embedding(node_features,
                                                                                                heterogeneous_edges,
                                                                                                train=False)
 
@@ -369,7 +369,7 @@ class PtrNet1(nn.Module):
             pi_list.append(next_job)
 
         pi = torch.stack(pi_list, dim=1)
-        return z, baselines, h, pi
+        return z, baselines, h, pi, mean_feature, z_mean_post
 
     def forward(self, x, device, scheduler_list, num_job, num_machine, old_sequence = None, train = True, old_sequence_in_ops=None):
         node_features, heterogeneous_edges = x

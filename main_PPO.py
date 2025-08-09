@@ -731,7 +731,7 @@ def test_model(params, selected_param, log_path=None):
 #     # 3-1. PCA 결과 (처음 2개 주성분)
 #     ax1 = plt.subplot(3, 4, 1)
 #     scatter1 = plt.scatter(z_pca[:, 0], z_pca[:, 1], c=flow_shop_index_list,
-#                            cmap='viridis', alpha=0.7, s=30)
+#                            cmap='RdBu', alpha=1.0, s=30)
 #     plt.title('PCA: Flow Shop Index', fontweight='bold')
 #     plt.xlabel(f'PC1 ({pca.explained_variance_ratio_[0]:.2%} var)')
 #     plt.ylabel(f'PC2 ({pca.explained_variance_ratio_[1]:.2%} var)')
@@ -740,7 +740,7 @@ def test_model(params, selected_param, log_path=None):
 #
 #     ax2 = plt.subplot(3, 4, 2)
 #     scatter2 = plt.scatter(z_pca[:, 0], z_pca[:, 1], c=bottleneck_index_list,
-#                            cmap='plasma', alpha=0.7, s=30)
+#                            cmap='RdBu', alpha=1.0, s=30)
 #     plt.title('PCA: Bottleneck Index', fontweight='bold')
 #     plt.xlabel(f'PC1 ({pca.explained_variance_ratio_[0]:.2%} var)')
 #     plt.ylabel(f'PC2 ({pca.explained_variance_ratio_[1]:.2%} var)')
@@ -750,7 +750,7 @@ def test_model(params, selected_param, log_path=None):
 #     # 3-2. GMM 클러스터링 결과
 #     ax3 = plt.subplot(3, 4, 3)
 #     scatter3 = plt.scatter(z_pca[:, 0], z_pca[:, 1], c=cluster_labels,
-#                            cmap='tab10', alpha=0.7, s=30)
+#                            cmap='tab10', alpha=1.0, s=30)
 #     plt.title(f'GMM Clustering (k={optimal_n_components})', fontweight='bold')
 #     plt.xlabel(f'PC1 ({pca.explained_variance_ratio_[0]:.2%} var)')
 #     plt.ylabel(f'PC2 ({pca.explained_variance_ratio_[1]:.2%} var)')
@@ -822,7 +822,7 @@ def test_model(params, selected_param, log_path=None):
 #
 #     ax10 = plt.subplot(3, 4, 10)
 #     scatter10 = plt.scatter(z_tsne[:, 0], z_tsne[:, 1], c=flow_shop_index_list,
-#                             cmap='viridis', alpha=0.7, s=30)
+#                             cmap='RdBu', alpha=1.0, s=30)
 #     plt.title('t-SNE: Flow Shop Index', fontweight='bold')
 #     plt.xlabel('t-SNE 1')
 #     plt.ylabel('t-SNE 2')
@@ -836,7 +836,7 @@ def test_model(params, selected_param, log_path=None):
 #
 #     ax11 = plt.subplot(3, 4, 11)
 #     scatter11 = plt.scatter(z_umap[:, 0], z_umap[:, 1], c=flow_shop_index_list,
-#                             cmap='viridis', alpha=0.7, s=30)
+#                             cmap='RdBu', alpha=1.0, s=30)
 #     plt.title('UMAP: Flow Shop Index', fontweight='bold')
 #     plt.xlabel('UMAP 1')
 #     plt.ylabel('UMAP 2')
@@ -856,7 +856,7 @@ def test_model(params, selected_param, log_path=None):
 #             cluster_mask = cluster_labels == i
 #             plt.scatter(z_pca[cluster_mask, 0], z_pca[cluster_mask, 1],
 #                         c=[color], alpha=0.6, s=30, label=f'Cluster {i}')
-#             plt.scatter(mean_pca[0], mean_pca[1], c='black', s=100, marker='x')
+#             plt.scatter(mean_pca[0], mean_pca[1], c='black', s=200, marker='x')
 #
 #     plt.title('GMM Clusters with Centers', fontweight='bold')
 #     plt.xlabel(f'PC1 ({pca.explained_variance_ratio_[0]:.2%} var)')
@@ -907,7 +907,7 @@ def visualize_model(params, selected_param, log_path=None):
     act_model = PtrNet1(params).to(device)
     baseline_model = PtrNet1(params).to(device)  # baseline_model 불필요
     baseline_model.load_state_dict(act_model.state_dict())  # baseline_model 불필요
-    file_name = 'after_rep_40000_param0_step_90901_mean_makespan_3328.0'  ###########fdfdf
+    file_name = 'multi_scaled_after_rep_40000_param0_step_117701_mean_makespan_3358.0'  ###########fdfdf
     checkpoint = torch.load('result/model/' + '{}.pt'.format(file_name))
     act_model.load_state_dict(checkpoint['model_state_dict_actor'])
 
@@ -930,167 +930,221 @@ def visualize_model(params, selected_param, log_path=None):
     inputs : batch_size X number_of_blocks X number_of_process
     pred_seq : batch_size X number_of_blocks
     """
-    b += 1
-    flow_shop_index_list = list()
-    bottleneck_index_list = list()
-    h_list = list()
-    z_list = list()
-    act_model.eval()
-    for i in range(5000):
-        num_machine = np.random.randint(5, 10)
-        num_job = np.random.randint(num_machine,10)
-        jobs_datas, scheduler_list = generate_jssp_instance(num_jobs=num_job, num_machine=num_machine, batch_size=1)
-        act_model.Latent.current_num_edges = num_machine * num_job
-        flow_shop_index = calculate_flow_shop_index(scheduler_list[0])
-        bottleneck_index = calculate_bottleneck_index(scheduler_list[0])
-        act_model.get_jssp_instance(scheduler_list)
-        scheduler = AdaptiveScheduler(jobs_datas[0])
-        node_features = [scheduler.get_node_feature()]
-        edge_precedence = scheduler.get_edge_index_precedence()
-        edge_antiprecedence = scheduler.get_edge_index_antiprecedence()
-        edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
-        heterogeneous_edges = [(edge_precedence, edge_antiprecedence, edge_machine_sharing)]  # 세종류의 엣지들을 하나의 변수로 참조시킴
-        input_data = (node_features, heterogeneous_edges)
-        z, v, h, pred_seq = act_model.forward_visualize(input_data,
-                                     device,
-                                     scheduler_list=scheduler_list,
-                                     num_machine=num_machine,
-                                     num_job=num_job
-                                     )
-
-
-        sequence = pred_seq[0]
-        scheduler = AdaptiveScheduler(jobs_datas[0])
-        makespan = -scheduler.run(sequence.tolist())
-
-        #print(z.shape)
-        flow_shop_index_list.append(v.squeeze(0).detach().cpu().numpy()[0])
-        bottleneck_index_list.append(makespan)
-        h_list.append(h.squeeze(0).detach().cpu().numpy().tolist())
-        z_list.append(z.squeeze(0).detach().cpu().numpy().tolist())
-        print("data collecting : ", i)
-
-    # numpy 배열로 변환
-    flow_shop_index_list = np.array(flow_shop_index_list)
-    bottleneck_index_list = np.array(bottleneck_index_list)
-    h_array = np.array(h_list)  # z_list를 빈 리스트로 재정의하지 않고 numpy 배열로 변환
-    z_array = np.array(z_list)  # z_list를 빈 리스트로 재정의하지 않고 numpy 배열로 변환
-
-    np.save('flow_shop_index_list.npy', flow_shop_index_list)
-    np.save('bottleneck_index_list.npy', bottleneck_index_list)
-    np.save('h_array.npy', h_array)
-    np.save('z_array.npy', z_array)
+    # b += 1
+    # flow_shop_index_list = list()
+    # bottleneck_index_list = list()
+    # makespan_list = list()
+    # h_list = list()
+    # z_list = list()
+    # mean_feature_list = list()
+    # z_mean_post_list = list()
+    # machine_number_list = list()  # 추가: machine number
+    # job_number_list = list()  # 추가: job number
+    # machine_job_product_list = list()  # 추가: machine number × job number
+    # act_model.eval()
+    # for i in range(20000):
+    #     num_machine = np.random.randint(5, 10)
+    #     num_job = np.random.randint(num_machine, 10)
+    #     jobs_datas, scheduler_list = generate_jssp_instance(num_jobs=num_job, num_machine=num_machine, batch_size=1)
+    #     act_model.Latent.current_num_edges = num_machine * num_job
+    #     flow_shop_index = calculate_flow_shop_index(scheduler_list[0])
+    #     bottleneck_index = calculate_bottleneck_index(scheduler_list[0])
+    #     machine_job_product = num_machine * num_job  # 추가: machine × job 계산
+    #     act_model.get_jssp_instance(scheduler_list)
+    #     scheduler = AdaptiveScheduler(jobs_datas[0])
+    #     node_features = [scheduler.get_node_feature()]
+    #     edge_precedence = scheduler.get_edge_index_precedence()
+    #     edge_antiprecedence = scheduler.get_edge_index_antiprecedence()
+    #     edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
+    #     heterogeneous_edges = [(edge_precedence, edge_antiprecedence, edge_machine_sharing)]  # 세종류의 엣지들을 하나의 변수로 참조시킴
+    #     input_data = (node_features, heterogeneous_edges)
+    #     z, v, h, pred_seq, mean_feature, z_mean_post = act_model.forward_visualize(input_data,
+    #                                                                                device,
+    #                                                                                scheduler_list=scheduler_list,
+    #                                                                                num_machine=num_machine,
+    #                                                                                num_job=num_job
+    #                                                                                )
+    # 
+    #     sequence = pred_seq[0]
+    #     scheduler = AdaptiveScheduler(jobs_datas[0])
+    #     makespan = -scheduler.run(sequence.tolist())
+    # 
+    #     # print(z.shape)
+    #     flow_shop_index_list.append(flow_shop_index)
+    #     makespan_list.append(makespan)
+    #     bottleneck_index_list.append(bottleneck_index)
+    #     machine_number_list.append(num_machine)  # 추가
+    #     job_number_list.append(num_job)  # 추가
+    #     machine_job_product_list.append(machine_job_product)  # 추가
+    #     h_list.append(h.squeeze(0).detach().cpu().numpy().tolist())
+    #     mean_feature_list.append(mean_feature.squeeze(0).detach().cpu().numpy().tolist())
+    #     z_mean_post_list.append(z_mean_post.squeeze(0).detach().cpu().numpy().tolist())
+    #     z_list.append(z.squeeze(0).detach().cpu().numpy().tolist())
+    #     print("data collecting : ", i)
+    # 
+    # # numpy 배열로 변환
+    # makespan_list = np.array(makespan_list)
+    # flow_shop_index_list = np.array(flow_shop_index_list)
+    # bottleneck_index_list = np.array(bottleneck_index_list)
+    # machine_number_list = np.array(machine_number_list)  # 추가
+    # job_number_list = np.array(job_number_list)  # 추가
+    # machine_job_product_list = np.array(machine_job_product_list)  # 추가
+    # h_array = np.array(h_list)  # z_list를 빈 리스트로 재정의하지 않고 numpy 배열로 변환
+    # z_array = np.array(z_list)  # z_list를 빈 리스트로 재정의하지 않고 numpy 배열로 변환
+    # mean_feature_array = np.array(mean_feature_list)
+    # z_mean_post_array = np.array(z_mean_post_list)
+    # makespan_list = np.array(makespan_list)
+    # 
+    # np.save('flow_shop_index_list.npy', flow_shop_index_list)
+    # np.save('bottleneck_index_list.npy', bottleneck_index_list)
+    # np.save('machine_number_list.npy', machine_number_list)  # 추가
+    # np.save('job_number_list.npy', job_number_list)  # 추가
+    # np.save('machine_job_product_list.npy', machine_job_product_list)  # 추가
+    # np.save('h_array.npy', h_array)
+    # np.save('z_array.npy', z_array)
+    # np.save('mean_feature_array.npy', mean_feature_array)
+    # np.save('z_mean_post_array.npy', z_mean_post_array)
+    # np.save('makespan_array.npy', makespan_list)
 
     # 데이터 검증
     # print(f"z_array shape: {z_array.shape}")
     # print(f"flow_shop_index_list shape: {flow_shop_index_list.shape}")
     # print(f"bottleneck_index_list shape: {bottleneck_index_list.shape}")
-
-    # flow_shop_index_list = np.load('flow_shop_index_list.npy')
-    # bottleneck_index_list= np.load('bottleneck_index_list.npy')
-    # z_array = np.load('z_array.npy')
+    
+    machine_number_list = np.load('machine_number_list.npy')  # 추가
+    job_number_list = np.load('job_number_list.npy')  # 추가
+    flow_shop_index_list = np.load('flow_shop_index_list.npy')
+    bottleneck_index_list = np.load('bottleneck_index_list.npy')
+    machine_number_list = np.load('machine_number_list.npy')  # 추가
+    job_number_list = np.load('job_number_list.npy')  # 추가
+    machine_job_product_list = np.load('machine_job_product_list.npy')  # 추가
+    makespan_list = np.load('makespan_array.npy')
+    z_array = np.load('z_mean_post_array.npy')
+    machine_number_list = np.load('machine_number_list.npy')  # 추가
+    job_number_list = np.load('job_number_list.npy')  # 추가
+    flow_shop_index_list = np.load('flow_shop_index_list.npy')
+    bottleneck_index_list = np.load('bottleneck_index_list.npy')
+    machine_number_list = np.load('machine_number_list.npy')  # 추가
+    job_number_list = np.load('job_number_list.npy')  # 추가
+    machine_job_product_list = np.load('machine_job_product_list.npy')  # 추가
+    makespan_list = -np.load('makespan_array.npy')
+    z_array = np.load('z_mean_post_array.npy')
 
     # 데이터가 비어있는지 확인
     if z_array.size == 0:
         print("Error: z_array is empty!")
         return
 
-    # StandardScaler 적용
     scaler = StandardScaler()
-    z_scaled = z_array #/zscaler.fit_transform(z_array)
-
-    # t-SNE와 UMAP으로 2차원 축소
-    print("t-SNE 차원 축소 진행 중...")
-    tsne = TSNE(n_components=2, random_state=42, perplexity=54, n_iter=3000)
-    z_2d_tsne = tsne.fit_transform(z_scaled)
-
+    # StandardScaler 적용
+    z_scaled = scaler.fit_transform(z_array)
+    print( makespan_list.min(), makespan_list.max()+300 )
+    # UMAP으로 2차원 축소
     print("UMAP 차원 축소 진행 중...")
-    umap_reducer = umap.UMAP(n_components=2, random_state=42, n_neighbors=15, min_dist=0.1)
+    umap_reducer = umap.UMAP(n_components=2, random_state=42, n_neighbors=7, min_dist=0.5, metric='cosine')
     z_2d_umap = umap_reducer.fit_transform(z_scaled)
 
-    # 시각화 (t-SNE와 UMAP 비교)
+    # 컬러맵 범위 설정 (원하는 값으로 조절하세요)
+    flow_shop_vmin, flow_shop_vmax = flow_shop_index_list.min()+0.15, flow_shop_index_list.max()-0.15# Flow Shop Index 범위
+    bottleneck_vmin, bottleneck_vmax = bottleneck_index_list.min()+0.15, bottleneck_index_list.max()-0.15 # Bottleneck Index 범위
+
+    makespan_vmin, makespan_vmax = makespan_list.min()+100, makespan_list.max()-100  # Makespan 범위 (전체 범위 사용)
+    machine_vmin, machine_vmax = 5, 10  # Machine Number 범위
+    job_vmin, job_vmax = 5, 10  # Job Number 범위
+    product_vmin, product_vmax = 25, 100  # Machine × Job Product 범위
+
+    # 시각화 (UMAP만 사용, 6개의 지표)
     fig, axes = plt.subplots(2, 3, figsize=(18, 12))
 
-    # t-SNE 결과
-    # 1. Flow Shop Index로 컬러맵 (t-SNE)
-    scatter1 = axes[0, 0].scatter(z_2d_tsne[:, 0], z_2d_tsne[:, 1], c=flow_shop_index_list, cmap='viridis',alpha=0.7, s=20)
-    axes[0, 0].set_title('t-SNE: Flow Shop Index', fontsize=14, fontweight='bold')
-    axes[0, 0].set_xlabel('t-SNE Component 1')
-    axes[0, 0].set_ylabel('t-SNE Component 2')
+    # 1. Flow Shop Index로 컬러맵 (UMAP)
+    scatter1 = axes[0, 0].scatter(z_2d_umap[:, 0], z_2d_umap[:, 1],
+                                  c=flow_shop_index_list,
+                                  cmap='RdBu',
+                                  alpha=1.0,
+                                  s=20,
+                                  vmin=flow_shop_vmin,
+                                  vmax=flow_shop_vmax)
+    axes[0, 0].set_title('UMAP: Flow Shop Index', fontsize=14, fontweight='bold')
+    axes[0, 0].set_xlabel('UMAP Component 1')
+    axes[0, 0].set_ylabel('UMAP Component 2')
     axes[0, 0].grid(True, alpha=0.3)
     cbar1 = plt.colorbar(scatter1, ax=axes[0, 0])
     cbar1.set_label('Flow Shop Index')
 
-    # 2. Bottleneck Index로 컬러맵 (t-SNE)
-    scatter2 = axes[0, 1].scatter(z_2d_tsne[:, 0], z_2d_tsne[:, 1],
+    # 2. Bottleneck Index로 컬러맵 (UMAP)
+    scatter2 = axes[0, 1].scatter(z_2d_umap[:, 0], z_2d_umap[:, 1],
                                   c=bottleneck_index_list,
-                                  cmap='plasma',
-                                  alpha=0.7,
-                                  s=20)
-    axes[0, 1].set_title('t-SNE: Bottleneck Index', fontsize=14, fontweight='bold')
-    axes[0, 1].set_xlabel('t-SNE Component 1')
-    axes[0, 1].set_ylabel('t-SNE Component 2')
+                                  cmap='RdBu',
+                                  alpha=1.0,
+                                  s=20,
+                                  vmin=bottleneck_vmin,
+                                  vmax=bottleneck_vmax)
+    axes[0, 1].set_title('UMAP: Bottleneck Index', fontsize=14, fontweight='bold')
+    axes[0, 1].set_xlabel('UMAP Component 1')
+    axes[0, 1].set_ylabel('UMAP Component 2')
     axes[0, 1].grid(True, alpha=0.3)
     cbar2 = plt.colorbar(scatter2, ax=axes[0, 1])
     cbar2.set_label('Bottleneck Index')
 
-    # 3. 두 지표를 조합한 컬러맵 (t-SNE)
-    # 각 지표를 0-1 범위로 정규화
-    flow_norm = (flow_shop_index_list - flow_shop_index_list.min()) / (
-            flow_shop_index_list.max() - flow_shop_index_list.min())
-    bottleneck_norm = (bottleneck_index_list - bottleneck_index_list.min()) / (
-            bottleneck_index_list.max() - bottleneck_index_list.min())
-
-    # RGB 조합 (R: flow_shop, G: bottleneck, B: 0.5 고정)
-    colors = np.column_stack([flow_norm, bottleneck_norm, np.full(len(flow_norm), 0.5)])
-
-    scatter3 = axes[0, 2].scatter(z_2d_tsne[:, 0], z_2d_tsne[:, 1],
-                                   c=colors,
-                                   alpha=0.7,
-                                   s=20)
-    axes[0, 2].set_title('t-SNE: Combined Index\n(Red: Flow Shop, Green: Bottleneck)',
-                         fontsize=14, fontweight='bold')
-    axes[0, 2].set_xlabel('t-SNE Component 1')
-    axes[0, 2].set_ylabel('t-SNE Component 2')
+    # 3. Makespan으로 컬러맵 (UMAP)
+    scatter3 = axes[0, 2].scatter(z_2d_umap[:, 0], z_2d_umap[:, 1],
+                                  c=makespan_list,
+                                  cmap='RdBu',
+                                  alpha=1.0,
+                                  s=20,
+                                  vmin=makespan_vmin,
+                                  vmax=makespan_vmax)
+    axes[0, 2].set_title('UMAP: Makespan', fontsize=14, fontweight='bold')
+    axes[0, 2].set_xlabel('UMAP Component 1')
+    axes[0, 2].set_ylabel('UMAP Component 2')
     axes[0, 2].grid(True, alpha=0.3)
+    cbar3 = plt.colorbar(scatter3, ax=axes[0, 2])
+    cbar3.set_label('Makespan')
 
-    # UMAP 결과
-    # 4. Flow Shop Index로 컬러맵 (UMAP)
+    # 4. Machine Number로 컬러맵 (UMAP) - 새로 추가
     scatter4 = axes[1, 0].scatter(z_2d_umap[:, 0], z_2d_umap[:, 1],
-                                  c=flow_shop_index_list,
-                                  cmap='viridis',
-                                  alpha=0.7,
-                                  s=20)
-    axes[1, 0].set_title('UMAP: Flow Shop Index', fontsize=14, fontweight='bold')
+                                  c=machine_number_list,
+                                  cmap='RdBu',
+                                  alpha=1.0,
+                                  s=20,
+                                  vmin=machine_vmin,
+                                  vmax=machine_vmax)
+    axes[1, 0].set_title('UMAP: Machine Number', fontsize=14, fontweight='bold')
     axes[1, 0].set_xlabel('UMAP Component 1')
     axes[1, 0].set_ylabel('UMAP Component 2')
     axes[1, 0].grid(True, alpha=0.3)
     cbar4 = plt.colorbar(scatter4, ax=axes[1, 0])
-    cbar4.set_label('Flow Shop Index')
+    cbar4.set_label('Machine Number')
 
-    # 5. Bottleneck Index로 컬러맵 (UMAP)
+    # 5. Job Number로 컬러맵 (UMAP) - 새로 추가
     scatter5 = axes[1, 1].scatter(z_2d_umap[:, 0], z_2d_umap[:, 1],
-                                  c=bottleneck_index_list,
-                                  cmap='viridis',
-                                  alpha=0.7,
-                                  s=20)
-    axes[1, 1].set_title('UMAP: Bottleneck Index', fontsize=14, fontweight='bold')
+                                  c=job_number_list,
+                                  cmap='RdBu',
+                                  alpha=1.0,
+                                  s=20,
+                                  vmin=job_vmin,
+                                  vmax=job_vmax)
+    axes[1, 1].set_title('UMAP: Job Number', fontsize=14, fontweight='bold')
     axes[1, 1].set_xlabel('UMAP Component 1')
     axes[1, 1].set_ylabel('UMAP Component 2')
     axes[1, 1].grid(True, alpha=0.3)
     cbar5 = plt.colorbar(scatter5, ax=axes[1, 1])
-    cbar5.set_label('Bottleneck Index')
+    cbar5.set_label('Job Number')
 
-    # 6. 두 지표를 조합한 컬러맵 (UMAP)
+    # 6. Machine × Job Product로 컬러맵 (UMAP)
     scatter6 = axes[1, 2].scatter(z_2d_umap[:, 0], z_2d_umap[:, 1],
-                                  c=colors,
-                                  alpha=0.7,
-                                  s=20)
-    axes[1, 2].set_title('UMAP: Combined Index\n(Red: Flow Shop, Green: Bottleneck)',
-                         fontsize=14, fontweight='bold')
+                                  c=machine_job_product_list,
+                                  cmap='RdBu',
+                                  alpha=1.0,
+                                  s=20,
+                                  vmin=product_vmin,
+                                  vmax=product_vmax)
+    axes[1, 2].set_title('UMAP: Machine × Job Product', fontsize=14, fontweight='bold')
     axes[1, 2].set_xlabel('UMAP Component 1')
     axes[1, 2].set_ylabel('UMAP Component 2')
     axes[1, 2].grid(True, alpha=0.3)
+    cbar6 = plt.colorbar(scatter6, ax=axes[1, 2])
+    cbar6.set_label('Machine × Job Product')
 
     plt.tight_layout()
     plt.show()
@@ -1098,33 +1152,73 @@ def visualize_model(params, selected_param, log_path=None):
     # 상관관계 분석
     print(f"\n=== 데이터 분석 결과 ===")
     print(f"원본 데이터 차원: {z_array.shape}")
-    print(f"t-SNE 축소된 데이터 차원: {z_2d_tsne.shape}")
     print(f"UMAP 축소된 데이터 차원: {z_2d_umap.shape}")
     print(f"Flow Shop Index 범위: {flow_shop_index_list.min():.2f} ~ {flow_shop_index_list.max():.2f}")
     print(f"Bottleneck Index 범위: {bottleneck_index_list.min():.2f} ~ {bottleneck_index_list.max():.2f}")
+    print(f"Makespan 범위: {makespan_list.min():.2f} ~ {makespan_list.max():.2f}")
+    print(f"Machine Number 범위: {machine_number_list.min()} ~ {machine_number_list.max()}")
+    print(f"Job Number 범위: {job_number_list.min()} ~ {job_number_list.max()}")
+    print(f"Machine × Job Product 범위: {machine_job_product_list.min()} ~ {machine_job_product_list.max()}")
     print(f"Flow Shop과 Bottleneck Index 상관계수: {np.corrcoef(flow_shop_index_list, bottleneck_index_list)[0, 1]:.3f}")
+    print(f"Flow Shop과 Makespan 상관계수: {np.corrcoef(flow_shop_index_list, makespan_list)[0, 1]:.3f}")
+    print(f"Flow Shop과 Machine Number 상관계수: {np.corrcoef(flow_shop_index_list, machine_number_list)[0, 1]:.3f}")
+    print(f"Flow Shop과 Job Number 상관계수: {np.corrcoef(flow_shop_index_list, job_number_list)[0, 1]:.3f}")
+    print(
+        f"Flow Shop과 Machine×Job Product 상관계수: {np.corrcoef(flow_shop_index_list, machine_job_product_list)[0, 1]:.3f}")
+    print(f"Bottleneck Index와 Makespan 상관계수: {np.corrcoef(bottleneck_index_list, makespan_list)[0, 1]:.3f}")
+    print(f"Bottleneck Index와 Machine Number 상관계수: {np.corrcoef(bottleneck_index_list, machine_number_list)[0, 1]:.3f}")
+    print(f"Bottleneck Index와 Job Number 상관계수: {np.corrcoef(bottleneck_index_list, job_number_list)[0, 1]:.3f}")
+    print(
+        f"Bottleneck Index와 Machine×Job Product 상관계수: {np.corrcoef(bottleneck_index_list, machine_job_product_list)[0, 1]:.3f}")
+    print(f"Makespan과 Machine Number 상관계수: {np.corrcoef(makespan_list, machine_number_list)[0, 1]:.3f}")
+    print(f"Makespan과 Job Number 상관계수: {np.corrcoef(makespan_list, job_number_list)[0, 1]:.3f}")
+    print(f"Makespan과 Machine×Job Product 상관계수: {np.corrcoef(makespan_list, machine_job_product_list)[0, 1]:.3f}")
+    print(f"Machine Number과 Job Number 상관계수: {np.corrcoef(machine_number_list, job_number_list)[0, 1]:.3f}")
+    print(
+        f"Machine Number과 Machine×Job Product 상관계수: {np.corrcoef(machine_number_list, machine_job_product_list)[0, 1]:.3f}")
+    print(f"Job Number과 Machine×Job Product 상관계수: {np.corrcoef(job_number_list, machine_job_product_list)[0, 1]:.3f}")
 
-    # 추가 시각화: 히스토그램
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+    # 추가 시각화: 히스토그램 (6개 지표)
+    fig, axes = plt.subplots(2, 3, figsize=(18, 8))
 
-    axes[0].hist(flow_shop_index_list, bins=30, alpha=0.7, color='viridis', edgecolor='black')
-    axes[0].set_title('Flow Shop Index 분포')
-    axes[0].set_xlabel('Flow Shop Index')
-    axes[0].set_ylabel('빈도')
-    axes[0].grid(True, alpha=0.3)
+    axes[0, 0].hist(flow_shop_index_list, bins=30, alpha=1.0, color='green', edgecolor='black')
+    axes[0, 0].set_title('Flow Shop Index 분포')
+    axes[0, 0].set_xlabel('Flow Shop Index')
+    axes[0, 0].set_ylabel('빈도')
+    axes[0, 0].grid(True, alpha=0.3)
 
-    axes[1].hist(bottleneck_index_list, bins=30, alpha=0.7, color='plasma', edgecolor='black')
-    axes[1].set_title('Bottleneck Index 분포')
-    axes[1].set_xlabel('Bottleneck Index')
-    axes[1].set_ylabel('빈도')
-    axes[1].grid(True, alpha=0.3)
+    axes[0, 1].hist(bottleneck_index_list, bins=30, alpha=1.0, color='purple', edgecolor='black')
+    axes[0, 1].set_title('Bottleneck Index 분포')
+    axes[0, 1].set_xlabel('Bottleneck Index')
+    axes[0, 1].set_ylabel('빈도')
+    axes[0, 1].grid(True, alpha=0.3)
+
+    axes[0, 2].hist(makespan_list, bins=30, alpha=1.0, color='orange', edgecolor='black')
+    axes[0, 2].set_title('Makespan 분포')
+    axes[0, 2].set_xlabel('Makespan')
+    axes[0, 2].set_ylabel('빈도')
+    axes[0, 2].grid(True, alpha=0.3)
+
+    axes[1, 0].hist(machine_number_list, bins=range(5, 11), alpha=1.0, color='blue', edgecolor='black')
+    axes[1, 0].set_title('Machine Number 분포')
+    axes[1, 0].set_xlabel('Machine Number')
+    axes[1, 0].set_ylabel('빈도')
+    axes[1, 0].grid(True, alpha=0.3)
+
+    axes[1, 1].hist(job_number_list, bins=range(5, 11), alpha=1.0, color='cyan', edgecolor='black')
+    axes[1, 1].set_title('Job Number 분포')
+    axes[1, 1].set_xlabel('Job Number')
+    axes[1, 1].set_ylabel('빈도')
+    axes[1, 1].grid(True, alpha=0.3)
+
+    axes[1, 2].hist(machine_job_product_list, bins=30, alpha=1.0, color='red', edgecolor='black')
+    axes[1, 2].set_title('Machine × Job Product 분포')
+    axes[1, 2].set_xlabel('Machine × Job Product')
+    axes[1, 2].set_ylabel('빈도')
+    axes[1, 2].grid(True, alpha=0.3)
 
     plt.tight_layout()
     plt.show()
-
-
-
-#
 #
 # if __name__ == '__main__':
 #
