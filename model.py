@@ -95,6 +95,7 @@ class GCRN(nn.Module):
         Wh2 = torch.matmul(Wh2, self.a2[e][m*self.graph_embedding_size:(m+1)*self.graph_embedding_size, :])
         a = Wh1 + Wh2.T
         return F.leaky_relu(a)
+
     def forward(self, A, X, mini_batch, layer = 0, final = False):
         batch_size = X.shape[0]
         num_nodes = X.shape[1]
@@ -116,8 +117,10 @@ class GCRN(nn.Module):
                     E = torch.sparse_coo_tensor(A[b][e],torch.ones(torch.tensor(torch.tensor(A[b][e]).shape[1])),(num_nodes, num_nodes)).to(device).to_dense()
                     Wh = X[b] @ self.Ws[e][m*self.feature_size:(m+1)*self.feature_size]
                     a = self._prepare_attentional_mechanism_input(Wh, Wh, e, m)
+
                     zero_vec = -9e15 * torch.ones_like(E)
                     a = torch.where(E > 0, a, zero_vec)
+
                     a = F.softmax(a, dim=1)
                     H =  F.elu(torch.matmul(a, Wh))
                     if final == False:

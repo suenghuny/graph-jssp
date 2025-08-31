@@ -39,7 +39,7 @@ def set_seed(seed):
     torch.backends.cudnn.benchmark = False
 
 # Example usage:
-dataset_name = 'orb' #ta, orb, dmu, la, abz, swv, ft
+dataset_name = 'ta' #ta, orb, dmu, la, abz, swv, ft
 excel_file = pd.ExcelFile("{}_structured.xlsx".format(dataset_name),
                           engine='openpyxl')
 
@@ -51,7 +51,7 @@ orb_list = []
 problem_number =  [str(i+1) for i in range(total_sheets )]
 
 
-for i in ['1']:
+for i in ['1', '2','3', '4','5','6','7','8','9','10']:
     df = pd.read_excel("{}_structured.xlsx".format(dataset_name), sheet_name=i, engine='openpyxl')
 
     orb_data = list()  #
@@ -112,7 +112,8 @@ def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=Non
     edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
     heterogeneous_edges = (edge_precedence, edge_antiprecedence, edge_machine_sharing)
     heterogeneous_edges = [heterogeneous_edges for _ in range(eval_number)]
-    input_data = (node_feature, heterogeneous_edges)
+    input_data = \
+        (node_feature, heterogeneous_edges)
     pred_seq, ll_old, _ = act_model(input_data,
                                     device,
                                     scheduler_list=scheduler_list_val,
@@ -128,6 +129,7 @@ def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=Non
         makespan_list.append(makespan)
         print(j, makespan)
         j+=1
+        #act_model.makespan_records.append(makespan)
     # print("크크크", val_makespan)
     return np.min(val_makespan), np.mean(val_makespan), makespan_list
 
@@ -154,8 +156,6 @@ def train_model(params, log_path=None):
 
 
     checkpoint = torch.load('experiment224/output/' + '{}_act.pt'.format(file_name))
-
-
     act_model.load_state_dict(checkpoint['model_state_dict_actor'])
 
     baseline_model = PtrNet1(params).to(device)  # baseline_model 불필요

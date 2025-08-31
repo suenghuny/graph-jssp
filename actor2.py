@@ -9,11 +9,90 @@ from model import GCRN
 device = torch.device(cfg.device)
 
 
+def calculate_probabilities(records):
+    # records에서 첫번째 요소만 추출
+    from collections import Counter
+
+    # key값만 추출
+
+
+    keys = np.array(records).reshape(-1).tolist()
+
+    #print(keys)
+    # 각 key의 개수를 세기
+
+    counter = Counter(keys)
+
+    # 전체 데이터 수
+    total = len(keys)
+
+    # 각 key의 확률을 계산하여 딕셔너리로 저장
+    probabilities = {key: count / total for key, count in counter.items()}
+
+    return probabilities
+def calculate_p_v_given_l(lb_records, makespan):
+    """
+    lb_records: shape (100, 32) - 각 배치에 대한 l samples
+    makespan: shape (32,) - 각 배치의 makespan(v) 값
+    """
+    # numpy array로 변환
+    lb_records = np.array(lb_records)
+    makespan = np.array(makespan)
+
+    # 각 l 값에 대해
+    unique_l = np.unique(lb_records)
+
+
+
+    p_v_given_l = {}
+
+    for l in unique_l:
+        # 이 l이 선택된 배치들 찾기
+        l_mask = (lb_records == l)
+        makespan_copied = deepcopy(makespan).reshape(-1)
+        # 해당 배치들의 makespan 값
+
+        l_mask = np.transpose(l_mask, (1,0,2)).reshape(100,-1)
+        v_values = makespan_copied[np.any(l_mask, axis=0)]
+
+        if len(v_values) > 0:
+            # 이 l에서 나온 v들의 분포 계산
+            unique_v, counts = np.unique(v_values, return_counts=True)
+            probs = counts / len(v_values)
+            p_v_given_l[l] = dict(zip(unique_v, probs))
+
+    return p_v_given_l
+def calculate_entropy(sequence):
+    """
+    주어진 숫자 시퀀스의 엔트로피를 계산합니다.
+
+    Parameters:
+    sequence (list/array): 숫자들의 시퀀스
+
+    Returns:
+    float: 계산된 엔트로피 값
+    """
+    # 숫자들의 발생 빈도를 계산
+    values, counts = np.unique(sequence, return_counts=True)
+    probabilities = counts / len(sequence)
+
+    # 엔트로피 계산 (Shannon's entropy formula)
+    entropy = -np.mean(probabilities * np.log2(probabilities))
+
+    return entropy
+
 class Categorical(nn.Module):
     def __init__(self):
         super().__init__()
     def forward(self, log_p):
         return torch.multinomial(log_p.exp(), 1).long().squeeze(1)
+
+
+class Greedy(nn.Module):
+    def __init__(self):
+        super().__init__()
+    def forward(self, log_p):
+        return torch.argmax(log_p, -1)#.long().squeeze(1)
 
 
 class ExEmbedding(nn.Module):
@@ -147,7 +226,10 @@ class PtrNet1(nn.Module):
         self.C = params["C"]
         self.T = params["T"]
         self.n_glimpse = params["n_glimpse"]
-        self.job_selecter = Categorical()
+        self.job_selecter = Greedy()
+
+        self.lb_records = [[],[],[],[],[],[]]
+        self.makespan_records = []
 
 
 
@@ -198,11 +280,6 @@ class PtrNet1(nn.Module):
 
             mask1[idx] = torch.tensor(instance.mask1).to(device)
             mask2[idx] = torch.tensor(instance.mask2).to(device)
-       # empty=list()
-        #for idx in range(len(self.instance)):
-       #     empty.append(self.instance[idx].mask1.index(1))
-        #print(empty)
-
         return mask1, mask2
 
 
@@ -223,37 +300,6 @@ class PtrNet1(nn.Module):
         if self.k_hop == 2:
             enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
             enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True, final = True)
-        # if cfg.k_hop == 3:
-        #     enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
-        #     enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
-        #     enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True, final = True)
-        # if cfg.k_hop == 4:
-        #     enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
-        #     enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
-        #     enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
-        #     enc_h = self.GraphEmbedding3(heterogeneous_edges, enc_h, mini_batch=True, final = True)
-        # if cfg.k_hop == 5:
-        #     enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
-        #     enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
-        #     enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
-        #     enc_h = self.GraphEmbedding3(heterogeneous_edges, enc_h, mini_batch=True)
-        #     enc_h = self.GraphEmbedding4(heterogeneous_edges, enc_h, mini_batch=True, final = True)
-        # if cfg.k_hop == 6:
-        #     enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
-        #     enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
-        #     enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
-        #     enc_h = self.GraphEmbedding3(heterogeneous_edges, enc_h, mini_batch=True)
-        #     enc_h = self.GraphEmbedding4(heterogeneous_edges, enc_h, mini_batch=True)
-        #     enc_h = self.GraphEmbedding5(heterogeneous_edges, enc_h, mini_batch=True, final = True)
-        #
-        # if cfg.k_hop == 7:
-        #     enc_h = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
-        #     enc_h = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True)
-        #     enc_h = self.GraphEmbedding2(heterogeneous_edges, enc_h, mini_batch=True)
-        #     enc_h = self.GraphEmbedding3(heterogeneous_edges, enc_h, mini_batch=True)
-        #     enc_h = self.GraphEmbedding4(heterogeneous_edges, enc_h, mini_batch=True)
-        #     enc_h = self.GraphEmbedding5(heterogeneous_edges, enc_h, mini_batch=True)
-        #     enc_h = self.GraphEmbedding6(heterogeneous_edges, enc_h, mini_batch=True, final = True)
 
         embed = enc_h.size(2)
         h = enc_h.mean(dim = 1).unsqueeze(0) # 모든 node embedding에 대해서(element wise) 평균을 낸다.
@@ -273,11 +319,17 @@ class PtrNet1(nn.Module):
         copied_mask2 = deepcopy(mask)
         copied_mask3 = deepcopy(mask)
         copied_mask4 = deepcopy(mask)
+        tighter_list = deepcopy(mask)
+        secondary_tighter_list = deepcopy(mask)
+        looser_list= deepcopy(mask)
+        most_looser_list = deepcopy(mask)
         avail_nodes = np.array(available_operations)
         avail_nodes_indices = np.where(avail_nodes == 1)[0].tolist() # 현재 시점에 가능한 operation들의 모임이다.
-        #print(avail_nodes_indices)
-        critical_path_list, critical_path_ij_list = scheduler.get_critical_path()
-
+        critical_path_list, critical_path_ij_list, critical_path_list2, critical_path_ij_list2, critical_path_list3, critical_path_list4 = scheduler.get_critical_path()
+        tighter_list[avail_nodes_indices] = critical_path_list2
+        looser_list[avail_nodes_indices] = critical_path_ij_list2
+        most_looser_list[avail_nodes_indices] = critical_path_list3
+        secondary_tighter_list[avail_nodes_indices] = critical_path_list4
         if np.max(critical_path_list)>0:
             copied_mask[avail_nodes_indices] = critical_path_list
             copied_mask = copied_mask/np.max(critical_path_list)
@@ -288,11 +340,11 @@ class PtrNet1(nn.Module):
 
         copied_mask3[avail_nodes_indices] = critical_path_list
         copied_mask4[avail_nodes_indices] = critical_path_ij_list
-
-        return mask, copied_mask, copied_mask2, copied_mask3, copied_mask4
+        return mask, copied_mask, copied_mask2, copied_mask3, copied_mask4, tighter_list, looser_list, most_looser_list, secondary_tighter_list
 
 ####
     def forward(self, x, device, scheduler_list, num_job, num_machine, upperbound= None, old_sequence = None):
+
         node_features, heterogeneous_edges = x
         node_features = torch.tensor(node_features).to(device).float()
         pi_list, log_ps = [], []
@@ -320,7 +372,8 @@ class PtrNet1(nn.Module):
         if old_sequence != None:
             old_sequence = torch.tensor(old_sequence).long().to(device)
         next_operation_indices = list()
-        lowerbound_records = [[],[]]
+        lb_records = [[],[],[],[],[],[]]
+
         for i in range(num_operations):
             #print(mask2_debug[0][0])
             est_placeholder = mask1_debug.clone().to(device)
@@ -339,8 +392,18 @@ class PtrNet1(nn.Module):
                 
                 """
                 cp_list = []
+                tighter_list = []
+                most_looser_list = []
+                looser_list = []
+                est_list = []
+                fin_list = []
+                secondary_tighter_list = []
                 for nb in range(batch_size):
-                    scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb])
+                    c_max, est, fin = scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb])
+                    #print(est.shape)
+                    est_list.append(est.reshape(-1).tolist())
+                    fin_list.append(fin.reshape(-1).tolist())
+
                     if self.params['third_feature'] == "no_state":
                         pass
                     #self.get_critical_check(scheduler_list[nb],  mask1_debug[nb,:].cpu().numpy())
@@ -352,15 +415,16 @@ class PtrNet1(nn.Module):
                         모두 다 masking 처리할 수도 있으므로, 모두다 masking 할 경우에는 mask로 복원 (if 1 not in mask)
 
                         """
-                        mask, critical_path, critical_path2, cp, cp2 = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub) # 안중요
+                        mask, critical_path, critical_path2, cp, cp2, tighter, looser, most_looser, secondary_tighter = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), nb, upperbound = ub) # 안중요
 
                         empty_zero[nb, :] = torch.tensor(critical_path).to(device)# 안중요
                         empty_zero2[nb, :] = torch.tensor(critical_path2).to(device)  # 안중요
-                        #cp_list.append(cp)
-                        # if 1 not in mask:
-                        #     pass
-                        # else:
-                        #     mask1_debug[nb, :] = torch.tensor(mask).to(device)
+
+                        tighter_list.append(tighter)
+                        looser_list.append(looser)
+                        most_looser_list.append(most_looser)
+                        secondary_tighter_list.append(secondary_tighter)
+
 
             else:
                 """
@@ -371,18 +435,32 @@ class PtrNet1(nn.Module):
 
                 """
                 cp_list = []
+                tighter_list = []
+                looser_list = []
+                est_list = []
+                fin_list = []
+                most_looser_list = []
+                secondary_tighter_list = []
                 for nb in range(batch_size):
                     k = next_operation_index[nb].item()
                     #scheduler_list[nb].add_selected_operation(k) # 그림으로 설명 예정# 안중요
                     next_b = next_job[nb].item()
-                    scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb], i = next_b) # next_b는 이전 스텝에서 선택된 Job이고, Adaptive Run이라는 것은 선택된 Job에 따라 update한 다음에 EST, EFIN을 구하라는 의미
+                    c_max, est, fin = scheduler_list[nb].adaptive_run(est_placeholder[nb], fin_placeholder[nb], i = next_b) # next_b는 이전 스텝에서 선택된 Job이고, Adaptive Run이라는 것은 선택된 Job에 따라 update한 다음에 EST, EFIN을 구하라는 의미
+                    est_list.append(est.reshape(-1).tolist())
+                    fin_list.append(fin.reshape(-1).tolist())
+
                     if self.params['third_feature'] == "no_state":
                         pass
                     elif (self.params['third_feature'] == "first_and_second") or\
                         (self.params['third_feature'] == "second_only"):
                         ub = upperbound[nb]
-                        mask, critical_path, critical_path2, cp, cp2 = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), i, upperbound = ub)
-                        #print(num_operations, i, "--------------------------------------------------")
+                        mask, critical_path, critical_path2, cp, cp2, tighter, looser, most_looser, secondary_tighter = self.branch_and_cut_masking(scheduler_list[nb], mask1_debug[nb,:].cpu().numpy(), nb, upperbound = ub)
+
+                        tighter_list.append(tighter)
+                        looser_list.append(looser)
+                        most_looser_list.append(most_looser)
+                        secondary_tighter_list.append(secondary_tighter)
+
                         empty_zero[nb, :]  = torch.tensor(critical_path).to(device)
                         empty_zero2[nb, :] = torch.tensor(critical_path2).to(device)  # 안중요
                         """
@@ -403,6 +481,9 @@ class PtrNet1(nn.Module):
                 ref = h_bar
             elif self.params['third_feature'] == "first_and_second":
                 if self.params['ex_embedding'] == True:
+
+                    #print(est_placeholder)
+
                     r_temp = torch.concat([est_placeholder, fin_placeholder,empty_zero, empty_zero2], dim=2)  # extended node embedding을 만드는 부분(z_t_i에 해당)
                     r_temp = r_temp.reshape(batch_size*num_operations, -1)
                     ex_embedding = self.ex_embedding(r_temp)
@@ -449,18 +530,35 @@ class PtrNet1(nn.Module):
                 next_operation_index = self.job_selecter(log_p)
             else:
                 next_operation_index = old_sequence[i, :]
-            #print(log_p.gather(1, next_operation_index.unsqueeze(1)).shape)
-            #print(log_p.shape, next_operation_index.unsqueeze(1).shape)
+            tighter_list = torch.tensor(tighter_list).to(device)
+            looser_list = torch.tensor(looser_list).to(device)
 
-            #print(empty_zero.squeeze(2).gather(1, next_operation_index.unsqueeze(1)).shape)
-            #print(i, cp_list.to(device).gather(1, next_operation_index.unsqueeze(1)))
-            #print(cp_list.shape, log_p.shape)
-            #print(cp_list.to(device).gather(1, next_operation_index.unsqueeze(1)).shape)
-            #lowerbound_records[0] = lowerbound_records[0] + cp_list.to(device).gather(1, next_operation_index.unsqueeze(1))[0,:].reshape(-1).tolist()
-            #lowerbound_records[1] = lowerbound_records[1] + log_p.gather(1, next_operation_index.unsqueeze(1)).exp()[0,:].reshape(-1).tolist()
-            #print()
-            #lowerbound_records[0] = lowerbound_records[0] + cp_list[0,:].reshape(-1).tolist()
-            #lowerbound_records[1] = lowerbound_records[1] + log_p[0,:].exp().reshape(-1).tolist()
+            est_list = torch.tensor(est_list).to(device)
+            fin_list = torch.tensor(fin_list).to(device)
+            most_looser_list = torch.tensor(most_looser_list).to(device)
+            secondary_tighter_list = torch.tensor(secondary_tighter_list).to(device)
+
+            batch_indices = torch.arange(next_operation_index.size(0))
+
+            selected_tighter_values = tighter_list[batch_indices, next_operation_index]
+            selected_looser_values = looser_list[batch_indices, next_operation_index]
+            selected_est_values = est_list[batch_indices, next_operation_index]
+            selected_fin_values = fin_list[batch_indices, next_operation_index]
+            selected_most_looser_values=most_looser_list[batch_indices, next_operation_index]
+            selected_secondary_tighter_values = secondary_tighter_list[batch_indices, next_operation_index]
+
+            lb_records[0].append(selected_est_values.tolist())
+            lb_records[1].append(selected_fin_values.tolist())
+            lb_records[2].append(selected_most_looser_values.tolist())
+            lb_records[3].append(selected_looser_values.tolist())
+            lb_records[4].append(selected_secondary_tighter_values.tolist())
+            lb_records[5].append(selected_tighter_values.tolist())
+
+
+
+
+
+
 
 
             log_probabilities.append(log_p.gather(1, next_operation_index.unsqueeze(1)))
@@ -471,8 +569,114 @@ class PtrNet1(nn.Module):
             next_operation_indices.append(next_operation_index.tolist())
             pi_list.append(next_job)
 
-
-
+        self.lb_records[0].append(lb_records[0])
+        self.lb_records[1].append(lb_records[1])
+        self.lb_records[2].append(lb_records[2])
+        self.lb_records[3].append(lb_records[3])
+        self.lb_records[4].append(lb_records[4])
+        self.lb_records[5].append(lb_records[5])
+        makespans = []
+        for nb in range(batch_size):
+            next_b = next_job[nb].item()
+            c_max = scheduler_list[nb].adaptive_run2(i=next_b)  # next_b는 이전 스텝에서 선택된 Job이고, Adaptive Run이라는 것은 선택된 Job에 따라 update한 다음에 EST, EFIN을 구하라는 의미
+            makespans.append(c_max)
+        self.makespan_records.append(makespans)
+        # import matplotlib.pyplot as plt
+        # import numpy as np
+        #
+        #
+        # p_v_given_l0 = calculate_p_v_given_l(self.lb_records[0], self.makespan_records)
+        # p_v_given_l1 = calculate_p_v_given_l(self.lb_records[1], self.makespan_records)
+        # p_v_given_l2 = calculate_p_v_given_l(self.lb_records[2], self.makespan_records)
+        # p_v_given_l3 = calculate_p_v_given_l(self.lb_records[3], self.makespan_records)
+        # p_v_given_l4 = calculate_p_v_given_l(self.lb_records[4], self.makespan_records)
+        # p_v_given_l5 = calculate_p_v_given_l(self.lb_records[5], self.makespan_records)
+        # #print(p_v_given_l0)
+        # probs_list = [
+        # calculate_probabilities(self.lb_records[0]),
+        # calculate_probabilities(self.lb_records[1]),
+        # calculate_probabilities(self.lb_records[2]),
+        # calculate_probabilities(self.lb_records[3]),
+        #     calculate_probabilities(self.lb_records[4]),
+        #     calculate_probabilities(self.lb_records[5])
+        # ]
+        #
+        #
+        # plt.rcParams['font.family'] = 'Times New Roman'
+        # fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+        # fig.suptitle(f'Distribution for fixed v', fontsize=16, y=1.05)
+        #
+        # colors = [
+        #     '#FF9999',  # 연한 빨강/분홍
+        #     '#FFB366',  # 연한 주황
+        #     '#FFFF99',  # 연한 노랑
+        #     '#90EE90',  # 연한 초록
+        #     '#99CCFF',  # 연한 파랑
+        #     '#CC99FF'  # 연한 보라
+        # ]
+        # labels = ['Lower Bound 1', 'Lower Bound 2', 'Lower Bound 3', 'Lower Bound 4', 'Lower Bound 5', 'Lower Bound 6']
+        #
+        # distributions = [p_v_given_l0, p_v_given_l1, p_v_given_l2, p_v_given_l3, p_v_given_l4, p_v_given_l5]
+        # # print(self.lb_records[0])
+        # # print(p_v_given_l0)
+        # # print(probs_list)
+        #
+        # # 모든 v값들 수집
+        # all_v = set()
+        # for l_dict in distributions[0].values():
+        #     all_v.update(l_dict.keys())
+        # v_values = sorted(list(all_v))
+        # entropy_list = []
+        # for idx, (ax, p_v_given_l) in enumerate(zip(axes.flat, distributions)):
+        #     entropy = 0
+        #     for selected_v in v_values:
+        #         l_values = []
+        #         probs = []
+        #         l_probs = []
+        #
+        #         for l in p_v_given_l.keys():
+        #             if selected_v in p_v_given_l[l]:
+        #                 l_values.append(l)
+        #                 probs.append(p_v_given_l[l][selected_v])
+        #                 l_probs.append(probs_list[idx][l])
+        #         probs_array = np.array([p for p in probs])
+        #
+        #         entropy -= np.sum(l_probs*probs_array * np.log(probs_array ))
+        #     entropy_list.append(entropy)
+        #
+        # # x축 범위 계산 (모든 l값들 수집)
+        # selected_v = v_values[0]
+        # all_l = set()
+        # for dist in distributions:
+        #     all_l.update(dist.keys())
+        # x_min, x_max = min(all_l), max(all_l)
+        #
+        # for idx, (ax, p_v_given_l) in enumerate(zip(axes.flat, distributions)):
+        #     l_values = []
+        #     probs = []
+        #     # 각 l에 대해 selected_v의 확률 추출
+        #     for l in p_v_given_l.keys():
+        #         if selected_v in p_v_given_l[l]:
+        #             l_values.append(l)
+        #             probs.append(p_v_given_l[l][selected_v])
+        #     ax.bar(l_values, probs, color=colors[idx], alpha=0.8,
+        #                edgecolor='black', linewidth=0.3, width=5)  # width 조정으로 막대 두께 변경
+        #     probs_array = np.array([p for p in probs if p > 0])
+        #     #print(entropy_list)
+        #     entropy = entropy_list[idx]
+        #
+        #
+        #     ax.set_title(f'{labels[idx]}\nConditional Entropy: {entropy:.3f}', y=1.05)
+        #     ax.set_xlabel('Lower bound value ($l$)', labelpad=10)
+        #     ax.set_ylabel('$P(v|l)$', labelpad=10)
+        #     ax.grid(True, alpha=0.3)
+        #     ax.tick_params(axis='both', labelsize=10)
+        #
+        #     # x축 범위 설정
+        #     ax.set_xlim(0, 500)
+        #
+        # plt.tight_layout()
+        # plt.savefig('entropy.png', dpi = 500)
         pi = torch.stack(pi_list, dim=1)
         log_probabilities = torch.stack(log_probabilities, dim=1)
         ll = log_probabilities.sum(dim=1)    # 각 solution element의 log probability를 더하는 방식
