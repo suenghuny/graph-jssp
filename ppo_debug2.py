@@ -192,8 +192,8 @@ def train_model(params, log_path=None):
                     mean_m = mean_m.transpose()
                     min_m.columns = problem_list
                     mean_m.columns = problem_list
-                    min_m.to_csv('min_makespan_w_third_feature333.csv')
-                    mean_m.to_csv('mean_makespan_w_third_feature333.csv')
+                    min_m.to_csv('min_makespan_w_third_feature_gcrn.csv')
+                    mean_m.to_csv('mean_makespan_w_third_feature_gcrn.csv')
 
         act_model.block_indices = []
         baseline_model.block_indices = []
