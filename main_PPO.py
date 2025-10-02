@@ -229,68 +229,111 @@ def train_model(params, selected_param, log_path=None):
         b += 1
 
         if s % 100 == 1:  # Evaluation 수행
+            if cfg.algo == 'reinforce':
+                for p in problem_list:
 
+                    eval_number = 1
+                    with torch.no_grad():
+                        min_makespan1, mean_makespan1 = evaluation(act_model, baseline_model, p, eval_number, device)
+                    min_makespan = min_makespan1
+                    mean_makespan = mean_makespan1
+                    if p == 1:
+                        mean_makespan71 = mean_makespan1
+                        min_makespan71 = min_makespan1
+                    else:
+                        mean_makespan72 = mean_makespan1
+                        min_makespan72 = min_makespan1
 
+                    print("TA{}".format(problem_list[p - 1]), min_makespan, mean_makespan)
+                    empty_records[p - 1].append(mean_makespan)
+                    #
+                    # if len(empty_records[1]) > 35 and np.mean(empty_records[1][-30:]) >= 3300:
+                    #     sys.exit()
 
-            for p in problem_list:
-                eval_number = 1
-                with torch.no_grad():
-                    min_makespan1, mean_makespan1 = evaluation(act_model, baseline_model, p, eval_number, device)
+                    if cfg.vessl == True:
+                        vessl.log(step=s, payload={'minmakespan{}'.format(str(problem_list[p - 1])): min_makespan})
+                        vessl.log(step=s, payload={'meanmakespan{}'.format(str(problem_list[p - 1])): mean_makespan})
+                    else:
+                        validation_records_min[p - 1].append(min_makespan)
+                        validation_records_mean[p - 1].append(mean_makespan)
+                        min_m = pd.DataFrame(validation_records_min)
+                        mean_m = pd.DataFrame(validation_records_mean)
+                        min_m = min_m.transpose()
+                        mean_m = mean_m.transpose()
+                        min_m.columns = problem_list
+                        mean_m.columns = problem_list
 
+                        t1 = time()
 
-
-                min_makespan = min_makespan1
-                mean_makespan = mean_makespan1
-                if p == 1:
-                    mean_makespan71 = mean_makespan1
-                    min_makespan71 = min_makespan1
-                else:
-                    mean_makespan72 = mean_makespan1
-                    min_makespan72 = min_makespan1
-
-                print("TA{}".format(problem_list[p - 1]), min_makespan, mean_makespan)
-                empty_records[p - 1].append(mean_makespan)
-                #
-                # if len(empty_records[1]) > 35 and np.mean(empty_records[1][-30:]) >= 3300:
-                #     sys.exit()
-
-                if cfg.vessl == True:
-                    vessl.log(step=s, payload={'minmakespan{}'.format(str(problem_list[p - 1])): min_makespan})
-                    vessl.log(step=s, payload={'meanmakespan{}'.format(str(problem_list[p - 1])): mean_makespan})
-                else:
-                    validation_records_min[p - 1].append(min_makespan)
-                    validation_records_mean[p - 1].append(mean_makespan)
-                    min_m = pd.DataFrame(validation_records_min)
-                    mean_m = pd.DataFrame(validation_records_mean)
-                    min_m = min_m.transpose()
-                    mean_m = mean_m.transpose()
-                    min_m.columns = problem_list
-                    mean_m.columns = problem_list
-
-
-                    t1 = time()
-
-                    if cfg.algo =='reinforce':
                         if params['w_representation_learning'] == True:
                             min_m.to_csv('w_rep_min_makespan_{}.csv'.format(selected_param))
                             mean_m.to_csv('w_rep_mean_makespan_{}.csv'.format(selected_param))
                         else:
                             min_m.to_csv('wo_rep_min_makespan_{}.csv'.format(selected_param))
                             mean_m.to_csv('wo_rep_mean_makespan_{}.csv'.format(selected_param))
-                    elif cfg.algo == 'rep_learning':
 
-                        min_m.to_csv('seperation_s_latent_{}_rep_min_makespan_{}.csv'.format(selected_param, s_latent))
-                        mean_m.to_csv('seperation_s_latent_{}_rep_mean_makespan_{}.csv'.format(selected_param, s_latent))
 
-            wandb.log({
-                "episode": s,
-                "71 mean_makespan": mean_makespan71,
-                "72 mean_makespan": mean_makespan72,
-                "71 min_makespan": min_makespan71,
-                "72 min_makespan": min_makespan72,
+                wandb.log({
+                    "episode": s,
+                    "71 mean_makespan": mean_makespan71,
+                    "72 mean_makespan": mean_makespan72,
+                    "71 min_makespan": min_makespan71,
+                    "72 min_makespan": min_makespan72,
 
-            })
-            print(s, "save")
+                })
+                print(s, "save")
+            elif cfg.algo == 'rep_learning':
+                if s <= s_latent:
+                    pass
+                else:
+                    for p in problem_list:
+
+                        eval_number = 1
+                        with torch.no_grad():
+                            min_makespan1, mean_makespan1 = evaluation(act_model, baseline_model, p, eval_number, device)
+                        min_makespan = min_makespan1
+                        mean_makespan = mean_makespan1
+                        if p == 1:
+                            mean_makespan71 = mean_makespan1
+                            min_makespan71 = min_makespan1
+                        else:
+                            mean_makespan72 = mean_makespan1
+                            min_makespan72 = min_makespan1
+
+                        print("TA{}".format(problem_list[p - 1]), min_makespan, mean_makespan)
+                        empty_records[p - 1].append(mean_makespan)
+                        #
+                        # if len(empty_records[1]) > 35 and np.mean(empty_records[1][-30:]) >= 3300:
+                        #     sys.exit()
+
+                        if cfg.vessl == True:
+                            vessl.log(step=s, payload={'minmakespan{}'.format(str(problem_list[p - 1])): min_makespan})
+                            vessl.log(step=s, payload={'meanmakespan{}'.format(str(problem_list[p - 1])): mean_makespan})
+                        else:
+                            validation_records_min[p - 1].append(min_makespan)
+                            validation_records_mean[p - 1].append(mean_makespan)
+                            min_m = pd.DataFrame(validation_records_min)
+                            mean_m = pd.DataFrame(validation_records_mean)
+                            min_m = min_m.transpose()
+                            mean_m = mean_m.transpose()
+                            min_m.columns = problem_list
+                            mean_m.columns = problem_list
+
+
+                            t1 = time()
+
+                            min_m.to_csv('seperation_s_latent_{}_rep_min_makespan_{}.csv'.format(selected_param, s_latent))
+                            mean_m.to_csv('seperation_s_latent_{}_rep_mean_makespan_{}.csv'.format(selected_param, s_latent))
+
+                    wandb.log({
+                        "episode": s-s_latent,
+                        "71 mean_makespan": mean_makespan71,
+                        "72 mean_makespan": mean_makespan72,
+                        "71 min_makespan": min_makespan71,
+                        "72 min_makespan": min_makespan72,
+
+                    })
+                    print(s, "save")
             if cfg.algo == 'reinforce':
                 if params['w_representation_learning'] == True:
                     torch.save({'epoch': s,
