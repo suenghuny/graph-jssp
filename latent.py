@@ -310,8 +310,8 @@ class LatentModel(nn.Module):
         X = X.to(device)[:, :-2, :]
         edge_cats = edge_cats.to(device)[:, :-2, :-2, :]
         z_mean_pri, z_std_pri = self.sample_prior(mean_feature)
-        #print(mean_feature.shape)
-        #print(mean_feature[0][252])
+
+
         z_mean_post, z_std_post, z = self.sample_posterior(mean_feature) # q(|G
         loss_kld = calculate_kl_divergence(z_mean_post, z_std_post, z_mean_pri, z_std_pri).mean(dim=0).sum()
         if train == True:
