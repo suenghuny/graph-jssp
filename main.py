@@ -165,6 +165,9 @@ if __name__ == '__main__':
              }
 
     selected_param = str(os.environ.get("selected_param", "param2"))
+    aggr= str(os.environ.get("aggr", "mean"))
+    s_latent = int(os.environ.get("s_latent", 40000))
+
     param_group = {
                    "param0": param0,
                    "param1": param1,
@@ -177,7 +180,10 @@ if __name__ == '__main__':
     print("입력된 파라미터 :", selected_param)
     param = param_group[selected_param]
 
+
     params = {
+        's_latent':s_latent,
+        'aggr':aggr,
         "num_of_process": 6,
         "step": cfg.step,
         "log_step": cfg.log_step,

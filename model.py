@@ -288,7 +288,7 @@ class NodeEmbedding(nn.Module):
 #         return Z.view(batch_size, num_nodes, -1)
 
 class GCRN(nn.Module):
-    def __init__(self, feature_size, embedding_size, graph_embedding_size, layers, n_multi_head, num_edge_cat, alpha,  attention = False):
+    def __init__(self, feature_size, embedding_size, graph_embedding_size, layers, n_multi_head, num_edge_cat, alpha, aggr, attention = False):
         super(GCRN, self).__init__()
         #device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.num_edge_cat = num_edge_cat
@@ -310,7 +310,7 @@ class GCRN(nn.Module):
         self.a2 = [nn.Parameter(torch.Tensor(size=(self.n_multi_head * graph_embedding_size, 1))) for _ in range(self.num_edge_cat)]
         self.a2 = nn.ParameterList(self.a2)
         [nn.init.xavier_uniform_(self.a2[k].data, gain=1.414) for k in range(self.num_edge_cat)]
-
+        self.aggr = aggr
         self.m = [nn.ReLU() for _ in range(num_edge_cat)]
         self.leakyrelu = [nn.LeakyReLU() for _ in range(num_edge_cat)]
         self.Embedding1 = nn.Linear(self.n_multi_head*graph_embedding_size*num_edge_cat, feature_size, bias = False)
@@ -380,12 +380,18 @@ class GCRN(nn.Module):
             X = X.reshape(batch_size * num_nodes, -1)
             H = self.BN1((1 - self.alpha)*H + self.alpha*X)
 
-        #Z = self.Embedding2(H)
-        #Z = self.BN2(H + Z)
+        if self.aggr == 'mean':
+            Z = self.Embedding2(H)
+            Z = self.BN2(H + Z)
+            Z = Z.reshape(batch_size, num_nodes, -1)
+        else:
+            Z = self.Embedding2(H)
+            Z = Z.reshape(batch_size, num_nodes, -1)
+
 
         # 추가 수정 제안
 
-        Z = H.reshape(batch_size, num_nodes, -1)
+
         return Z, edge_cat_tensor
 
 

@@ -33,8 +33,10 @@ class Gaussian(nn.Module):
 
     def __init__(self, input_dim, output_dim, hidden_units=(256, 256)):
         super().__init__()
+
+
         self.net = build_mlp(
-            input_dim=input_dim*2,
+            input_dim=input_dim,
             output_dim=output_dim*2,
             hidden_units=hidden_units,
             hidden_activation=nn.LeakyReLU(0.2),
@@ -57,6 +59,7 @@ class Encoder(nn.Module):
 
         self.params = params
         self.k_hop = params["k_hop"]
+        self.aggr = params["aggr"]
         num_edge_cat = 3
 
         self.GraphEmbedding = GCRN(
@@ -66,7 +69,8 @@ class Encoder(nn.Module):
                                    layers =  params["layers"],
                                    alpha =  params["alpha"],
                                    n_multi_head = params["n_multi_head"],
-                                   num_edge_cat = num_edge_cat
+                                   num_edge_cat = num_edge_cat,
+                                   aggr=params["aggr"]
                                    ).to(device)
         self.GraphEmbedding1 = GCRN(feature_size =  params["n_hidden"],
                                    graph_embedding_size= params["graph_embedding_size"],
@@ -74,7 +78,9 @@ class Encoder(nn.Module):
                                     n_multi_head=params["n_multi_head"],
                                     layers =  params["layers"],
                                     alpha=params["alpha"],
-                                    num_edge_cat = num_edge_cat).to(device)
+                                    num_edge_cat = num_edge_cat,
+                                    aggr=params["aggr"]
+                                    ).to(device)
 
 
     def forward(self, node_features, heterogeneous_edges):
@@ -90,12 +96,20 @@ class Encoder(nn.Module):
             enc_h, edge_cats = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
             enc_h, edge_cats = self.GraphEmbedding1(heterogeneous_edges, enc_h, mini_batch=True, final = True)
 
-        #h = enc_h.mean(dim = 1) # 모든 node embedding에 대해서(element wise) 평균을 낸다.
+        if self.aggr == 'mean':
+            h_mean = enc_h.mean(dim=1)
+            h = h_mean
+        elif self.aggr == 'mean_max':
+            h_mean = enc_h.mean(dim=1)
+            h_max = enc_h.max(dim=1)[0]
+            h = torch.concat([h_mean, h_max], dim =1)
+        elif self.aggr == 'mean_max_std':
+            h_mean = enc_h.mean(dim=1)
+            h_max = enc_h.max(dim=1)[0]
+            h_std = enc_h.std(dim=1)
+            h = torch.concat([h_mean, h_max, h_std], dim=1)
 
-        h_mean = enc_h.mean(dim=1)
-        #h_max = enc_h.max(dim=1)[0]
-        h_std = enc_h.std(dim=1)
-        h = torch.cat([h_mean, h_std], dim=-1)
+            #
 
 
         enc_h = enc_h[:, :-2]                 # dummy node(source, sink)는 제외한다.
@@ -280,15 +294,23 @@ class LatentModel(nn.Module):
         # x = encoder(G)
         self.encoder = Encoder(params)
         # q(z | x)
+        if params['aggr']== 'mean':
+            aug_input_dim = z_dim
+        elif self.aggr == 'mean_max':
+            aug_input_dim = z_dim*2
+        elif self.aggr == 'mean_max_std':
+            aug_input_dim = z_dim * 3
+
+
+
         self.z_posterior = Gaussian(
-            params['n_hidden'],
+            aug_input_dim,
             z_dim,
             hidden_units,
         )
         # p(G | z)
         self.decoder = GraphVAEDecoder(z_dim, edge_types=3, node_types=6, hidden_dims=[128, 256, 512]
         )
-        #self.apply(initialize_weight)
 
 
     def sample_prior(self, x):

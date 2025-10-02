@@ -39,7 +39,7 @@ def get_cfg():
     parser.add_argument("--third_feature", type=bool, default=False, help="")
     parser.add_argument("--baseline_reset", type=bool, default=False, help="")
     parser.add_argument("--ex_embedding", type=bool, default=True, help="")
-    parser.add_argument("--algo", type=str, default='kkk', help="")
+    parser.add_argument("--algo", type=str, default='rep_learning', help="")
 
     return parser.parse_args()
 ##

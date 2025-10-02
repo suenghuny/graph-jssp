@@ -89,7 +89,7 @@ def heuristic_eval(p):  # 불필요(현재로써는)
     return makespan_heu
 
 
-def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=None):
+def evaluation(act_model, baseline_model, p, eval_number, device):
     scheduler_list_val = [AdaptiveScheduler(orb_list[p - 1]) for _ in range(eval_number)]
     val_makespan = list()
     act_model.get_jssp_instance(scheduler_list_val)
@@ -162,14 +162,17 @@ def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=Non
 
 def train_model(params, selected_param, log_path=None):
     wandb.login()
-    s_latent = int(os.environ.get("s_latent", 40000))
+    s_latent = params["s_latent"]
+    aggr = params['aggr']
+
+
     if cfg.algo == 'reinforce':
         if params["w_representation_learning"] == True:
-            wandb.init(project="Graph JSSP", name=selected_param + 'm_s_w_rep')
+            wandb.init(project="Graph JSSP", name=selected_param + 'w_rep_{}'.format(aggr))
         else:
-            wandb.init(project="Graph JSSP", name=selected_param + 'm_s_wo_rep')
-    else:
-        wandb.init(project="Graph JSSP", name=selected_param + 'm_s_s_latent_{}_wo_rep'.format(s_latent))
+            wandb.init(project="Graph JSSP", name=selected_param + 'wo_rep_{}'.format(aggr))
+    elif cfg.algo == 'rep_learning':
+        wandb.init(project="Graph JSSP", name=selected_param + 'seperation_s_latent_{}_{}'.format(s_latent, aggr))
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     date = datetime.now().strftime('%m%d_%H_%M')
     param_path = params["log_dir"] + '/ppo' + '/%s_%s_param.csv' % (date, "train")
@@ -230,12 +233,9 @@ def train_model(params, selected_param, log_path=None):
 
 
             for p in problem_list:
-                min_makespan = heuristic_eval(p)
                 eval_number = 1
                 with torch.no_grad():
-                    min_makespan_list = [min_makespan] * eval_number
-                    min_makespan1, mean_makespan1 = evaluation(act_model, baseline_model, p, eval_number, device,
-                                                               upperbound=min_makespan_list)
+                    min_makespan1, mean_makespan1 = evaluation(act_model, baseline_model, p, eval_number, device)
 
 
 
@@ -272,15 +272,15 @@ def train_model(params, selected_param, log_path=None):
 
                     if cfg.algo =='reinforce':
                         if params['w_representation_learning'] == True:
-                            min_m.to_csv('multi_scaled2_w_rep_min_makespan_{}.csv'.format(selected_param))
-                            mean_m.to_csv('multi_scaled2_w_rep_mean_makespan_{}.csv'.format(selected_param))
+                            min_m.to_csv('w_rep_min_makespan_{}.csv'.format(selected_param))
+                            mean_m.to_csv('w_rep_mean_makespan_{}.csv'.format(selected_param))
                         else:
-                            min_m.to_csv('multi_scaled2_wo_rep_min_makespan_{}.csv'.format(selected_param))
-                            mean_m.to_csv('multi_scaled2_wo_rep_mean_makespan_{}.csv'.format(selected_param))
-                    else:
+                            min_m.to_csv('wo_rep_min_makespan_{}.csv'.format(selected_param))
+                            mean_m.to_csv('wo_rep_mean_makespan_{}.csv'.format(selected_param))
+                    elif cfg.algo == 'rep_learning':
 
-                        min_m.to_csv('multi_scaled2_s_latent_{}_rep_min_makespan_{}.csv'.format(selected_param, s_latent))
-                        mean_m.to_csv('multi_scaled2_s_latent_{}_rep_mean_makespan_{}.csv'.format(selected_param, s_latent))
+                        min_m.to_csv('seperation_s_latent_{}_rep_min_makespan_{}.csv'.format(selected_param, s_latent))
+                        mean_m.to_csv('seperation_s_latent_{}_rep_mean_makespan_{}.csv'.format(selected_param, s_latent))
 
             wandb.log({
                 "episode": s,
@@ -299,7 +299,7 @@ def train_model(params, selected_param, log_path=None):
                                 'ave_act_loss': ave_act_loss,
                                 'ave_cri_loss': 0,
                                 'ave_makespan': ave_makespan},
-                               params["model_dir"] + '/multi_scaled2_w_rep_{}_step_{}_mean_makespan_{}.pt'.format(selected_param, s, mean_makespan72))
+                               params["model_dir"] + '/w_rep_{}_step_{}_mean_makespan_{}.pt'.format(selected_param, s, mean_makespan72))
                 else:
                     torch.save({'epoch': s,
                                 'model_state_dict_actor': act_model.state_dict(),
@@ -307,8 +307,8 @@ def train_model(params, selected_param, log_path=None):
                                 'ave_act_loss': ave_act_loss,
                                 'ave_cri_loss': 0,
                                 'ave_makespan': ave_makespan},
-                               params["model_dir"] + '/multi_scaled2_wo_rep_{}_step_{}_mean_makespan_{}.pt'.format(selected_param, s, mean_makespan72))
-            else:
+                               params["model_dir"] + '/wo_rep_{}_step_{}_mean_makespan_{}.pt'.format(selected_param, s, mean_makespan72))
+            elif cfg.algo == 'rep_learning':
                 torch.save({'epoch': s,
                             'model_state_dict_actor': act_model.state_dict(),
                             'optimizer_state_dict_actor': act_optim.state_dict(),
@@ -316,7 +316,7 @@ def train_model(params, selected_param, log_path=None):
                             'ave_cri_loss': 0,
                             'ave_makespan': ave_makespan},
 
-                params["model_dir"] + '/multi_scaled2_after_rep_{}_{}_step_{}_mean_makespan_{}.pt'.format(s_latent, selected_param, s,
+                params["model_dir"] + '/seperationf_after_rep_{}_{}_step_{}_mean_makespan_{}.pt'.format(s_latent, selected_param, s,
                                                                                       mean_makespan72))
 
 
@@ -441,7 +441,7 @@ def train_model(params, selected_param, log_path=None):
                     print('without representation learning step:%d/%d, actic loss:%1.3f, crictic loss:%1.3f, L:%1.3f, %dmin%dsec' % (
                     s, params["step"], ave_act_loss / ((s + 1) * params["iteration"]),
                     ave_cri_loss / ((s + 1) * params["iteration"]), ave_makespan, (t2 - t1) // 60, (t2 - t1) % 60))
-        else:
+        elif cfg.algo == 'rep_learning':
             if s <=s_latent:
                 edge_loss, node_loss, loss_kld = act_model.forward_latent(input_data,
                                                 device,
@@ -578,12 +578,9 @@ def test_model(params, selected_param, log_path=None):
 
 
             for p in problem_list:
-                min_makespan = heuristic_eval(p)
-                eval_number = 5
+                eval_number =1
                 with torch.no_grad():
-                    min_makespan_list = [min_makespan] * eval_number
-                    min_makespan1, mean_makespan1 = evaluation(act_model, baseline_model, p, eval_number, device,
-                                                               upperbound=min_makespan_list)
+                    min_makespan1, mean_makespan1 = evaluation(act_model, baseline_model, p, eval_number, device)
 
 
 
@@ -619,18 +616,14 @@ def test_model(params, selected_param, log_path=None):
                     t1 = time()
                     if cfg.algo =='reinforce':
                         if params['w_representation_learning'] == True:
-                            min_m.to_csv('multi_scaled2_w_rep_min_makespan_{}.csv'.format(selected_param))
-                            mean_m.to_csv('multi_scaled2_w_rep_mean_makespan_{}.csv'.format(selected_param))
+                            min_m.to_csv('w_rep_min_makespan_{}.csv'.format(selected_param))
+                            mean_m.to_csv('w_rep_mean_makespan_{}.csv'.format(selected_param))
                         else:
-                            min_m.to_csv('multi_scaled2_wo_rep_min_makespan_{}.csv'.format(selected_param))
-                            mean_m.to_csv('multi_scaled2_wo_rep_mean_makespan_{}.csv'.format(selected_param))
-                    else:
-                        if params['w_representation_learning'] == True:
-                            min_m.to_csv('multi_scaled2_rep_min_makespan_{}.csv'.format(selected_param))
-                            mean_m.to_csv('multi_scaled2_rep_mean_makespan_{}.csv'.format(selected_param))
-                        else:
-                            min_m.to_csv('multi_scaled2_wo_rep_min_makespan_{}.csv'.format(selected_param))
-                            mean_m.to_csv('multi_scaled2_wo_rep_mean_makespan_{}.csv'.format(selected_param))
+                            min_m.to_csv('wo_rep_min_makespan_{}.csv'.format(selected_param))
+                            mean_m.to_csv('wo_rep_mean_makespan_{}.csv'.format(selected_param))
+                    elif cfg.algo == 'rep_learning':
+                        min_m.to_csv('seperation_rep_min_makespan_{}.csv'.format(selected_param))
+                        mean_m.to_csv('seperation_rep_mean_makespan_{}.csv'.format(selected_param))
             wandb.log({
                 "episode": s,
                 "71 mean_makespan": mean_makespan71,
