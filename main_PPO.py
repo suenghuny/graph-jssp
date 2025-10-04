@@ -368,13 +368,9 @@ def train_model(params, selected_param, log_path=None):
                             mean_m.columns = problem_list
 
                             t1 = time()
-
-                            if params['w_representation_learning'] == True:
-                                min_m.to_csv('w_rep_min_makespan_{}.csv'.format(selected_param))
-                                mean_m.to_csv('w_rep_mean_makespan_{}.csv'.format(selected_param))
-                            else:
-                                min_m.to_csv('wo_rep_min_makespan_{}.csv'.format(selected_param))
-                                mean_m.to_csv('wo_rep_mean_makespan_{}.csv'.format(selected_param))
+                            mean_m.to_csv('seperation_after_rep_{}_{}_step_{}_mean_makespan_{}.csv'.format(
+                                   s_latent, selected_param, s,
+                                   mean_makespan61))
 
                     wandb.log({
                         "episode": s,
@@ -391,7 +387,7 @@ def train_model(params, selected_param, log_path=None):
                                 'ave_cri_loss': 0,
                                 'ave_makespan': ave_makespan},
 
-                               params["model_dir"] + '/seperationf_after_rep_{}_{}_step_{}_mean_makespan_{}.pt'.format(
+                               params["model_dir"] + '/seperation_after_rep_{}_{}_step_{}_mean_makespan_{}.pt'.format(
                                    s_latent, selected_param, s,
                                    mean_makespan61))
 
