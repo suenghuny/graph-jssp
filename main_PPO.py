@@ -1,6 +1,6 @@
 import pandas as pd
 import torch
-#torch.autograd.set_detect_anomaly(True)
+# torch.autograd.set_detect_anomaly(True)
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
@@ -32,6 +32,7 @@ if cfg.vessl == True:
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
+
 def step_with_min(scheduler, optimizer, min_lr=1e-6):
     scheduler.step()
     for param_group in optimizer.param_groups:
@@ -53,8 +54,8 @@ def set_seed(seed):
 set_seed(int(os.environ.get("seed", 30)))  # 30 했었음
 opt_list = [1059, 888, 1005, 1005, 887, 1010, 397, 899, 934, 944]
 orb_list = []
-for i in ["61", "62"]:
-    df = pd.read_excel("ta.xlsx", sheet_name=i, engine='openpyxl')
+for i in ["ta61", "ta62", "dmu76", "dmu77"]:
+    df = pd.read_excel("eval_dataset.xlsx", sheet_name=i, engine='openpyxl')
     orb_data = list()  #
     for row, column in df.iterrows():
         job = []
@@ -112,18 +113,20 @@ def evaluation(act_model, baseline_model, p, eval_number, device):
     heterogeneous_edges = [heterogeneous_edges for _ in range(eval_number)]
     input_data = (node_feature, heterogeneous_edges)
     pred_seq, ll_old, _, _, _, _, _ = act_model(input_data,
-                                    device,
-                                    scheduler_list=scheduler_list_val,
-                                    num_machine=num_machine,
-                                    num_job=num_job,
-                                    train = False)
+                                                device,
+                                                scheduler_list=scheduler_list_val,
+                                                num_machine=num_machine,
+                                                num_job=num_job,
+                                                train=False)
     for sequence in pred_seq:
         scheduler = AdaptiveScheduler(orb_list[p - 1])
         makespan = scheduler.run(sequence.tolist())
         val_makespan.append(makespan)
     # print("크크크", val_makespan)
     return np.min(val_makespan), np.mean(val_makespan)
-#0628_20_59_step86000_act_w_rep
+
+
+# 0628_20_59_step86000_act_w_rep
 
 def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=None):
     scheduler_list_val = [AdaptiveScheduler(orb_list[p - 1]) for _ in range(eval_number)]
@@ -148,11 +151,11 @@ def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=Non
     heterogeneous_edges = [heterogeneous_edges for _ in range(eval_number)]
     input_data = (node_feature, heterogeneous_edges)
     pred_seq, ll_old, _, _, _, _, _ = act_model(input_data,
-                                    device,
-                                    scheduler_list=scheduler_list_val,
-                                    num_machine=num_machine,
-                                    num_job=num_job,
-                                    train = False)
+                                                device,
+                                                scheduler_list=scheduler_list_val,
+                                                num_machine=num_machine,
+                                                num_job=num_job,
+                                                train=False)
     for sequence in pred_seq:
         scheduler = AdaptiveScheduler(orb_list[p - 1])
         makespan = scheduler.run(sequence.tolist())
@@ -160,11 +163,11 @@ def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=Non
     # print("크크크", val_makespan)
     return np.min(val_makespan), np.mean(val_makespan)
 
+
 def train_model(params, selected_param, log_path=None):
     wandb.login()
     s_latent = params["s_latent"]
     aggr = params['aggr']
-
 
     if cfg.algo == 'reinforce':
         if params["w_representation_learning"] == True:
@@ -190,9 +193,12 @@ def train_model(params, selected_param, log_path=None):
     baseline_model.load_state_dict(act_model.state_dict())  # baseline_model 불필요
     if params["w_representation_learning"] == True:
         latent_optim = optim.Adam(act_model.Latent.parameters(), lr=params["lr_latent"])
-        act_optim = optim.Adam(list(act_model.all_attention_params) + list(act_model.critic.parameters()), lr=params["lr"])
-        act_lr_scheduler = optim.lr_scheduler.StepLR(act_optim, step_size=params["lr_decay_step"], gamma=params["lr_decay"])
-        latent_lr_scheduler = optim.lr_scheduler.StepLR(latent_optim, step_size=params["lr_decay_step"], gamma=params["lr_decay"])
+        act_optim = optim.Adam(list(act_model.all_attention_params) + list(act_model.critic.parameters()),
+                               lr=params["lr"])
+        act_lr_scheduler = optim.lr_scheduler.StepLR(act_optim, step_size=params["lr_decay_step"],
+                                                     gamma=params["lr_decay"])
+        latent_lr_scheduler = optim.lr_scheduler.StepLR(latent_optim, step_size=params["lr_decay_step"],
+                                                        gamma=params["lr_decay"])
         """
         act_model이라는 신경망 뭉치에 파라미터(가중치, 편향)을 업데이트 할꺼야.
 
@@ -200,7 +206,8 @@ def train_model(params, selected_param, log_path=None):
 
     else:
         act_optim = optim.Adam(act_model.parameters(), lr=params["lr"])
-        act_lr_scheduler = optim.lr_scheduler.StepLR(act_optim, step_size=params["lr_decay_step"], gamma=params["lr_decay"])
+        act_lr_scheduler = optim.lr_scheduler.StepLR(act_optim, step_size=params["lr_decay_step"],
+                                                     gamma=params["lr_decay"])
 
     # if params["is_lr_decay"]:
     #     act_lr_scheduler = optim.lr_scheduler.StepLR(act_optim, step_size=params["lr_decay_step"],
@@ -211,13 +218,12 @@ def train_model(params, selected_param, log_path=None):
 
     c_max = list()
     b = 0
-    problem_list = [1, 2]
+    problem_list = [1, 2, 3, 4]
     validation_records_min = [[] for _ in problem_list]
     validation_records_mean = [[] for _ in problem_list]
-    empty_records = [[], []]
+    empty_records = [[] for _ in problem_list]
 
     for s in range(epoch + 1, params["step"]):
-
 
         """
 
@@ -228,7 +234,7 @@ def train_model(params, selected_param, log_path=None):
         """
         b += 1
 
-        if s % 100 == 1:  # Evaluation 수행
+        if s % 200 == 1:  # Evaluation 수행
             if cfg.algo == 'reinforce':
                 for p in problem_list:
 
@@ -238,14 +244,26 @@ def train_model(params, selected_param, log_path=None):
                     min_makespan = min_makespan1
                     mean_makespan = mean_makespan1
                     if p == 1:
-                        mean_makespan71 = mean_makespan1
-                        min_makespan71 = min_makespan1
+                        mean_makespan61 = mean_makespan1
+                        min_makespan61 = min_makespan1
+                        print("TA61", min_makespan, mean_makespan)
+                        empty_records[p - 1].append(mean_makespan)
+                    elif p == 2:
+                        mean_makespan62 = mean_makespan1
+                        min_makespan62 = min_makespan1
+                        print("TA62", min_makespan, mean_makespan)
+                        empty_records[p - 1].append(mean_makespan)
+                    elif p == 3:
+                        mean_makespan76 = mean_makespan1
+                        min_makespan76 = min_makespan1
+                        print("DMU76", min_makespan, mean_makespan)
+                        empty_records[p - 1].append(mean_makespan)
                     else:
-                        mean_makespan72 = mean_makespan1
-                        min_makespan72 = min_makespan1
+                        mean_makespan77 = mean_makespan1
+                        min_makespan77 = min_makespan1
+                        print("DMU77", min_makespan, mean_makespan)
+                        empty_records[p - 1].append(mean_makespan)
 
-                    print("TA{}".format(problem_list[p - 1]), min_makespan, mean_makespan)
-                    empty_records[p - 1].append(mean_makespan)
                     #
                     # if len(empty_records[1]) > 35 and np.mean(empty_records[1][-30:]) >= 3300:
                     #     sys.exit()
@@ -272,14 +290,12 @@ def train_model(params, selected_param, log_path=None):
                             min_m.to_csv('wo_rep_min_makespan_{}.csv'.format(selected_param))
                             mean_m.to_csv('wo_rep_mean_makespan_{}.csv'.format(selected_param))
 
-
                 wandb.log({
                     "episode": s,
-                    "71 mean_makespan": mean_makespan71,
-                    "72 mean_makespan": mean_makespan72,
-                    "71 min_makespan": min_makespan71,
-                    "72 min_makespan": min_makespan72,
-
+                    "TA61 makespan": mean_makespan61,
+                    "TA62 makespan": mean_makespan62,
+                    "DMU76 makespan": mean_makespan76,
+                    "DMU77 makespan": mean_makespan77,
                 })
                 print(s, "save")
                 if params['w_representation_learning'] == True:
@@ -289,7 +305,8 @@ def train_model(params, selected_param, log_path=None):
                                 'ave_act_loss': ave_act_loss,
                                 'ave_cri_loss': 0,
                                 'ave_makespan': ave_makespan},
-                               params["model_dir"] + '/w_rep_{}_step_{}_mean_makespan_{}.pt'.format(selected_param, s, mean_makespan72))
+                               params["model_dir"] + '/w_rep_{}_step_{}_mean_makespan_{}.pt'.format(selected_param, s,
+                                                                                                    mean_makespan61))
                 else:
                     torch.save({'epoch': s,
                                 'model_state_dict_actor': act_model.state_dict(),
@@ -297,7 +314,8 @@ def train_model(params, selected_param, log_path=None):
                                 'ave_act_loss': ave_act_loss,
                                 'ave_cri_loss': 0,
                                 'ave_makespan': ave_makespan},
-                               params["model_dir"] + '/wo_rep_{}_step_{}_mean_makespan_{}.pt'.format(selected_param, s, mean_makespan72))
+                               params["model_dir"] + '/wo_rep_{}_step_{}_mean_makespan_{}.pt'.format(selected_param, s,
+                                                                                                     mean_makespan61))
             elif cfg.algo == 'rep_learning':
                 if s <= s_latent:
                     pass
@@ -306,25 +324,39 @@ def train_model(params, selected_param, log_path=None):
 
                         eval_number = 1
                         with torch.no_grad():
-                            min_makespan1, mean_makespan1 = evaluation(act_model, baseline_model, p, eval_number, device)
+                            min_makespan1, mean_makespan1 = evaluation(act_model, baseline_model, p, eval_number,
+                                                                       device)
                         min_makespan = min_makespan1
                         mean_makespan = mean_makespan1
                         if p == 1:
-                            mean_makespan71 = mean_makespan1
-                            min_makespan71 = min_makespan1
+                            mean_makespan61 = mean_makespan1
+                            min_makespan61 = min_makespan1
+                            print("TA61", min_makespan, mean_makespan)
+                            empty_records[p - 1].append(mean_makespan)
+                        elif p == 2:
+                            mean_makespan62 = mean_makespan1
+                            min_makespan62 = min_makespan1
+                            print("TA62", min_makespan, mean_makespan)
+                            empty_records[p - 1].append(mean_makespan)
+                        elif p == 3:
+                            mean_makespan76 = mean_makespan1
+                            min_makespan76 = min_makespan1
+                            print("DMU76", min_makespan, mean_makespan)
+                            empty_records[p - 1].append(mean_makespan)
                         else:
-                            mean_makespan72 = mean_makespan1
-                            min_makespan72 = min_makespan1
+                            mean_makespan77 = mean_makespan1
+                            min_makespan77 = min_makespan1
+                            print("DMU77", min_makespan, mean_makespan)
+                            empty_records[p - 1].append(mean_makespan)
 
-                        print("TA{}".format(problem_list[p - 1]), min_makespan, mean_makespan)
-                        empty_records[p - 1].append(mean_makespan)
                         #
                         # if len(empty_records[1]) > 35 and np.mean(empty_records[1][-30:]) >= 3300:
                         #     sys.exit()
 
                         if cfg.vessl == True:
                             vessl.log(step=s, payload={'minmakespan{}'.format(str(problem_list[p - 1])): min_makespan})
-                            vessl.log(step=s, payload={'meanmakespan{}'.format(str(problem_list[p - 1])): mean_makespan})
+                            vessl.log(step=s,
+                                      payload={'meanmakespan{}'.format(str(problem_list[p - 1])): mean_makespan})
                         else:
                             validation_records_min[p - 1].append(min_makespan)
                             validation_records_mean[p - 1].append(mean_makespan)
@@ -335,19 +367,21 @@ def train_model(params, selected_param, log_path=None):
                             min_m.columns = problem_list
                             mean_m.columns = problem_list
 
-
                             t1 = time()
 
-                            min_m.to_csv('seperation_s_latent_{}_rep_min_makespan_{}.csv'.format(selected_param, s_latent))
-                            mean_m.to_csv('seperation_s_latent_{}_rep_mean_makespan_{}.csv'.format(selected_param, s_latent))
+                            if params['w_representation_learning'] == True:
+                                min_m.to_csv('w_rep_min_makespan_{}.csv'.format(selected_param))
+                                mean_m.to_csv('w_rep_mean_makespan_{}.csv'.format(selected_param))
+                            else:
+                                min_m.to_csv('wo_rep_min_makespan_{}.csv'.format(selected_param))
+                                mean_m.to_csv('wo_rep_mean_makespan_{}.csv'.format(selected_param))
 
                     wandb.log({
-                        "episode": s-s_latent,
-                        "71 mean_makespan": mean_makespan71,
-                        "72 mean_makespan": mean_makespan72,
-                        "71 min_makespan": min_makespan71,
-                        "72 min_makespan": min_makespan72,
-
+                        "episode": s,
+                        "TA61 makespan": mean_makespan61,
+                        "TA62 makespan": mean_makespan62,
+                        "DMU76 makespan": mean_makespan76,
+                        "DMU77 makespan": mean_makespan77,
                     })
                     print(s, "save")
                     torch.save({'epoch': s,
@@ -359,9 +393,7 @@ def train_model(params, selected_param, log_path=None):
 
                                params["model_dir"] + '/seperationf_after_rep_{}_{}_step_{}_mean_makespan_{}.pt'.format(
                                    s_latent, selected_param, s,
-                                   mean_makespan72))
-
-
+                                   mean_makespan61))
 
         act_model.block_indices = []
         baseline_model.block_indices = []
@@ -373,12 +405,11 @@ def train_model(params, selected_param, log_path=None):
             num_machine = np.random.randint(5, 10)
             num_job = np.random.randint(num_machine, 10)
 
-
             jobs_datas, scheduler_list = generate_jssp_instance(num_jobs=num_job,
                                                                 num_machine=num_machine,
                                                                 batch_size=params['batch_size'])
-            act_model.Latent.current_num_edges = num_machine*num_job
-           # act_model.Latent.decoder.max_nodes = num_machine * num_job
+            act_model.Latent.current_num_edges = num_machine * num_job
+            # act_model.Latent.decoder.max_nodes = num_machine * num_job
             makespan_list_for_upperbound = list()
             for scheduler in scheduler_list:
                 c_max_heu = scheduler.heuristic_run()
@@ -416,11 +447,11 @@ def train_model(params, selected_param, log_path=None):
         if cfg.algo == 'reinforce':
 
             pred_seq, ll_old, _, edge_loss, node_loss, loss_kld, baselines = act_model(input_data,
-                                            device,
-                                            scheduler_list=scheduler_list,
-                                            num_machine=num_machine,
-                                            num_job=num_job
-                                            )
+                                                                                       device,
+                                                                                       scheduler_list=scheduler_list,
+                                                                                       num_machine=num_machine,
+                                                                                       num_job=num_job
+                                                                                       )
             real_makespan = list()
             for n in range(pred_seq.shape[0]):  # act_model(agent)가 산출한 해를 평가하는 부분
                 sequence = pred_seq[n]
@@ -437,14 +468,14 @@ def train_model(params, selected_param, log_path=None):
             initial_coeff = params['entropy_coeff']
             target_coeff = params['entropy_min']
             anneal_step = params['rep_anneal']
-            entrop_coeff = max(target_coeff, initial_coeff-(initial_coeff - target_coeff)*s/anneal_step)
+            entrop_coeff = max(target_coeff, initial_coeff - (initial_coeff - target_coeff) * s / anneal_step)
             entropy_loss = entrop_coeff * entropy
-
 
             # target_entropy = params["target_entropy"]
             # log_alpha_loss = -act_model.log_alpha * (ll_old.detach() + target_entropy).mean()
             adv = torch.tensor(real_makespan).detach().unsqueeze(1).to(device) - baselines  # baseline(advantage) 구하는 부분
-            cri_loss = F.mse_loss(torch.tensor(real_makespan).to(device)+entropy_loss.detach().squeeze(1), baselines.squeeze(1))
+            cri_loss = F.mse_loss(torch.tensor(real_makespan).to(device) + entropy_loss.detach().squeeze(1),
+                                  baselines.squeeze(1))
 
             """
 
@@ -453,15 +484,16 @@ def train_model(params, selected_param, log_path=None):
             3. Update 하기(act_optim.step)
 
             """
-            latent_loss = edge_loss+node_loss+loss_kld
-            act_loss = -(ll_old * adv.detach()+entropy_loss).mean()  # loss 구하는 부분 /  ll_old의 의미 log_theta (pi | s)
+            latent_loss = edge_loss + node_loss + loss_kld
+            act_loss = -(ll_old * adv.detach() + entropy_loss).mean()  # loss 구하는 부분 /  ll_old의 의미 log_theta (pi | s)
 
             if params['w_representation_learning'] == True:
-                total_loss = latent_loss + act_loss + cri_loss#+log_alpha_loss
+                total_loss = latent_loss + act_loss + cri_loss  # +log_alpha_loss
                 latent_optim.zero_grad()
                 act_optim.zero_grad()
                 total_loss.backward()
-                nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 5)),norm_type=2)
+                nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 5)),
+                                         norm_type=2)
                 latent_optim.step()
                 act_optim.step()
                 step_with_min(act_lr_scheduler, act_optim, min_lr=params['lr_decay_min'])
@@ -470,30 +502,35 @@ def train_model(params, selected_param, log_path=None):
                 total_loss = act_loss + cri_loss
                 act_optim.zero_grad()
                 total_loss.backward()
-                nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 5)),norm_type=2)
+                nn.utils.clip_grad_norm_(act_model.parameters(), max_norm=float(os.environ.get("grad_clip", 5)),
+                                         norm_type=2)
                 act_optim.step()
                 step_with_min(act_lr_scheduler, act_optim, min_lr=params['lr_decay_min'])
             ave_act_loss += act_loss.item()
             if s % params["log_step"] == 0:
                 t2 = time()
                 if params['w_representation_learning'] == True:
-                    print('with representation learning step:%d/%d, actic loss:%1.3f, crictic loss:%1.3f, L:%1.3f, %dmin%dsec' % (
-                    s, params["step"], ave_act_loss / ((s + 1) * params["iteration"]),
-                    ave_cri_loss / ((s + 1) * params["iteration"]), ave_makespan, (t2 - t1) // 60, (t2 - t1) % 60))
+                    print(
+                        'with representation learning step:%d/%d, actic loss:%1.3f, crictic loss:%1.3f, L:%1.3f, %dmin%dsec' % (
+                            s, params["step"], ave_act_loss / ((s + 1) * params["iteration"]),
+                            ave_cri_loss / ((s + 1) * params["iteration"]), ave_makespan, (t2 - t1) // 60,
+                            (t2 - t1) % 60))
                 else:
-                    print('without representation learning step:%d/%d, actic loss:%1.3f, crictic loss:%1.3f, L:%1.3f, %dmin%dsec' % (
-                    s, params["step"], ave_act_loss / ((s + 1) * params["iteration"]),
-                    ave_cri_loss / ((s + 1) * params["iteration"]), ave_makespan, (t2 - t1) // 60, (t2 - t1) % 60))
+                    print(
+                        'without representation learning step:%d/%d, actic loss:%1.3f, crictic loss:%1.3f, L:%1.3f, %dmin%dsec' % (
+                            s, params["step"], ave_act_loss / ((s + 1) * params["iteration"]),
+                            ave_cri_loss / ((s + 1) * params["iteration"]), ave_makespan, (t2 - t1) // 60,
+                            (t2 - t1) % 60))
         elif cfg.algo == 'rep_learning':
-            if s <=s_latent:
+            if s <= s_latent:
                 edge_loss, node_loss, loss_kld = act_model.forward_latent(input_data,
-                                                device,
-                                                scheduler_list=scheduler_list,
-                                                num_machine=num_machine,
-                                                num_job=num_job
-                                                )
+                                                                          device,
+                                                                          scheduler_list=scheduler_list,
+                                                                          num_machine=num_machine,
+                                                                          num_job=num_job
+                                                                          )
 
-                latent_loss = edge_loss+node_loss+loss_kld
+                latent_loss = edge_loss + node_loss + loss_kld
                 total_loss = latent_loss
                 latent_optim.zero_grad()
                 total_loss.backward()
@@ -526,7 +563,8 @@ def train_model(params, selected_param, log_path=None):
 
                 target_coeff = params['entropy_min']
                 anneal_step = params['rep_anneal']
-                entrop_coeff = max(target_coeff, initial_coeff - (initial_coeff - target_coeff) * (s-s_latent) / anneal_step)
+                entrop_coeff = max(target_coeff,
+                                   initial_coeff - (initial_coeff - target_coeff) * (s - s_latent) / anneal_step)
                 entropy_loss = entrop_coeff * entropy
 
                 # target_entropy = params["target_entropy"]
@@ -543,7 +581,8 @@ def train_model(params, selected_param, log_path=None):
                 3. Update 하기(act_optim.step)
 
                 """
-                act_loss = -(ll_old * adv.detach() + entropy_loss).mean()  # loss 구하는 부분 /  ll_old의 의미 log_theta (pi | s)
+                act_loss = -(
+                            ll_old * adv.detach() + entropy_loss).mean()  # loss 구하는 부분 /  ll_old의 의미 log_theta (pi | s)
 
                 total_loss = act_loss + cri_loss  # +log_alpha_loss
                 act_optim.zero_grad()
@@ -571,10 +610,6 @@ def train_model(params, selected_param, log_path=None):
                                 (t2 - t1) % 60))
 
 
-
-
-
-
 def test_model(params, selected_param, log_path=None):
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     date = datetime.now().strftime('%m%d_%H_%M')
@@ -590,20 +625,19 @@ def test_model(params, selected_param, log_path=None):
     act_model = PtrNet1(params).to(device)
     baseline_model = PtrNet1(params).to(device)  # baseline_model 불필요
     baseline_model.load_state_dict(act_model.state_dict())  # baseline_model 불필요
-    file_name = '0628_20_59_step87401_act_w_rep'###########fdfdf
+    file_name = '0628_20_59_step87401_act_w_rep'  ###########fdfdf
     checkpoint = torch.load('result/model/' + '{}.pt'.format(file_name))
     act_model.load_state_dict(checkpoint['model_state_dict_actor'])
-
 
     t1 = time()
     ave_makespan = 0
 
     c_max = list()
     b = 0
-    problem_list = [1, 2]
+    problem_list = [1, 2, 3, 4]
     validation_records_min = [[] for _ in problem_list]
     validation_records_mean = [[] for _ in problem_list]
-    empty_records = [[], []]
+    empty_records = [[], [], [], []]
 
     for s in range(epoch + 1, params["step"]):
 
@@ -618,14 +652,10 @@ def test_model(params, selected_param, log_path=None):
 
         if s % 100 == 1:  # Evaluation 수행
 
-
-
             for p in problem_list:
-                eval_number =1
+                eval_number = 1
                 with torch.no_grad():
                     min_makespan1, mean_makespan1 = evaluation(act_model, baseline_model, p, eval_number, device)
-
-
 
                 min_makespan = min_makespan1
                 mean_makespan = mean_makespan1
@@ -655,9 +685,8 @@ def test_model(params, selected_param, log_path=None):
                     min_m.columns = problem_list
                     mean_m.columns = problem_list
 
-
                     t1 = time()
-                    if cfg.algo =='reinforce':
+                    if cfg.algo == 'reinforce':
                         if params['w_representation_learning'] == True:
                             min_m.to_csv('w_rep_min_makespan_{}.csv'.format(selected_param))
                             mean_m.to_csv('w_rep_mean_makespan_{}.csv'.format(selected_param))
@@ -675,6 +704,7 @@ def test_model(params, selected_param, log_path=None):
                 "72 min_makespan": min_makespan72,
 
             })
+
 
 #
 # def visualize_model(params, selected_param, log_path=None):
@@ -1000,11 +1030,11 @@ def visualize_model(params, selected_param, log_path=None):
     #                                                                                num_machine=num_machine,
     #                                                                                num_job=num_job
     #                                                                                )
-    # 
+    #
     #     sequence = pred_seq[0]
     #     scheduler = AdaptiveScheduler(jobs_datas[0])
     #     makespan = -scheduler.run(sequence.tolist())
-    # 
+    #
     #     # print(z.shape)
     #     flow_shop_index_list.append(flow_shop_index)
     #     makespan_list.append(makespan)
@@ -1017,7 +1047,7 @@ def visualize_model(params, selected_param, log_path=None):
     #     z_mean_post_list.append(z_mean_post.squeeze(0).detach().cpu().numpy().tolist())
     #     z_list.append(z.squeeze(0).detach().cpu().numpy().tolist())
     #     print("data collecting : ", i)
-    # 
+    #
     # # numpy 배열로 변환
     # makespan_list = np.array(makespan_list)
     # flow_shop_index_list = np.array(flow_shop_index_list)
@@ -1030,7 +1060,7 @@ def visualize_model(params, selected_param, log_path=None):
     # mean_feature_array = np.array(mean_feature_list)
     # z_mean_post_array = np.array(z_mean_post_list)
     # makespan_list = np.array(makespan_list)
-    # 
+    #
     # np.save('flow_shop_index_list.npy', flow_shop_index_list)
     # np.save('bottleneck_index_list.npy', bottleneck_index_list)
     # np.save('machine_number_list.npy', machine_number_list)  # 추가
@@ -1046,7 +1076,7 @@ def visualize_model(params, selected_param, log_path=None):
     # print(f"z_array shape: {z_array.shape}")
     # print(f"flow_shop_index_list shape: {flow_shop_index_list.shape}")
     # print(f"bottleneck_index_list shape: {bottleneck_index_list.shape}")
-    
+
     machine_number_list = np.load('machine_number_list.npy')  # 추가
     job_number_list = np.load('job_number_list.npy')  # 추가
     flow_shop_index_list = np.load('flow_shop_index_list.npy')
@@ -1074,17 +1104,17 @@ def visualize_model(params, selected_param, log_path=None):
     scaler = StandardScaler()
     # StandardScaler 적용
     z_scaled = scaler.fit_transform(z_array)
-    print( makespan_list.min(), makespan_list.max()+300 )
+    print(makespan_list.min(), makespan_list.max() + 300)
     # UMAP으로 2차원 축소
     print("UMAP 차원 축소 진행 중...")
     umap_reducer = umap.UMAP(n_components=2, random_state=42, n_neighbors=7, min_dist=0.5, metric='cosine')
     z_2d_umap = umap_reducer.fit_transform(z_scaled)
 
     # 컬러맵 범위 설정 (원하는 값으로 조절하세요)
-    flow_shop_vmin, flow_shop_vmax = flow_shop_index_list.min()+0.15, flow_shop_index_list.max()-0.15# Flow Shop Index 범위
-    bottleneck_vmin, bottleneck_vmax = bottleneck_index_list.min()+0.15, bottleneck_index_list.max()-0.15 # Bottleneck Index 범위
+    flow_shop_vmin, flow_shop_vmax = flow_shop_index_list.min() + 0.15, flow_shop_index_list.max() - 0.15  # Flow Shop Index 범위
+    bottleneck_vmin, bottleneck_vmax = bottleneck_index_list.min() + 0.15, bottleneck_index_list.max() - 0.15  # Bottleneck Index 범위
 
-    makespan_vmin, makespan_vmax = makespan_list.min()+100, makespan_list.max()-100  # Makespan 범위 (전체 범위 사용)
+    makespan_vmin, makespan_vmax = makespan_list.min() + 100, makespan_list.max() - 100  # Makespan 범위 (전체 범위 사용)
     machine_vmin, machine_vmax = 5, 10  # Machine Number 범위
     job_vmin, job_vmax = 5, 10  # Job Number 범위
     product_vmin, product_vmax = 25, 100  # Machine × Job Product 범위
