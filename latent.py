@@ -42,10 +42,25 @@ class Gaussian(nn.Module):
             hidden_activation=nn.LeakyReLU(0.2),
         ).apply(initialize_weight)
 
+        self.net_mean = build_mlp(
+            input_dim=output_dim,
+            output_dim=output_dim,
+            hidden_units=[128, 128],
+            hidden_activation=nn.LeakyReLU(0.2),
+        ).apply(initialize_weight)
+
+        self.net_std = build_mlp(
+            input_dim=output_dim,
+            output_dim=output_dim,
+            hidden_units=[128, 128],
+            hidden_activation=nn.LeakyReLU(0.2),
+        ).apply(initialize_weight)
+
 
     def forward(self, x):
         x = self.net(x)
         mean, std = torch.chunk(x, 2, dim=-1)
+        mean, std = self.net_mean(mean), self.net_std(std)
         std = F.softplus(std) + 1e-5
         return mean, std
 
@@ -321,7 +336,9 @@ class LatentModel(nn.Module):
     def sample_posterior(self, features):
         # p(z1(0)) = N(0, I)
         z_mean, z_std = self.z_posterior(features)
+
         z = z_mean + torch.randn_like(z_std) * z_std
+        #print(z_std.shape, z_mean.shape, z.shape)
         return z_mean, z_std, z
 
 
@@ -334,6 +351,7 @@ class LatentModel(nn.Module):
 
 
         z_mean_post, z_std_post, z = self.sample_posterior(mean_feature) # q(|G
+        #print(z_mean_post.shape, z_std_post.shape, z_mean_pri.shape, z_std_pri.shape)
         loss_kld = calculate_kl_divergence(z_mean_post, z_std_post, z_mean_pri, z_std_pri).mean(dim=0).sum()
         if train == True:
             node_pred, edge_pred = self.decoder(z)
