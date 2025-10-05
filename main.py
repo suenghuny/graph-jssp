@@ -74,12 +74,12 @@ if __name__ == '__main__':
              "lr_critic": 1.0e-4,
              "lr": 1.0e-4,
              "entropy_coeff": 0.00001,
-        "entropy_min": 0.00,
+        "entropy_min": 0.000001,
              "layers": eval('[196, 96]'),
              "lr_decay_step": 1000,
              "lr_decay": 0.99,
              "lr_decay_min": 5e-5,
-            'rep_anneal': 10000,
+             'rep_anneal': 10000,
         "graph_embedding_size": 96,
              }
 
