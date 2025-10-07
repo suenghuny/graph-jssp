@@ -104,24 +104,24 @@ if __name__ == '__main__':
              }
 
     param4 ={
-             "alpha": 0.1,
-             "n_hidden": 128,
-             "ex_embedding_size": 42,
-             "ex_embedding_size2": 56,
-             "n_multi_head": 3,
+             "alpha": 0.05,
+             "n_hidden": 96,
+             "ex_embedding_size": 32,
+             "ex_embedding_size2": 54,
+             "n_multi_head": 1,
              "k_hop": 1,
-             "lr_latent": 5.0e-5,
+             "lr_latent":  1.0e-4,
              "lr_critic": 1.0e-4,
              "lr": 1.0e-4,
-             "entropy_coeff": 0.0001,
-        "entropy_min": 0.00001,
-             "layers": eval('[128, 64]'),
-             "lr_decay_step": 500,
-             "lr_decay": 0.975,
-             "lr_decay_min": 2.5e-5,
-            'rep_anneal': 20000,
-        "graph_embedding_size": 128,
-             } # not good
+             "entropy_coeff": 0.000,
+        "entropy_min": 0.0,
+             "layers": eval('[196, 128]'),
+             "lr_decay_step": 50000000000,
+             "lr_decay": 1.0,
+             "lr_decay_min": 5e-5,
+            'rep_anneal': 30000,
+        "graph_embedding_size": 96,
+             }
 
 
     param5 = {
