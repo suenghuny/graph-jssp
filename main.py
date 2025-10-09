@@ -164,6 +164,26 @@ if __name__ == '__main__':
         "graph_embedding_size": 86,
              }
 
+    param7 = {
+        "alpha": 0.1,
+        "n_hidden": 86,
+        "ex_embedding_size": 36,
+        "ex_embedding_size2": 56,
+        "n_multi_head": 2,
+        "k_hop": 1,
+        "lr_latent": 1.0e-4,
+        "lr_critic": 1.0e-4,
+        "lr": 1.0e-4,
+        "entropy_coeff": 0.0001,
+        "entropy_min": 0.000005,
+        "layers": eval('[196, 128]'),
+        "lr_decay_step": 500,
+        "lr_decay": 0.995,
+        "lr_decay_min": 7.5e-5,
+        'rep_anneal': 20000,
+        "graph_embedding_size": 86,
+    }
+
     selected_param = str(os.environ.get("selected_param", "param2"))
     aggr= str(os.environ.get("aggr", "mean"))
     s_latent = int(os.environ.get("s_latent", 40000))
