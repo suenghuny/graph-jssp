@@ -196,6 +196,7 @@ if __name__ == '__main__':
                    "param4": param4,
                    "param5": param5,
                    "param6": param6,
+        "param7": param7,
                    }
     print("입력된 파라미터 :", selected_param)
     param = param_group[selected_param]
