@@ -184,6 +184,26 @@ if __name__ == '__main__':
         "graph_embedding_size": 86,
     }
 
+    param8 = {
+        "alpha": 0.1,
+        "n_hidden": 74,
+        "ex_embedding_size": 34,
+        "ex_embedding_size2": 49,
+        "n_multi_head": 2,
+        "k_hop": 1,
+        "lr_latent": 1.0e-4,
+        "lr_critic": 1.0e-4,
+        "lr": 1.0e-4,
+        "entropy_coeff": 0.001,
+        "entropy_min": 0.000001,
+        "layers": eval('[196, 128]'),
+        "lr_decay_step": 500,
+        "lr_decay": 0.995,
+        "lr_decay_min": 7.5e-5,
+        'rep_anneal': 20000,
+        "graph_embedding_size": 96,
+    }
+
     selected_param = str(os.environ.get("selected_param", "param2"))
     aggr= str(os.environ.get("aggr", "mean"))
     s_latent = int(os.environ.get("s_latent", 40000))
@@ -196,7 +216,8 @@ if __name__ == '__main__':
                    "param4": param4,
                    "param5": param5,
                    "param6": param6,
-        "param7": param7,
+                    "param7": param7,
+                    "param8": param8,
                    }
     print("입력된 파라미터 :", selected_param)
     param = param_group[selected_param]
