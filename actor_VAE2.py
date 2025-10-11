@@ -7,7 +7,7 @@ from copy import deepcopy
 cfg = cfg.get_cfg()
 from model import GCRN
 from latent import LatentModel
-device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+device = torch.device(cfg.device if torch.cuda.is_available() else 'cpu')
 
 
 

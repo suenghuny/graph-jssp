@@ -955,7 +955,7 @@ def test_model(params, selected_param, log_path=None):
 #     return z_array, flow_shop_index_list, bottleneck_index_list, cluster_labels
 #
 def visualize_model(params, selected_param, log_path=None):
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    device = torch.device(cfg.device if torch.cuda.is_available() else 'cpu')
     date = datetime.now().strftime('%m%d_%H_%M')
     param_path = params["log_dir"] + '/ppo' + '/%s_%s_param.csv' % (date, "train")
     print(f'generate {param_path}')
