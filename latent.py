@@ -311,9 +311,9 @@ class LatentModel(nn.Module):
         # q(z | x)
         if params['aggr']== 'mean':
             aug_input_dim = z_dim
-        elif self.aggr == 'mean_max':
+        elif params['aggr'] == 'mean_max':
             aug_input_dim = z_dim*2
-        elif self.aggr == 'mean_max_std':
+        elif params['aggr'] == 'mean_max_std':
             aug_input_dim = z_dim * 3
 
 
