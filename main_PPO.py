@@ -176,7 +176,7 @@ def train_model(params, selected_param, log_path=None):
             wandb.init(project="Graph JSSP", name=selected_param + 'wo_rep_{}'.format(aggr))
     elif cfg.algo == 'rep_learning':
         wandb.init(project="Graph JSSP", name=selected_param + 'seperation_s_latent_{}_{}'.format(s_latent, aggr))
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    device = torch.device(cfg.device if torch.cuda.is_available() else 'cpu')
     date = datetime.now().strftime('%m%d_%H_%M')
     param_path = params["log_dir"] + '/ppo' + '/%s_%s_param.csv' % (date, "train")
     print(f'generate {param_path}')
