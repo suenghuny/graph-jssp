@@ -165,6 +165,26 @@ if __name__ == '__main__':
         "graph_embedding_size": 96,
              }
 
+    param4_64 = {
+             "alpha": 0.05,
+             "n_hidden": 128,
+             "ex_embedding_size": 32,
+             "ex_embedding_size2": 54,
+             "n_multi_head": 1,
+             "k_hop": 1,
+             "lr_latent":  1.0e-4,
+             "lr_critic": 1.0e-4,
+             "lr": 1.0e-4,
+             "entropy_coeff": 0.000,
+        "entropy_min": 0.0,
+             "layers": eval('[196, 128]'),
+             "lr_decay_step": 50000000000,
+             "lr_decay": 1.0,
+             "lr_decay_min": 5e-5,
+            'rep_anneal': 30000,
+        "graph_embedding_size": 96,
+             }
+
 
 
     selected_param = str(os.environ.get("selected_param", "param2"))
@@ -175,10 +195,12 @@ if __name__ == '__main__':
                    "param0": param0,
                    "param1": param1,
                    "param2": param2,
+                  "param4_64": param4_64,
                    "param4": param4,
+                   "param4_128": param4_128,
                    "param5": param5,
                    "param6": param6,
-                    "param4_128": param4_128,
+
     }
     print("입력된 파라미터 :", selected_param)
     param = param_group[selected_param]
