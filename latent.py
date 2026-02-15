@@ -336,9 +336,7 @@ class LatentModel(nn.Module):
     def sample_posterior(self, features):
         # p(z1(0)) = N(0, I)
         z_mean, z_std = self.z_posterior(features)
-
         z = z_mean + torch.randn_like(z_std) * z_std
-        #print(z_std.shape, z_mean.shape, z.shape)
         return z_mean, z_std, z
 
 

@@ -606,6 +606,42 @@ def train_model(params, selected_param, log_path=None):
                                 (t2 - t1) % 60))
 
 
+def test(act_model, baseline_model, p, eval_number, device, problems, upperbound=None):
+    scheduler_list_val = [AdaptiveScheduler(problems[p - 1]) for _ in range(eval_number)]
+    val_makespan = list()
+    act_model.get_jssp_instance(scheduler_list_val)
+    baseline_model.get_jssp_instance(scheduler_list_val)
+
+    act_model.eval()
+
+    scheduler = AdaptiveScheduler(problems[p - 1])  # scheduler는 validation(ORB set)에 대해 수행
+
+    num_job = scheduler.num_job
+    num_machine = scheduler.num_mc
+    # print(num_job, num_machine)
+
+    node_feature = scheduler.get_node_feature()
+    node_feature = [node_feature for _ in range(int(eval_number))]
+    edge_precedence = scheduler.get_edge_index_precedence()
+    edge_antiprecedence = scheduler.get_edge_index_antiprecedence()
+    edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
+    heterogeneous_edges = (edge_precedence, edge_antiprecedence, edge_machine_sharing)
+    heterogeneous_edges = [heterogeneous_edges for _ in range(eval_number)]
+    input_data = (node_feature, heterogeneous_edges)
+    pred_seq, ll_old, _, _, _, _, _ = act_model(input_data,
+                                                device,
+                                                scheduler_list=scheduler_list_val,
+                                                num_machine=num_machine,
+                                                num_job=num_job,
+                                                train=False)
+    for sequence in pred_seq:
+        scheduler = AdaptiveScheduler(problems[p - 1])
+        makespan = scheduler.run(sequence.tolist())
+        val_makespan.append(makespan)
+    # print("크크크", val_makespan)
+    return np.min(val_makespan), np.mean(val_makespan)
+
+
 def test_model(params, selected_param, log_path=None):
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     date = datetime.now().strftime('%m%d_%H_%M')
@@ -613,93 +649,42 @@ def test_model(params, selected_param, log_path=None):
     print(f'generate {param_path}')
     with open(param_path, 'w') as f:
         f.write(''.join('%s,%s\n' % item for item in params.items()))
-
-    epoch = 0
-    ave_act_loss = 0.0
-    ave_cri_loss = 0.0
-
     act_model = PtrNet1(params).to(device)
     baseline_model = PtrNet1(params).to(device)  # baseline_model 불필요
     baseline_model.load_state_dict(act_model.state_dict())  # baseline_model 불필요
-    file_name = '0628_20_59_step87401_act_w_rep'  ###########fdfdf
-    checkpoint = torch.load('result/model/' + '{}.pt'.format(file_name))
+    file_name = 'seperation_after_rep_80000_param4_step_86001_mean_makespan_3181.0'  ###########fdfdf
+    checkpoint = torch.load('{}.pt'.format(file_name))
     act_model.load_state_dict(checkpoint['model_state_dict_actor'])
 
-    t1 = time()
-    ave_makespan = 0
+    for dataset_name in ['ta', 'dmu', 'orb', 'la', 'abz', 'swv', 'ft', 'yn']:
+        excel_file = pd.ExcelFile("{}_structured.xlsx".format(dataset_name), engine='openpyxl')
+        total_sheets = len(excel_file.sheet_names)
+        orb_list = []
+        problem_number = [str(i + 1) for i in range(total_sheets)]
+        print(problem_number)
+        for i in problem_number:
+            df = pd.read_excel("{}_structured.xlsx".format(dataset_name), sheet_name=i, engine='openpyxl')
+            orb_data = list()  #
+            for row, column in df.iterrows():
+                job = []
+                for j in range(0, len(column.tolist()), 2):
+                    element = (column.tolist()[j], column.tolist()[j + 1])
+                    job.append(element)
+                orb_data.append(job)
+            orb_list.append(orb_data)
+        problem_list = [int(p) for p in problem_number]
+        empty_records = dict()
 
-    c_max = list()
-    b = 0
-    problem_list = [1, 2, 3, 4]
-    validation_records_min = [[] for _ in problem_list]
-    validation_records_mean = [[] for _ in problem_list]
-    empty_records = [[], [], [], []]
 
-    for s in range(epoch + 1, params["step"]):
-
-        """
-
-        변수별 shape 
-        inputs : batch_size X number_of_blocks X number_of_process
-        pred_seq : batch_size X number_of_blocks
-
-        """
-        b += 1
-
-        if s % 100 == 1:  # Evaluation 수행
-
-            for p in problem_list:
-                eval_number = 1
-                with torch.no_grad():
-                    min_makespan1, mean_makespan1 = evaluation(act_model, baseline_model, p, eval_number, device)
-
-                min_makespan = min_makespan1
-                mean_makespan = mean_makespan1
-                if p == 1:
-                    mean_makespan71 = mean_makespan1
-                    min_makespan71 = min_makespan1
-                else:
-                    mean_makespan72 = mean_makespan1
-                    min_makespan72 = min_makespan1
-
-                print("TA{}".format(problem_list[p - 1]), min_makespan, mean_makespan)
-                empty_records[p - 1].append(mean_makespan)
-                #
-                # if len(empty_records[1]) > 35 and np.mean(empty_records[1][-30:]) >= 3300:
-                #     sys.exit()
-
-                if cfg.vessl == True:
-                    vessl.log(step=s, payload={'minmakespan{}'.format(str(problem_list[p - 1])): min_makespan})
-                    vessl.log(step=s, payload={'meanmakespan{}'.format(str(problem_list[p - 1])): mean_makespan})
-                else:
-                    validation_records_min[p - 1].append(min_makespan)
-                    validation_records_mean[p - 1].append(mean_makespan)
-                    min_m = pd.DataFrame(validation_records_min)
-                    mean_m = pd.DataFrame(validation_records_mean)
-                    min_m = min_m.transpose()
-                    mean_m = mean_m.transpose()
-                    min_m.columns = problem_list
-                    mean_m.columns = problem_list
-
-                    t1 = time()
-                    if cfg.algo == 'reinforce':
-                        if params['w_representation_learning'] == True:
-                            min_m.to_csv('w_rep_min_makespan_{}.csv'.format(selected_param))
-                            mean_m.to_csv('w_rep_mean_makespan_{}.csv'.format(selected_param))
-                        else:
-                            min_m.to_csv('wo_rep_min_makespan_{}.csv'.format(selected_param))
-                            mean_m.to_csv('wo_rep_mean_makespan_{}.csv'.format(selected_param))
-                    elif cfg.algo == 'rep_learning':
-                        min_m.to_csv('seperation_rep_min_makespan_{}.csv'.format(selected_param))
-                        mean_m.to_csv('seperation_rep_mean_makespan_{}.csv'.format(selected_param))
-            wandb.log({
-                "episode": s,
-                "71 mean_makespan": mean_makespan71,
-                "72 mean_makespan": mean_makespan72,
-                "71 min_makespan": min_makespan71,
-                "72 min_makespan": min_makespan72,
-
-            })
+        for p in problem_list:
+            eval_number = 1
+            with torch.no_grad():
+                min_makespan1, mean_makespan1 = test(act_model, baseline_model, p, eval_number, device,  problems = orb_list )
+            print("{}{} : {}".format(dataset_name,p, min_makespan1))
+            empty_records[str(p)] = [min_makespan1]
+            #print(empty_records)
+            test_m = pd.DataFrame(empty_records).transpose()
+            test_m.to_csv('{}_test_{}.csv'.format(dataset_name, file_name))
 
 
 #
@@ -969,8 +954,8 @@ def visualize_model(params, selected_param, log_path=None):
     act_model = PtrNet1(params).to(device)
     baseline_model = PtrNet1(params).to(device)  # baseline_model 불필요
     baseline_model.load_state_dict(act_model.state_dict())  # baseline_model 불필요
-    file_name = 'multi_scaled_after_rep_40000_param0_step_117701_mean_makespan_3358.0'  ###########fdfdf
-    checkpoint = torch.load('result/model/' + '{}.pt'.format(file_name))
+    file_name = 'seperation_after_rep_80000_param1_step_92601_mean_makespan_3180.0'  ###########fdfdf
+    checkpoint = torch.load('{}.pt'.format(file_name))
     act_model.load_state_dict(checkpoint['model_state_dict_actor'])
 
     import numpy as np
@@ -992,7 +977,7 @@ def visualize_model(params, selected_param, log_path=None):
     inputs : batch_size X number_of_blocks X number_of_process
     pred_seq : batch_size X number_of_blocks
     """
-    # b += 1
+    b += 1
     # flow_shop_index_list = list()
     # bottleneck_index_list = list()
     # makespan_list = list()
@@ -1067,25 +1052,17 @@ def visualize_model(params, selected_param, log_path=None):
     # np.save('mean_feature_array.npy', mean_feature_array)
     # np.save('z_mean_post_array.npy', z_mean_post_array)
     # np.save('makespan_array.npy', makespan_list)
-
-    # 데이터 검증
+    #
     # print(f"z_array shape: {z_array.shape}")
     # print(f"flow_shop_index_list shape: {flow_shop_index_list.shape}")
     # print(f"bottleneck_index_list shape: {bottleneck_index_list.shape}")
 
-    machine_number_list = np.load('machine_number_list.npy')  # 추가
-    job_number_list = np.load('job_number_list.npy')  # 추가
-    flow_shop_index_list = np.load('flow_shop_index_list.npy')
-    bottleneck_index_list = np.load('bottleneck_index_list.npy')
-    machine_number_list = np.load('machine_number_list.npy')  # 추가
-    job_number_list = np.load('job_number_list.npy')  # 추가
+
     machine_job_product_list = np.load('machine_job_product_list.npy')  # 추가
-    makespan_list = np.load('makespan_array.npy')
-    z_array = np.load('z_mean_post_array.npy')
-    machine_number_list = np.load('machine_number_list.npy')  # 추가
+
     job_number_list = np.load('job_number_list.npy')  # 추가
-    flow_shop_index_list = np.load('flow_shop_index_list.npy')
-    bottleneck_index_list = np.load('bottleneck_index_list.npy')
+    flow_shop_index_list = np.load('flow_shop_index_list.npy')#np.log( np.load('flow_shop_index_list.npy')*job_number_list/machine_job_product_list)
+    bottleneck_index_list = np.load('flow_shop_index_list.npy')*job_number_list/machine_job_product_list#np.log( np.load('flow_shop_index_list.npy')/(job_number_list*machine_job_product_list))
     machine_number_list = np.load('machine_number_list.npy')  # 추가
     job_number_list = np.load('job_number_list.npy')  # 추가
     machine_job_product_list = np.load('machine_job_product_list.npy')  # 추가
@@ -1103,12 +1080,12 @@ def visualize_model(params, selected_param, log_path=None):
     print(makespan_list.min(), makespan_list.max() + 300)
     # UMAP으로 2차원 축소
     print("UMAP 차원 축소 진행 중...")
-    umap_reducer = umap.UMAP(n_components=2, random_state=42, n_neighbors=7, min_dist=0.5, metric='cosine')
+    umap_reducer = umap.UMAP(n_components=5, random_state=42, n_neighbors=5, min_dist=0.5, metric='cosine')
     z_2d_umap = umap_reducer.fit_transform(z_scaled)
 
     # 컬러맵 범위 설정 (원하는 값으로 조절하세요)
     flow_shop_vmin, flow_shop_vmax = flow_shop_index_list.min() + 0.15, flow_shop_index_list.max() - 0.15  # Flow Shop Index 범위
-    bottleneck_vmin, bottleneck_vmax = bottleneck_index_list.min() + 0.15, bottleneck_index_list.max() - 0.15  # Bottleneck Index 범위
+    bottleneck_vmin, bottleneck_vmax = bottleneck_index_list.min(), bottleneck_index_list.max()   # Bottleneck Index 범위
 
     makespan_vmin, makespan_vmax = makespan_list.min() + 100, makespan_list.max() - 100  # Makespan 범위 (전체 범위 사용)
     machine_vmin, machine_vmax = 5, 10  # Machine Number 범위
