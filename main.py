@@ -167,7 +167,7 @@ if __name__ == '__main__':
 
     param4_64 = {
              "alpha": 0.05,
-             "n_hidden": 128,
+             "n_hidden": 64,
              "ex_embedding_size": 32,
              "ex_embedding_size2": 54,
              "n_multi_head": 1,
