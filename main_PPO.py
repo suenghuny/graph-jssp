@@ -368,7 +368,14 @@ def train_model(params, selected_param, log_path=None):
                             mean_m.columns = problem_list
 
                             t1 = time()
-                            mean_m.to_csv('seperation_after_rep_{}_{}_mean_makespan_{}.csv'.format(
+                            if cfg.feature_selection_mode==True:
+                                mean_m.to_csv(
+                                    'feature_selection_mode_{}_seperation_after_rep_{}_{}_mean_makespan_{}.csv'.format(
+                                   cfg.exclude_feature,
+                                   s_latent, selected_param,
+                                   mean_makespan61))
+                            else:
+                                mean_m.to_csv('seperation_after_rep_{}_{}_mean_makespan_{}.csv'.format(
                                    s_latent, selected_param,
                                    mean_makespan61))
 
