@@ -70,8 +70,11 @@ class Encoder(nn.Module):
         super().__init__()
         device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.n_multi_head = params["n_multi_head"]
-        self.Embedding = nn.Linear(params["num_of_process"],params["n_hidden"], bias=False).to(device)  # 그림 상에서 Encoder에 FF(feedforward)라고 써져있는 부분
-
+        if cfg.feature_selection_mode == True:
+            self.Embedding = nn.Linear(5, params["n_hidden"], bias=False).to(device)  # 그림 상에서 Encoder에 FF(feedforward)라고 써져있는 부분
+        else:
+            self.Embedding = nn.Linear(6, params["n_hidden"], bias=False).to(
+                device)  # 그림 상에서 Encoder에 FF(feedforward)라고 써져있는 부분
         self.params = params
         self.k_hop = params["k_hop"]
         self.aggr = params["aggr"]
@@ -104,6 +107,7 @@ class Encoder(nn.Module):
         node_num = node_features.shape[1]
         node_reshaped_features = node_features.reshape(batch * node_num, -1)
         node_embedding = self.Embedding(node_reshaped_features)
+
         node_embedding = node_embedding.reshape(batch, node_num, -1)
         if self.k_hop == 1:
             enc_h, edge_cats = self.GraphEmbedding(heterogeneous_edges, node_embedding,  mini_batch = True)
@@ -324,8 +328,10 @@ class LatentModel(nn.Module):
             hidden_units,
         )
         # p(G | z)
-        self.decoder = GraphVAEDecoder(z_dim, edge_types=3, node_types=6, hidden_dims=[128, 256, 512]
-        )
+        if cfg.feature_selection_mode == True:
+            self.decoder = GraphVAEDecoder(z_dim, edge_types=3, node_types=5, hidden_dims=[128, 256, 512])
+        else:
+            self.decoder = GraphVAEDecoder(z_dim, edge_types=3, node_types=6, hidden_dims=[128, 256, 512])
 
 
     def sample_prior(self, x):

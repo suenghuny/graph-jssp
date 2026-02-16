@@ -1,6 +1,9 @@
 import numpy as np
 from copy import deepcopy
 import pandas as pd
+import cfg
+from copy import deepcopy
+cfg = cfg.get_cfg()
 pt_tmp = pd.read_excel("JSP_dataset.xlsx", sheet_name="Processing Time", index_col=[0], engine = 'openpyxl')
 ms_tmp = pd.read_excel(
          "JSP_dataset.xlsx", sheet_name="Machines Sequence", index_col=[0], engine = 'openpyxl')
@@ -659,17 +662,87 @@ class AdaptiveScheduler:
                 sum_ops_o = [float(job[k][1]) for k in range(0, o+1)]
                 sum_ops_o.append(0)
                 sum_ops_o = sum(sum_ops_o)
-                node_features.append([
-                                      float(ops[1]) / sum_ops,
-                                      float(ops[1]) / np.max(empty),
-                                      sum_ops_o/sum_ops,
-                                      sum_ops / np.max(empty2),
-                                      (o+1)/len(job),
-                                      float(ops[1]) / self.total_processing_time_by_machine[ops[0]],
-                                     ])
+                if cfg.feature_selection_mode == True:
+                    if cfg.exclude_feature == 0:
+                        node_features.append([
+                            float(ops[1]) / np.max(empty),
+                            sum_ops_o / sum_ops,
+                            sum_ops / np.max(empty2),
+                            (o + 1) / len(job),
+                            float(ops[1]) / self.total_processing_time_by_machine[ops[0]],
+                        ])
+                    if cfg.exclude_feature == 1:
+                        node_features.append([
+                            float(ops[1]) / sum_ops,
+                            sum_ops_o / sum_ops,
+                            sum_ops / np.max(empty2),
+                            (o + 1) / len(job),
+                            float(ops[1]) / self.total_processing_time_by_machine[ops[0]],
+                        ])
+                    if cfg.exclude_feature == 2:
+                        node_features.append([
+                            float(ops[1]) / sum_ops,
+                            float(ops[1]) / np.max(empty),
+                            sum_ops / np.max(empty2),
+                            (o + 1) / len(job),
+                            float(ops[1]) / self.total_processing_time_by_machine[ops[0]],
+                        ])
+                    if cfg.exclude_feature == 3:
+                        node_features.append([
+                            float(ops[1]) / sum_ops,
+                            float(ops[1]) / np.max(empty),
+                            sum_ops_o / sum_ops,
+                            (o + 1) / len(job),
+                            float(ops[1]) / self.total_processing_time_by_machine[ops[0]],
+                        ])
+                    if cfg.exclude_feature == 4:
+                        node_features.append([
+                            float(ops[1]) / sum_ops,
+                            float(ops[1]) / np.max(empty),
+                            sum_ops_o / sum_ops,
+                            sum_ops / np.max(empty2),
+                            float(ops[1]) / self.total_processing_time_by_machine[ops[0]],
+                        ])
+                    if cfg.exclude_feature == 5:
+                        node_features.append([
+                            float(ops[1]) / sum_ops,
+                            float(ops[1]) / np.max(empty),
+                            sum_ops_o / sum_ops,
+                            sum_ops / np.max(empty2),
+                            (o + 1) / len(job)
+                        ])
 
-        node_features.append([0., 0., 0, 0, 0, 0])
-        node_features.append([0., 0., 1, 1, 1, 0])
+                else:
+                    node_features.append([
+                                          float(ops[1]) / sum_ops,
+                                          float(ops[1]) / np.max(empty),
+                                          sum_ops_o/sum_ops,
+                                          sum_ops / np.max(empty2),
+                                          (o+1)/len(job),
+                                          float(ops[1]) / self.total_processing_time_by_machine[ops[0]],
+                                         ])
+        if cfg.feature_selection_mode == True:
+            if cfg.exclude_feature == 0:
+                node_features.append([0., 0, 0, 0, 0])
+                node_features.append([0., 1, 1, 1, 0])
+            if cfg.exclude_feature == 1:
+                node_features.append([0., 0, 0, 0, 0])
+                node_features.append([0., 1, 1, 1, 0])
+            if cfg.exclude_feature == 2:
+                node_features.append([0., 0., 0, 0, 0])
+                node_features.append([0., 0., 1, 1, 0])
+            if cfg.exclude_feature == 3:
+                node_features.append([0., 0., 0,  0, 0])
+                node_features.append([0., 0., 1, 1, 0])
+            if cfg.exclude_feature == 4:
+                node_features.append([0., 0., 0, 0, 0])
+                node_features.append([0., 0., 1, 1, 0])
+            if cfg.exclude_feature == 5:
+                node_features.append([0., 0., 0, 0, 0])
+                node_features.append([0., 0., 1, 1, 1])
+        else:
+            node_features.append([0., 0., 0, 0, 0, 0])
+            node_features.append([0., 0., 1, 1, 1, 0])
         return node_features
 
     def get_fully_connected_edge_index(self):

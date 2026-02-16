@@ -75,8 +75,10 @@ class PtrNet1(nn.Module):
         self.critic = Critic(z_dim)
         self.Latent = LatentModel(z_dim=z_dim, params = params).to(device)
         augmented_hidden_size = params["n_hidden"]
-
-        self.ex_embedding = ExEmbedding(raw_feature_size=6, feature_size= params["n_hidden"])
+        if cfg.feature_selection_mode == True:
+            self.ex_embedding = ExEmbedding(raw_feature_size=5, feature_size=params["n_hidden"])
+        else:
+            self.ex_embedding = ExEmbedding(raw_feature_size=6, feature_size= params["n_hidden"])
 
         # Vec 파라미터 리스트 생성 (문제 없음)
         self.W_v = nn.ParameterList([nn.Parameter(torch.FloatTensor(2 * params["n_hidden"], 2 * params["n_hidden"]))for _ in range(self.n_multi_head)])
