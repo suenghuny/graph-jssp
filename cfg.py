@@ -42,6 +42,7 @@ def get_cfg():
     parser.add_argument("--algo", type=str, default='rep_learning', help="")
     parser.add_argument("--feature_selection_mode", type=bool, default=False, help="")
     parser.add_argument("--exclude_feature", type=int, default=0, help="")
+    parser.add_argument("--additional_validation", type=bool, default=False, help="")
 
     return parser.parse_args()
 ##

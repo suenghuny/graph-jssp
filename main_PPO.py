@@ -54,16 +54,30 @@ def set_seed(seed):
 set_seed(int(os.environ.get("seed", 30)))  # 30 했었음
 opt_list = [1059, 888, 1005, 1005, 887, 1010, 397, 899, 934, 944]
 orb_list = []
-for i in ["ta61", "ta62", "dmu76", "dmu77"]:
-    df = pd.read_excel("eval_dataset.xlsx", sheet_name=i, engine='openpyxl')
-    orb_data = list()  #
-    for row, column in df.iterrows():
-        job = []
-        for j in range(0, len(column.tolist()), 2):
-            element = (column.tolist()[j], column.tolist()[j + 1])
-            job.append(element)
-        orb_data.append(job)
-    orb_list.append(orb_data)
+
+if cfg.additional_validation == True:
+    for i in ["ta21", "ta22", "dmu46", "dmu47", "ta61", "ta62", "dmu76", "dmu77"]:
+        df = pd.read_excel("eval_dataset.xlsx", sheet_name=i, engine='openpyxl')
+        orb_data = list()  #
+        for row, column in df.iterrows():
+            job = []
+            for j in range(0, len(column.tolist()), 2):
+                element = (column.tolist()[j], column.tolist()[j + 1])
+                job.append(element)
+            orb_data.append(job)
+        orb_list.append(orb_data)
+
+else:
+    for i in ["ta61", "ta62", "dmu76", "dmu77"]:
+        df = pd.read_excel("eval_dataset.xlsx", sheet_name=i, engine='openpyxl')
+        orb_data = list()  #
+        for row, column in df.iterrows():
+            job = []
+            for j in range(0, len(column.tolist()), 2):
+                element = (column.tolist()[j], column.tolist()[j + 1])
+                job.append(element)
+            orb_data.append(job)
+        orb_list.append(orb_data)
 
 
 def generate_jssp_instance(num_jobs, num_machine, batch_size):
@@ -218,7 +232,10 @@ def train_model(params, selected_param, log_path=None):
 
     c_max = list()
     b = 0
-    problem_list = [1, 2, 3, 4]
+    if cfg.additional_validation == True:
+        problem_list = [1, 2, 3, 4, 5, 6, 7, 8]
+    else:
+        problem_list = [1, 2, 3, 4]
     validation_records_min = [[] for _ in problem_list]
     validation_records_mean = [[] for _ in problem_list]
     empty_records = [[] for _ in problem_list]
@@ -243,52 +260,94 @@ def train_model(params, selected_param, log_path=None):
                         min_makespan1, mean_makespan1 = evaluation(act_model, baseline_model, p, eval_number, device)
                     min_makespan = min_makespan1
                     mean_makespan = mean_makespan1
-                    if p == 1:
-                        mean_makespan61 = mean_makespan1
-                        min_makespan61 = min_makespan1
-                        print("TA61", min_makespan, mean_makespan)
-                        empty_records[p - 1].append(mean_makespan)
-                    elif p == 2:
-                        mean_makespan62 = mean_makespan1
-                        min_makespan62 = min_makespan1
-                        print("TA62", min_makespan, mean_makespan)
-                        empty_records[p - 1].append(mean_makespan)
-                    elif p == 3:
-                        mean_makespan76 = mean_makespan1
-                        min_makespan76 = min_makespan1
-                        print("DMU76", min_makespan, mean_makespan)
-                        empty_records[p - 1].append(mean_makespan)
-                    else:
-                        mean_makespan77 = mean_makespan1
-                        min_makespan77 = min_makespan1
-                        print("DMU77", min_makespan, mean_makespan)
-                        empty_records[p - 1].append(mean_makespan)
 
-                    #
-                    # if len(empty_records[1]) > 35 and np.mean(empty_records[1][-30:]) >= 3300:
-                    #     sys.exit()
-
-                    if cfg.vessl == True:
-                        vessl.log(step=s, payload={'minmakespan{}'.format(str(problem_list[p - 1])): min_makespan})
-                        vessl.log(step=s, payload={'meanmakespan{}'.format(str(problem_list[p - 1])): mean_makespan})
-                    else:
-                        validation_records_min[p - 1].append(min_makespan)
-                        validation_records_mean[p - 1].append(mean_makespan)
-                        min_m = pd.DataFrame(validation_records_min)
-                        mean_m = pd.DataFrame(validation_records_mean)
-                        min_m = min_m.transpose()
-                        mean_m = mean_m.transpose()
-                        min_m.columns = problem_list
-                        mean_m.columns = problem_list
-
-                        t1 = time()
+                    if cfg.additional_validation == True:
+                        if p == 1:
+                            mean_makespan21 = mean_makespan1
+                            print("TA21", min_makespan, mean_makespan)
+                            empty_records[p - 1].append(mean_makespan)
+                        elif p == 2:
+                            mean_makespan22 = mean_makespan1
+                            print("TA22", min_makespan, mean_makespan)
+                            empty_records[p - 1].append(mean_makespan)
+                        elif p == 3:
+                            mean_makespan46 = mean_makespan1
+                            print("DMU46", min_makespan, mean_makespan)
+                            empty_records[p - 1].append(mean_makespan)
+                        elif p == 4:
+                            mean_makespan47 = mean_makespan1
+                            print("DMU47", min_makespan, mean_makespan)
+                            empty_records[p - 1].append(mean_makespan)
+                        elif p == 5:
+                            mean_makespan61 = mean_makespan1
+                            print("TA61", min_makespan, mean_makespan)
+                            empty_records[p - 1].append(mean_makespan)
+                        elif p == 6:
+                            mean_makespan62 = mean_makespan1
+                            print("TA62", min_makespan, mean_makespan)
+                            empty_records[p - 1].append(mean_makespan)
+                        elif p == 7:
+                            mean_makespan76 = mean_makespan1
+                            print("DMU76", min_makespan, mean_makespan)
+                            empty_records[p - 1].append(mean_makespan)
+                        else:
+                            mean_makespan77 = mean_makespan1
+                            print("DMU77", min_makespan, mean_makespan)
+                            empty_records[p - 1].append(mean_makespan)
 
                         if params['w_representation_learning'] == True:
-                            min_m.to_csv('w_rep_min_makespan_{}.csv'.format(selected_param))
-                            mean_m.to_csv('w_rep_mean_makespan_{}.csv'.format(selected_param))
+                            min_m.to_csv('additional_val_w_rep_min_makespan_{}.csv'.format(selected_param))
+                            mean_m.to_csv('additional_val_w_rep_mean_makespan_{}.csv'.format(selected_param))
+
+
+
+                    else:
+                        if p == 1:
+                            mean_makespan61 = mean_makespan1
+                            min_makespan61 = min_makespan1
+                            print("TA61", min_makespan, mean_makespan)
+                            empty_records[p - 1].append(mean_makespan)
+                        elif p == 2:
+                            mean_makespan62 = mean_makespan1
+                            min_makespan62 = min_makespan1
+                            print("TA62", min_makespan, mean_makespan)
+                            empty_records[p - 1].append(mean_makespan)
+                        elif p == 3:
+                            mean_makespan76 = mean_makespan1
+                            min_makespan76 = min_makespan1
+                            print("DMU76", min_makespan, mean_makespan)
+                            empty_records[p - 1].append(mean_makespan)
                         else:
-                            min_m.to_csv('wo_rep_min_makespan_{}.csv'.format(selected_param))
-                            mean_m.to_csv('wo_rep_mean_makespan_{}.csv'.format(selected_param))
+                            mean_makespan77 = mean_makespan1
+                            min_makespan77 = min_makespan1
+                            print("DMU77", min_makespan, mean_makespan)
+                            empty_records[p - 1].append(mean_makespan)
+
+                        #
+                        # if len(empty_records[1]) > 35 and np.mean(empty_records[1][-30:]) >= 3300:
+                        #     sys.exit()
+
+                        if cfg.vessl == True:
+                            vessl.log(step=s, payload={'minmakespan{}'.format(str(problem_list[p - 1])): min_makespan})
+                            vessl.log(step=s, payload={'meanmakespan{}'.format(str(problem_list[p - 1])): mean_makespan})
+                        else:
+                            validation_records_min[p - 1].append(min_makespan)
+                            validation_records_mean[p - 1].append(mean_makespan)
+                            min_m = pd.DataFrame(validation_records_min)
+                            mean_m = pd.DataFrame(validation_records_mean)
+                            min_m = min_m.transpose()
+                            mean_m = mean_m.transpose()
+                            min_m.columns = problem_list
+                            mean_m.columns = problem_list
+
+                            t1 = time()
+
+                            if params['w_representation_learning'] == True:
+                                min_m.to_csv('w_rep_min_makespan_{}.csv'.format(selected_param))
+                                mean_m.to_csv('w_rep_mean_makespan_{}.csv'.format(selected_param))
+                            else:
+                                min_m.to_csv('wo_rep_min_makespan_{}.csv'.format(selected_param))
+                                mean_m.to_csv('wo_rep_mean_makespan_{}.csv'.format(selected_param))
 
                 wandb.log({
                     "episode": s,
@@ -1265,98 +1324,3 @@ def visualize_model(params, selected_param, log_path=None):
 
     plt.tight_layout()
     plt.show()
-#
-# if __name__ == '__main__':
-#
-#     load_model = False
-#
-#     log_dir = "./result/log"
-#     if not os.path.exists(log_dir + "/ppo"):
-#         os.makedirs(log_dir + "/ppo")
-#
-#     model_dir = "./result/model"
-#     if not os.path.exists(model_dir + "/ppo_w_third_feature"):
-#         os.makedirs(model_dir + "/ppo_w_third_feature")
-#
-#     param_group = 1
-#     params = {
-#         "num_of_process": 6,
-#         "step": cfg.step,
-#         "log_step": cfg.log_step,
-#         "log_dir": log_dir,
-#         "save_step": cfg.save_step,
-#         "model_dir": model_dir,
-#         "batch_size": cfg.batch_size,
-#         "init_min": -0.08,
-#         "init_max": 0.08,
-#         "use_logit_clipping": True,
-#         "C": cfg.C,
-#         "T": cfg.T,
-#         "iteration": cfg.iteration,
-#         "epsilon": float(os.environ.get("epsilon", 0.2)),
-#         "optimizer": "Adam",
-#         "n_glimpse": cfg.n_glimpse,
-#         "n_process": cfg.n_process,
-#         "lr_decay_step_critic": cfg.lr_decay_step_critic,
-#         "load_model": load_model,
-#         "entropy_coeff": float(os.environ.get("entropy_loss", 0.00001)),
-#         "dot_product": cfg.dot_product,
-#         "lr_critic": cfg.lr_critic,
-#
-#         "reward_scaler": cfg.reward_scaler,
-#         "beta": float(os.environ.get("beta", 0.65)),
-#         "alpha": float(os.environ.get("alpha", 0.1)),
-#         "lr_latent": float(os.environ.get("lr_latent", 5.0e-5)),
-#         "lr_critic": float(os.environ.get("lr_critic", 1.0e-4)),
-#         "lr": float(os.environ.get("lr", 1.0e-4)),
-#         "lr_decay": float(os.environ.get("lr_decay", 0.95)),
-#         "lr_decay_step": int(os.environ.get("lr_decay_step",500)),
-#         "layers": eval(str(os.environ.get("layers", '[256, 128]'))),
-#         "n_embedding": int(os.environ.get("n_embedding", 48)),
-#         "n_hidden": int(os.environ.get("n_hidden", 108)),
-#         "graph_embedding_size": int(os.environ.get("graph_embedding_size", 96)),
-#         "n_multi_head": int(os.environ.get("n_multi_head",2)),
-#         "ex_embedding_size": int(os.environ.get("ex_embedding_size",36)),
-#         "ex_embedding_size2": int(os.environ.get("ex_embedding_size2", 48)),
-#         "k_hop": int(os.environ.get("k_hop", 1)),
-#         "is_lr_decay": True,
-#         "third_feature": 'first_and_second',  # first_and_second, first_only, second_only
-#         "baseline_reset": True,
-#         "ex_embedding": True,
-#         "w_representation_learning":True,
-#         "z_dim": 128,
-#         "k_epoch": int(os.environ.get("k_epoch", 1)),
-#         "target_entropy": int(os.environ.get("target_entropy", -2)),
-#     }
-#
-#
-#
-#     wandb.login()
-#     if params['w_representation_learning'] == True:
-#         wandb.init(project="Graph JSSP", name="W_REP GES_{} EXEMB_{}_{}  KHOP_{} NMH_{} NH_{} LR_{} LR CRI_{} LR LAT_{} EC_{}".format(params['graph_embedding_size'],
-#                                                                            params['ex_embedding_size'],
-#                                                                            params['ex_embedding_size2'],
-#                                                                            params['k_hop'],
-#
-#                                                                            params['n_multi_head'],
-#                                                                            params['n_hidden'],
-#                                                                                                                       params['lr'],
-#                                                                                                                       params['lr_critic'],
-#                                                                                                                                 params['lr_latent'],
-#                                                                                                                                 params[
-#                                                                                                                                     'entropy_coeff']
-#                                                                                                                                 ))
-#     else:
-#         wandb.init(project="Graph JSSP", name="WO_REP GES_{} EXEMB_{}_{} KHOP_{} NMH_{} NH_{} LR_{} LR CRI_{} LR LAT_{} EC_{}".format(params['graph_embedding_size'],
-#                                                                            params['ex_embedding_size'],
-#                                                                            params['ex_embedding_size2'],
-#                                                                            params['k_hop'],
-#                                                                            params['n_multi_head'],
-#                                                                            params['n_hidden'],
-#                                                                                                                       params['lr'],
-#                                                                                                                       params['lr_critic'],
-#                                                                                                                                 params['lr_latent'],
-#                                                                                                                                 params[
-#                                                                                                                                     'entropy_coeff']
-#                                                                                                                                 ))
-#     train_model(params)
