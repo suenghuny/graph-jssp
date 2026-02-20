@@ -343,8 +343,12 @@ def train_model(params, selected_param, log_path=None):
                             t1 = time()
 
                             if params['w_representation_learning'] == True:
-                                min_m.to_csv('w_rep_min_makespan_{}.csv'.format(selected_param))
-                                mean_m.to_csv('w_rep_mean_makespan_{}.csv'.format(selected_param))
+                                if cfg.continuous_bernoulli == False:
+                                    min_m.to_csv('w_rep_min_makespan_{}.csv'.format(selected_param))
+                                    mean_m.to_csv('w_rep_mean_makespan_{}.csv'.format(selected_param))
+                                else:
+                                    min_m.to_csv('cont_bernoulli_w_rep_min_makespan_{}.csv'.format(selected_param))
+                                    mean_m.to_csv('cont_bernoulli_w_rep_mean_makespan_{}.csv'.format(selected_param))
                             else:
                                 min_m.to_csv('wo_rep_min_makespan_{}.csv'.format(selected_param))
                                 mean_m.to_csv('wo_rep_mean_makespan_{}.csv'.format(selected_param))
