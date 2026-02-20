@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.distributions import ContinuousBernoulli
 import numpy as np
 from utils import *
 import cfg
@@ -362,9 +363,14 @@ class LatentModel(nn.Module):
             node_pred = node_pred[:,:self.current_num_edges, :]
             edge_pred = edge_pred[:,:self.current_num_edges, :self.current_num_edges,:]
             edge_loss = edge_cats*torch.log(edge_pred)+(1-edge_cats)*torch.log(1-edge_pred)
-            node_loss = X*torch.log(node_pred)+(1-X)*torch.log(1-node_pred)
+
             edge_loss = -edge_loss.mean()
-            node_loss = -node_loss.mean()
+            if cfg.continuous_bernoulli == False:
+                node_loss = X * torch.log(node_pred) + (1 - X) * torch.log(1 - node_pred)
+                node_loss = -node_loss.mean()
+            else:
+                cb_dist = ContinuousBernoulli(probs=node_pred)
+                node_loss = -cb_dist.log_prob(X).mean()
         else:
             edge_loss = None
             node_loss = None

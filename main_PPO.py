@@ -1014,7 +1014,7 @@ def visualize_model(params, selected_param, log_path=None):
         f.write(''.join('%s,%s\n' % item for item in params.items()))
 
     epoch = 0
-    ave_act_loss = 0.0
+    ave_act_loss = 0.01
     ave_cri_loss = 0.0
 
     act_model = PtrNet1(params).to(device)
