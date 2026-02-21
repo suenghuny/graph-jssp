@@ -438,9 +438,14 @@ def train_model(params, selected_param, log_path=None):
                                    s_latent, selected_param,
                                    mean_makespan61))
                             else:
-                                mean_m.to_csv('seperation_after_rep_{}_{}_mean_makespan_{}.csv'.format(
-                                   s_latent, selected_param,
-                                   mean_makespan61))
+                                if cfg.continuous_bernoulli == False:
+                                    mean_m.to_csv('seperation_after_rep_{}_{}_mean_makespan_{}.csv'.format(
+                                       s_latent, selected_param,
+                                       mean_makespan61))
+                                else:
+                                    mean_m.to_csv('continuous_bernoulli_seperation_after_rep_{}_{}_mean_makespan_{}.csv'.format(
+                                        s_latent, selected_param,
+                                        mean_makespan61))
 
                     wandb.log({
                         "episode": s,
