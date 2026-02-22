@@ -43,7 +43,7 @@ def get_cfg():
     parser.add_argument("--feature_selection_mode", type=bool, default=False, help="")
     parser.add_argument("--exclude_feature", type=int, default=0, help="")
     parser.add_argument("--additional_validation", type=bool, default=False, help="")
-    parser.add_argument("--continuous_bernoulli", type=bool, default=False, help="")
+    parser.add_argument("--loss_type", type='str', default='cross_entropy', help="")
 
     return parser.parse_args()
 ##

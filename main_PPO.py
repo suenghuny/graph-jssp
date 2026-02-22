@@ -438,14 +438,19 @@ def train_model(params, selected_param, log_path=None):
                                    s_latent, selected_param,
                                    mean_makespan61))
                             else:
-                                if cfg.continuous_bernoulli == False:
+                                if cfg.loss_type == 'cross_entropy':
                                     mean_m.to_csv('seperation_after_rep_{}_{}_mean_makespan_{}.csv'.format(
                                        s_latent, selected_param,
                                        mean_makespan61))
-                                else:
+                                elif cfg.loss_type == 'continuous_bernoulli':
                                     mean_m.to_csv('continuous_bernoulli_seperation_after_rep_{}_{}_mean_makespan_{}.csv'.format(
                                         s_latent, selected_param,
                                         mean_makespan61))
+                                elif cfg.loss_type == 'mse':
+                                    mean_m.to_csv(
+                                        'mse_seperation_after_rep_{}_{}_mean_makespan_{}.csv'.format(
+                                            s_latent, selected_param,
+                                            mean_makespan61))
 
                     wandb.log({
                         "episode": s,
