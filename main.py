@@ -83,6 +83,47 @@ if __name__ == '__main__':
         "graph_embedding_size": 96,
              }
 
+    param2_64 ={
+             "alpha": 0.05,
+             "n_hidden": 64,
+             "ex_embedding_size": 32,
+             "ex_embedding_size2": 54,
+             "n_multi_head": 1,
+             "k_hop": 1,
+             "lr_latent":  1.0e-4,
+             "lr_critic": 1.0e-4,
+             "lr": 1.0e-4,
+             "entropy_coeff": 0.00001,
+        "entropy_min": 0.000001,
+             "layers": eval('[196, 96]'),
+             "lr_decay_step": 1000,
+             "lr_decay": 0.99,
+             "lr_decay_min": 5e-5,
+             'rep_anneal': 10000,
+        "graph_embedding_size": 96,
+             }
+
+    param2_96 ={
+             "alpha": 0.05,
+             "n_hidden": 96,
+             "ex_embedding_size": 32,
+             "ex_embedding_size2": 54,
+             "n_multi_head": 1,
+             "k_hop": 1,
+             "lr_latent":  1.0e-4,
+             "lr_critic": 1.0e-4,
+             "lr": 1.0e-4,
+             "entropy_coeff": 0.00001,
+        "entropy_min": 0.000001,
+             "layers": eval('[196, 96]'),
+             "lr_decay_step": 1000,
+             "lr_decay": 0.99,
+             "lr_decay_min": 5e-5,
+             'rep_anneal': 10000,
+        "graph_embedding_size": 96,
+             }
+
+
 
     param4 = {
              "alpha": 0.05,
@@ -235,6 +276,8 @@ if __name__ == '__main__':
                     "param1_64": param1_64,
                       "param1_128": param1_128,
                    "param2": param2,
+        "param2_64": param2_64,
+        "param2_96": param2_96,
                   "param4_64": param4_64,
                    "param4": param4,
                    "param4_128": param4_128,
