@@ -44,6 +44,8 @@ def get_cfg():
     parser.add_argument("--exclude_feature", type=int, default=0, help="")
     parser.add_argument("--additional_validation", type=bool, default=False, help="")
     parser.add_argument("--loss_type", type=str, default='cross_entropy', help="")
+    parser.add_argument("--beta_vae", type=bool, default=False, help="")
+    parser.add_argument("--beta_kld", type=float, default=1, help="")
 
     return parser.parse_args()
 ##
