@@ -567,7 +567,7 @@ if __name__ == '__main__':
     aggr = str(os.environ.get("aggr", "mean"))
     s_latent = int(os.environ.get("s_latent", 40000))
 
-    param_group = {
+    param_group = {"param0": param0,
                    "param0_32": param0_32,
         "param0_64": param0_64,
         "param0_96": param0_96,
