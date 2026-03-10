@@ -161,6 +161,26 @@ if __name__ == '__main__':
         "graph_embedding_size": 96,
     }  # not good
 
+    param0_nmh_4 = {
+        "alpha": 0.1,
+        "n_hidden": 108,
+        "ex_embedding_size": 36,
+        "ex_embedding_size2": 48,
+        "n_multi_head": 4,
+        "k_hop": 1,
+        "lr_latent": 1.0e-4,
+        "lr_critic": 1.0e-4,
+        "lr": 1.0e-4,
+        "entropy_coeff": 0.0005,
+        "entropy_min": 0.00,
+        "layers": eval('[128, 96]'),
+        "lr_decay_step": 500,
+        "lr_decay": 0.95,
+        "lr_decay_min": 5e-5,
+        'rep_anneal': 40000,
+        "graph_embedding_size": 96,
+    }  # not good
+
     param1_32 ={
              "alpha": 0.05,
              "n_hidden": 32,
@@ -266,6 +286,26 @@ if __name__ == '__main__':
         "ex_embedding_size": 32,
         "ex_embedding_size2": 54,
         "n_multi_head": 3,
+        "k_hop": 1,
+        "lr_latent": 1.0e-4,
+        "lr_critic": 1.0e-4,
+        "lr": 1.0e-4,
+        "entropy_coeff": 0.001,
+        "entropy_min": 0.0,
+        "layers": eval('[196, 128]'),
+        "lr_decay_step": 600,
+        "lr_decay": 0.99,
+        "lr_decay_min": 5e-5,
+        'rep_anneal': 30000,
+        "graph_embedding_size": 96,
+    }
+
+    param1_nmh_4 = {
+        "alpha": 0.05,
+        "n_hidden": 96,
+        "ex_embedding_size": 32,
+        "ex_embedding_size2": 54,
+        "n_multi_head": 4,
         "k_hop": 1,
         "lr_latent": 1.0e-4,
         "lr_critic": 1.0e-4,
@@ -441,7 +481,25 @@ if __name__ == '__main__':
         'rep_anneal': 30000,
         "graph_embedding_size": 96,
     }
-
+    param4_nmh_4 = {
+        "alpha": 0.05,
+        "n_hidden": 96,
+        "ex_embedding_size": 32,
+        "ex_embedding_size2": 54,
+        "n_multi_head": 4,
+        "k_hop": 1,
+        "lr_latent": 1.0e-4,
+        "lr_critic": 1.0e-4,
+        "lr": 1.0e-4,
+        "entropy_coeff": 0.000,
+        "entropy_min": 0.0,
+        "layers": eval('[196, 128]'),
+        "lr_decay_step": 50000000000,
+        "lr_decay": 1.0,
+        "lr_decay_min": 5e-5,
+        'rep_anneal': 30000,
+        "graph_embedding_size": 96,
+    }
 
     param5 = {
              "alpha": 0.05,
