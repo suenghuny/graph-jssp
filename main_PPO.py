@@ -387,6 +387,7 @@ def train_model(params, selected_param, log_path=None):
                                 min_makespan1, mean_makespan1 = evaluation(act_model, baseline_model, p, eval_number,
                                                                            device)
                         except:
+                            print('try_except1')
                             torch.save({'epoch': s,
                                         'model_state_dict_actor': act_model.state_dict(),
                                         'optimizer_state_dict_actor': act_optim.state_dict(),
@@ -395,9 +396,9 @@ def train_model(params, selected_param, log_path=None):
                                         'ave_makespan': ave_makespan},
 
                                        params[
-                                           "model_dir"] + '/이런 나쁜 seperation_after_rep_{}_{}_step_{}_mean_makespan_{}.pt'.format(
-                                           s_latent, selected_param, s,
-                                           mean_makespan61))
+                                           "model_dir"] + '/이런 나쁜 seperation_after_rep_{}_{}_step_{}.pt'.format(
+                                           s_latent, selected_param, s))
+                            print('try_except2')
                         min_makespan = min_makespan1
                         mean_makespan = mean_makespan1
                         if p == 1:
