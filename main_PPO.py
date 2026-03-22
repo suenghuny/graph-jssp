@@ -381,9 +381,9 @@ def train_model(params, selected_param, log_path=None):
                 if s <= s_latent:
                     if s < s_latent:
                         pass
-                    else:
-                        rep_learning_duration = time()-rep_learning_start
-                        computation_time_dict['representation']= rep_learning_duration
+                    elif s== s_latent:
+                        rep_learning_finish = time()
+
 
                 else:
                     for p in problem_list:
@@ -716,7 +716,11 @@ def train_model(params, selected_param, log_path=None):
                                 (t2 - t1) % 60))
 
         policy_epoch_duration = time()-policy_epoch_duration_start
+
+
         policy_duration+= policy_epoch_duration
+
+        computation_time_dict['representation'] = rep_learning_finish-rep_learning_start
         computation_time_dict['policy'] = policy_duration
         compute_df = pd.DataFrame(computation_time_dict, index=[0])
         compute_df.to_csv('compute_df.csv')
