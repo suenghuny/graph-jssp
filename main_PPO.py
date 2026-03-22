@@ -718,7 +718,7 @@ def train_model(params, selected_param, log_path=None):
         policy_epoch_duration = time()-policy_epoch_duration_start
         policy_duration+= policy_epoch_duration
         computation_time_dict['policy'] = policy_duration
-        compute_df = pd.DataFrame(computation_time_dict)
+        compute_df = pd.DataFrame(computation_time_dict, index=[0])
         compute_df.to_csv('compute_df.csv')
 
 
