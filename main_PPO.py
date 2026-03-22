@@ -239,7 +239,9 @@ def train_model(params, selected_param, log_path=None):
     validation_records_min = [[] for _ in problem_list]
     validation_records_mean = [[] for _ in problem_list]
     empty_records = [[] for _ in problem_list]
-
+    rep_learning_start = time()
+    policy_duration = 0
+    computation_time_dict = {'representation':0, 'policy':0}
     for s in range(epoch + 1, params["step"]):
 
         """
@@ -377,7 +379,12 @@ def train_model(params, selected_param, log_path=None):
                                                                                                      mean_makespan61))
             elif cfg.algo == 'rep_learning':
                 if s <= s_latent:
-                    pass
+                    if s < s_latent:
+                        pass
+                    else:
+                        rep_learning_duration = time()-rep_learning_start
+                        computation_time_dict['representation']= rep_learning_duration
+
                 else:
                     for p in problem_list:
 
@@ -491,7 +498,7 @@ def train_model(params, selected_param, log_path=None):
                                params["model_dir"] + '/seperation_after_rep_{}_{}_step_{}_mean_makespan_{}.pt'.format(
                                    s_latent, selected_param, s,
                                    mean_makespan61))
-
+        policy_epoch_duration_start = time()
         act_model.block_indices = []
         baseline_model.block_indices = []
 
@@ -707,6 +714,12 @@ def train_model(params, selected_param, log_path=None):
                                 s, params["step"], ave_act_loss / ((s + 1) * params["iteration"]),
                                 ave_cri_loss / ((s + 1) * params["iteration"]), ave_makespan, (t2 - t1) // 60,
                                 (t2 - t1) % 60))
+
+        policy_epoch_duration = time()-policy_epoch_duration_start
+        policy_duration+= policy_epoch_duration
+        computation_time_dict['policy'] = policy_duration
+        compute_df = pd.DataFrame(computation_time_dict)
+        compute_df.to_csv('compute_df.csv')
 
 
 def test(act_model, baseline_model, p, eval_number, device, problems, upperbound=None):

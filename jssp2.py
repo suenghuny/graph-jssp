@@ -301,162 +301,138 @@ class AdaptiveScheduler:
 
 
         return makespan, est_holder, fin_holder, critical_path_list, critical_path_ij_list
-
-    def adaptive_run(self, est_holder, fin_holder, mwkr_holder1, mwkr_holder2,i= None):
-
-        if i != None:
-            """
-            if j is determines, i is determined following the j:
-                p_ij 
-            p-prime_j^{t}=p_j^{t}+p_ij
-            p-prime_i^{t}=p_i^{t}+p_ij
-            p-prime_i^{t}=max(p_j^{t}+p_ij, p_i^{t}+p_ij)
-            p-prime_j^{t}=max(p_j^{t}+p_ij, p_i^{t}+p_ij)
-            
-            Earliest Processing Time
-            e_ij^{t} = max(p-prime_i^{t}, p-prime_j^{t})
-                     = max(p_i^{t-1}+p_ik, p_j^{t-1}+p_lj)
-            
-            Earliest Finish Time
-            f^{t} = max(p_i^{t}, p_j^{t})+p_ij
-                  = max(p_i^{t-1}+p_ik, p_j^{t-1}+p_il)+p_ij
-            
-            LB
-            l^{t} = e^{t}+r^{t}
-            
-            
-            """
-            gen_t = int(self.pt[i][self.key_count[i]])        # 선택된 operation에 대한 processing time 선택
-            gen_m = int(self.ms[i][self.key_count[i]])        # 선택된 operation에 대한 machine_sequence 선택
-            self.j_count[i]     = self.j_count[i] + gen_t          # Job i에 대한 누적 작업 완료시간 업데이트
-            self.m_count[gen_m] = self.m_count[gen_m] + gen_t  # Machine gen_m에 대한 누적 작업 완료시간 업데이트
-            self.total_processing_time_by_machine[gen_m - 1]-=gen_t
+    def adaptive_run(self, est_holder, fin_holder, mwkr_holder1, mwkr_holder2, i=None):
+        if i is not None:
+            gen_t = int(self.pt[i][self.key_count[i]])
+            gen_m = int(self.ms[i][self.key_count[i]])
+            self.j_count[i] = self.j_count[i] + gen_t
+            self.m_count[gen_m] = self.m_count[gen_m] + gen_t
+            self.total_processing_time_by_machine[gen_m - 1] -= gen_t
             self.total_processing_time_by_job[i] -= gen_t
             if self.m_count[gen_m] < self.j_count[i]:
                 self.m_count[gen_m] = self.j_count[i]
             elif self.m_count[gen_m] > self.j_count[i]:
-                self.j_count[i] = self.m_count[gen_m]          # if 및 elif 문은 각각의 누적 작업 완료시간을 큰 녀석으로 업데이트 한다는 의미
-            self.key_count[i] = self.key_count[i] + 1          # 해당 Job이 몇번 선택되었는지 count하는 것 업데이트
-        makespan = max(self.j_count.values())
-        estI_list = list()
-        gentI_list = list()
-        for j_prime, i_prime in self.key_count.items():
-            I = j_prime
-            if i_prime != self.num_mc:
-                gen_tI = int(self.pt[I][self.key_count[I]])
-                gen_mI = int(self.ms[I][self.key_count[I]])
-                estI   = max(self.j_count[I], self.m_count[gen_mI])
+                self.j_count[i] = self.m_count[gen_m]
+            self.key_count[i] = self.key_count[i] + 1
+
+        # ── 로컬 alias (attribute lookup 비용 제거, 복사 없음) ──────────────
+        key_count = self.key_count
+        j_count = self.j_count
+        m_count = self.m_count
+        pt = self.pt
+        ms = self.ms
+        num_mc = self.num_mc
+        num_job = self.num_job
+        tpm = self.total_processing_time_by_machine
+        tpj = self.total_processing_time_by_job
+
+        makespan = max(j_count.values())
+
+        # ── [최적화 1] 두 개였던 outer loop → 한 번으로 합침 ───────────────
+        # 첫 pass: estI / gentI 수집 (정규화에 필요한 max를 미리 확정)
+        incomplete_jobs = []  # (j_prime, i_prime, gen_tI, gen_mI, estI)
+        estI_list = []
+        gentI_list = []
+
+        for j_prime, i_prime in key_count.items():
+            if i_prime != num_mc:
+                gen_tI = int(pt[j_prime][i_prime])
+                gen_mI = int(ms[j_prime][i_prime])
+                estI = max(j_count[j_prime], m_count[gen_mI])
                 estI_list.append(estI)
-                gentI_list.append(estI+gen_tI)
+                gentI_list.append(estI + gen_tI)
+                incomplete_jobs.append((j_prime, i_prime, gen_tI, gen_mI, estI))
+
+        max_estI = max(estI_list) if estI_list else 0
+        max_gentI = max(gentI_list) if gentI_list else 0
+
+        # mwkr 계산용 (원본과 동일)
+        current_max = max(key_count.values()) if key_count else 0
+        current_sum = sum(key_count.values()) if key_count else 0
+
+        critical_path_list = np.zeros([num_job, num_mc])
+        critical_path_ij_list = np.zeros([num_job, num_mc])
+
+        # ── 두 번째 pass: 나머지 연산 ─────────────────────────────────────
+        for j_prime, i_prime, gen_tI, gen_mI, estI in incomplete_jobs:
+
+            # est / fin / mwkr holder
+            if max_estI != 0:
+                est_holder[j_prime][i_prime] = estI / max_estI
+                fin_holder[j_prime][i_prime] = (estI + gen_tI) / max_gentI
+                new_max = max(current_max, i_prime + 1)
+                new_mean = (current_sum + 1) / num_job
+                mwkr_holder1[j_prime][i_prime] = new_max / num_mc
+                mwkr_holder2[j_prime][i_prime] = new_mean / num_mc
             else:
-                pass
+                if max_estI == 0: pass  # 원본 동작 유지
 
+            # ── [최적화 2] .copy() (O(n)) → in-place 뮤테이션 + 복원 (O(1)) ──
+            # gen_tI / gen_mI 는 이미 위에서 계산된 값과 동일하므로 재사용
+            orig_jc = j_count[j_prime]
+            orig_mc = m_count[gen_mI]
+            orig_tpm = tpm[gen_mI - 1]
+            orig_tpj = tpj[j_prime]
 
-        critical_path_list    = np.zeros([self.num_job, self.num_mc])
-        critical_path_ij_list = np.zeros([self.num_job, self.num_mc])
-        for j_prime, i_prime in self.key_count.items():
-            I = j_prime
-            if i_prime != self.num_mc:
-                gen_tI = int(self.pt[I][self.key_count[I]])
-                gen_mI = int(self.ms[I][self.key_count[I]])
-                estI = max(self.j_count[I], self.m_count[gen_mI])
-                if len(estI_list)>0 and np.max(estI_list)!=0:
-                    est_holder[I][self.key_count[I]] = estI/np.max(estI_list)
-                    fin_holder[I][self.key_count[I]] = (estI+gen_tI)/np.max(gentI_list)
-                    copied_key_count = deepcopy(self.key_count)
+            # 원본의 if/elif sync 를 수식 한 줄로 표현 (결과 동일)
+            new_val = max(orig_jc, orig_mc) + gen_tI
+            j_count[j_prime] = new_val
+            m_count[gen_mI] = new_val
+            tpm[gen_mI - 1] -= gen_tI
+            tpj[j_prime] -= gen_tI
 
-                    copied_key_count[I] = copied_key_count[I] + 1
-                    #print(copied_key_count)
-                    #print(copied_key_count.values())
-                    mwkr_holder1[I][self.key_count[I]] = np.max(list(copied_key_count.values())) / self.num_mc
-                    mwkr_holder2[I][self.key_count[I]] = np.mean(list(copied_key_count.values())) / self.num_mc
-                else: # 첫번째 operation에 대해서는 1로 처리한다.
-                    if np.max(estI_list)==0:pass
-                """
-                ES, EF
-                
-                """
-                #
-                key_count = deepcopy(self.key_count)
-                j_count = deepcopy(self.j_count)
-                m_count = deepcopy(self.m_count)
-                total_processing_time_by_machine = deepcopy(self.total_processing_time_by_machine)
-                total_processing_time_by_job = deepcopy(self.total_processing_time_by_job)
-                try:
-                    gen_t = int(self.pt[j_prime][key_count[j_prime]])  # 선택된 operation에 대한 processing time 선택
-                    gen_m = int(self.ms[j_prime][key_count[j_prime]])  # 선택된 operation에 대한 machine_sequence 선택
-                    j_count[j_prime] = j_count[j_prime] + gen_t  # Job i에 대한 누적 작업 완료시간 업데이트
-                    m_count[gen_m] = m_count[gen_m] + gen_t  # Machine gen_m에 대한 누적 작업 완료시간 업데이트
-                    if m_count[gen_m] < j_count[j_prime]:
-                        m_count[gen_m] = j_count[j_prime]
-                    elif m_count[gen_m] > j_count[j_prime]:
-                        j_count[j_prime] = m_count[gen_m]  # if 및 elif 문은 각각의 누적 작업 완료시간을 큰 녀석으로 업데이트 한다는 의미
-                    total_processing_time_by_machine[gen_m - 1] -= gen_t
-                    total_processing_time_by_job[j_prime] -= gen_t
-                    gen_t_cum = j_count[j_prime] + total_processing_time_by_job[j_prime]
-                    gen_m_prime = int(self.ms[j_prime][key_count[j_prime] + 1])
-                    gen_m_cum = m_count[gen_m_prime] + total_processing_time_by_machine[gen_m_prime - 1]
-                    critical_path_ij_list[j_prime][i_prime] = np.max([gen_t_cum, gen_m_cum])
-                except IndexError as IE:
-                    critical_path_ij_list[j_prime][i_prime] = 0
+            # critical_path_ij_list
+            try:
+                gen_t_cum = j_count[j_prime] + tpj[j_prime]
+                gen_m_next = int(ms[j_prime][i_prime + 1])
+                gen_m_cum = m_count[gen_m_next] + tpm[gen_m_next - 1]
+                critical_path_ij_list[j_prime][i_prime] = max(gen_t_cum, gen_m_cum)
+            except IndexError:
+                critical_path_ij_list[j_prime][i_prime] = 0
 
-                key_count[j_prime] = key_count[j_prime] + 1
-                longest_path_list = list()
-                for j, i in key_count.items():
-                    if i != self.num_mc:
-                        gen_m_prime = self.ms[j][key_count[j]]  # remain processing time (해당 machine의 남은 operation에 대한 processing time의 합)
-                        longest_path_list.append(np.max([m_count[gen_m_prime] + total_processing_time_by_machine[gen_m_prime - 1],
-                                    j_count[j] + total_processing_time_by_job[j_prime]
-                                    ]))
-                    else:
-                        pass
+            # inner loop 용 key_count 임시 증가
+            key_count[j_prime] = i_prime + 1
 
-                if len(longest_path_list) > 0:
-                    critical_path_list[j_prime][i_prime] = np.max(longest_path_list)
-                else:
-                    critical_path_list[j_prime][i_prime] = 0
-        if np.max(critical_path_list) != 0:
-            critical_path_list    = critical_path_list/np.max(critical_path_list)
-        if np.max(critical_path_ij_list) != 0:
-            critical_path_ij_list = critical_path_ij_list/ np.max(critical_path_ij_list)
-        ##########################################################################################
-        ##########################################################################################
-        ##########################################################################################
-        ##########################################################################################
-        # for j_prime, i_prime in self.key_count.items():
-        #     i = j_prime
-        #     if i_prime != self.num_mc:
-        #         key_count = deepcopy(self.key_count)
-        #         j_count = deepcopy(self.j_count)
-        #         m_count = deepcopy(self.m_count)
-        #         gen_t = int(self.pt[i][key_count[i]])
-        #         gen_m = int(self.ms[i][key_count[i]])
-        #         j_count[i] = j_count[i] + gen_t
-        #         m_count[gen_m] = m_count[gen_m] + gen_t
-        #         if m_count[gen_m] < j_count[i]:
-        #             m_count[gen_m] = j_count[i]
-        #         elif m_count[gen_m] > j_count[i]:
-        #             j_count[i] = m_count[gen_m]
-        #         key_count[i] = key_count[i] + 1
-        #
-        #
-        #     for _ in range(self.num_ops - (self.cum_seq_len + 1)):
-        #         i = min(j_count, key=j_count.get)
-        #         i_prime = key_count[i]
-        #         if i_prime != self.num_mc:
-        #             gen_t = int(self.pt[i][key_count[i]])
-        #             gen_m = int(self.ms[i][key_count[i]])
-        #             j_count[i] = j_count[i] + gen_t
-        #             m_count[gen_m] = m_count[gen_m] + gen_t
-        #             if m_count[gen_m] < j_count[i]:
-        #                 m_count[gen_m] = j_count[i]
-        #             elif m_count[gen_m] > j_count[i]:
-        #                 j_count[i] = m_count[gen_m]
-        #             key_count[i] = key_count[i] + 1
-        #
-        #     makespan = max(self.j_count.values())
-        ##########################################################################################
-       # print(mwkr_holder1)
+            # ── [최적화 3] inner loop: longest_path_list 제거 ───────────────
+            # 원본: max over j of max(term1_j, term2_j)
+            #      = max( max_j(term1_j),  max_j(term2_j) )
+            # term2_j = j_count[j] + tpj[j_prime]  ← tpj[j_prime]는 inner loop에서 상수
+            # 따라서 max_j(term2_j) = max_j(j_count[j]) + tpj[j_prime]
+            max_term1 = -1
+            max_jcount = -1
+            has_incomplete = False
+
+            for j, kc_j in key_count.items():
+                if kc_j != num_mc:
+                    has_incomplete = True
+                    gm_inner = ms[j][kc_j]
+                    t1 = m_count[gm_inner] + tpm[gm_inner - 1]
+                    if t1 > max_term1:
+                        max_term1 = t1
+                    jc_j = j_count[j]
+                    if jc_j > max_jcount:
+                        max_jcount = jc_j
+
+            if has_incomplete:
+                max_term2 = max_jcount + tpj[j_prime]
+                critical_path_list[j_prime][i_prime] = max(max_term1, max_term2)
+            # else: 0 유지 (np.zeros 초기화)
+
+            # ── in-place 복원 ─────────────────────────────────────────────
+            j_count[j_prime] = orig_jc
+            m_count[gen_mI] = orig_mc
+            tpm[gen_mI - 1] = orig_tpm
+            tpj[j_prime] = orig_tpj
+            key_count[j_prime] = i_prime
+
+        # 정규화
+        max_cp = np.max(critical_path_list)
+        if max_cp != 0:
+            critical_path_list /= max_cp
+        max_cpij = np.max(critical_path_ij_list)
+        if max_cpij != 0:
+            critical_path_ij_list /= max_cpij
+
         return makespan, est_holder, fin_holder, critical_path_list, critical_path_ij_list, mwkr_holder1, mwkr_holder2
 
     def check_avail_ops(self, avail_ops):
