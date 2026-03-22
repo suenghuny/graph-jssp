@@ -379,11 +379,7 @@ def train_model(params, selected_param, log_path=None):
                                                                                                      mean_makespan61))
             elif cfg.algo == 'rep_learning':
                 if s <= s_latent:
-                    if s < s_latent:
-                        pass
-                    elif s== s_latent:
-                        rep_learning_finish = time()
-
+                    pass
 
                 else:
                     for p in problem_list:
@@ -720,7 +716,11 @@ def train_model(params, selected_param, log_path=None):
 
         policy_duration+= policy_epoch_duration
 
-        computation_time_dict['representation'] = rep_learning_finish-rep_learning_start
+        if s < s_latent:
+            pass
+        elif s == s_latent:
+            rep_learning_finish = time()
+            computation_time_dict['representation'] = rep_learning_finish-rep_learning_start
         computation_time_dict['policy'] = policy_duration
         compute_df = pd.DataFrame(computation_time_dict, index=[0])
         compute_df.to_csv('compute_df.csv')
