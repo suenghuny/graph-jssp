@@ -47,5 +47,10 @@ def get_cfg():
     parser.add_argument("--beta_vae", type=bool, default=False, help="")
     parser.add_argument("--beta_kld", type=float, default=1, help="")
 
+    parser.add_argument("--state_feature_selection", type=bool, default=False, help="")
+    parser.add_argument("--state_feature_group", type=str, default='group1', help="")
+
+
+
     return parser.parse_args()
 ##

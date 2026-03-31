@@ -454,6 +454,15 @@ def train_model(params, selected_param, log_path=None):
                                     s_latent, selected_param,
                                     mean_makespan61))
 
+                            if cfg.state_feature_selection == False:
+                                pass
+                            else:
+                                mean_m.to_csv(
+                                    'state_feature_selection_mode_{}_seperation_after_rep_{}_{}_mean_makespan_{}.csv'.format(
+                                   cfg.state_feature_group,
+                                   s_latent, selected_param,
+                                   mean_makespan61))
+
 
                             if cfg.feature_selection_mode==True:
                                 mean_m.to_csv(

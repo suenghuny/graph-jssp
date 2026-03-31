@@ -75,7 +75,11 @@ class PtrNet1(nn.Module):
         self.critic = Critic(z_dim)
         self.Latent = LatentModel(z_dim=z_dim, params = params).to(device)
         augmented_hidden_size = params["n_hidden"]
-        self.ex_embedding = ExEmbedding(raw_feature_size=6, feature_size= params["n_hidden"])
+
+        if cfg.state_feature_selection==False:
+            self.ex_embedding = ExEmbedding(raw_feature_size=6, feature_size= params["n_hidden"])
+        else:
+            self.ex_embedding = ExEmbedding(raw_feature_size=4, feature_size=params["n_hidden"])
 
         # Vec 파라미터 리스트 생성 (문제 없음)
         self.W_v = nn.ParameterList([nn.Parameter(torch.FloatTensor(2 * params["n_hidden"], 2 * params["n_hidden"]))for _ in range(self.n_multi_head)])
@@ -318,9 +322,8 @@ class PtrNet1(nn.Module):
             empty_zero = empty_zero.unsqueeze(2)
             empty_zero2 = empty_zero2.unsqueeze(2)
             # print(est_placeholder.shape, mwkr_placeholder2.shape)
-            r_temp = torch.concat(
-                [est_placeholder, fin_placeholder, empty_zero, empty_zero2, mwkr_placeholder1, mwkr_placeholder2],
-                dim=2)  # extended node embedding을 만드는 부분(z_t_i에 해당)
+
+            r_temp = torch.concat([est_placeholder, fin_placeholder, empty_zero, empty_zero2, mwkr_placeholder1, mwkr_placeholder2], dim=2)  # extended node embedding을 만드는 부분(z_t_i에 해당)
 
             r_temp = r_temp.reshape([batch * num_operations, -1])
             r_temp = self.ex_embedding(r_temp)
@@ -484,7 +487,16 @@ class PtrNet1(nn.Module):
             empty_zero = empty_zero.unsqueeze(2)
             empty_zero2 = empty_zero2.unsqueeze(2)
            # print(est_placeholder.shape, mwkr_placeholder2.shape)
-            r_temp = torch.concat([est_placeholder, fin_placeholder, empty_zero, empty_zero2, mwkr_placeholder1,mwkr_placeholder2], dim=2)  # extended node embedding을 만드는 부분(z_t_i에 해당)
+
+            if cfg.state_feature_selection==False:
+                r_temp = torch.concat([est_placeholder, fin_placeholder, empty_zero, empty_zero2, mwkr_placeholder1,mwkr_placeholder2], dim=2)  # extended node embedding을 만드는 부분(z_t_i에 해당)
+            else:
+                if cfg.state_feature_group=='group1':
+                    r_temp = torch.concat([est_placeholder, fin_placeholder, empty_zero, empty_zero2, mwkr_placeholder1, mwkr_placeholder2], dim=2)
+                elif cfg.state_feature_group == 'group2':
+                    r_temp = torch.concat([est_placeholder, fin_placeholder, mwkr_placeholder1,  mwkr_placeholder2], dim=2)
+                elif cfg.state_feature_group == 'group3':
+                    r_temp = torch.concat([est_placeholder, fin_placeholder, empty_zero, empty_zero2], dim=2)
 
             r_temp = r_temp.reshape([batch*num_operations, -1])
             r_temp = self.ex_embedding(r_temp)
