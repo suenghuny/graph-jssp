@@ -264,11 +264,11 @@ def train_model(params, selected_param, log_path=None):
 
                     if cfg.additional_validation == True:
                         if p == 1:
-                            mean_makespan21 = mean_makespan1
+                            mean_makespan61 = mean_makespan1
                             print("TA71", min_makespan, mean_makespan)
                             empty_records[p - 1].append(mean_makespan)
                         elif p == 2:
-                            mean_makespan22 = mean_makespan1
+                            mean_makespan62 = mean_makespan1
                             print("TA72", min_makespan, mean_makespan)
                             empty_records[p - 1].append(mean_makespan)
                         elif p == 3:
