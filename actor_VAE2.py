@@ -79,7 +79,10 @@ class PtrNet1(nn.Module):
         if cfg.state_feature_selection==False:
             self.ex_embedding = ExEmbedding(raw_feature_size=6, feature_size= params["n_hidden"])
         else:
-            self.ex_embedding = ExEmbedding(raw_feature_size=4, feature_size=params["n_hidden"])
+            if cfg.state_feature_group=='light-version':
+                self.ex_embedding = ExEmbedding(raw_feature_size=3, feature_size=params["n_hidden"])
+            else:
+                self.ex_embedding = ExEmbedding(raw_feature_size=4, feature_size=params["n_hidden"])
 
         # Vec 파라미터 리스트 생성 (문제 없음)
         self.W_v = nn.ParameterList([nn.Parameter(torch.FloatTensor(2 * params["n_hidden"], 2 * params["n_hidden"]))for _ in range(self.n_multi_head)])
@@ -98,12 +101,6 @@ class PtrNet1(nn.Module):
         attention_params_1 = list(self.W_v) + [p for m in self.W_q for p in m.parameters()] + [p for m in self.W_k for
                                                                                                p in m.parameters()] +[p for m in self.W_o for
                                                                                                p in m.parameters()]
-        # attention_params_2 = list(self.Vec3) + [p for m in self.W_q3 for p in m.parameters()] + [p for m in self.W_ref3
-        #                                                                                          for p in
-        #                                                                                          m.parameters()]
-        # attention_params_3 = list(self.Vec4) + [p for m in self.W_q4 for p in m.parameters()] + [p for m in self.W_ref4
-        #                                                                                          for p in
-        #                                                                                          m.parameters()]
 
         # 마지막 포인터 네트워크 관련 파라미터
         pointer_params = [self.Vec2, self.W_q2.weight]
@@ -428,18 +425,41 @@ class PtrNet1(nn.Module):
 
 
                 for nb in range(batch_size):
-                    c_max, est, fin, critical_path, critical_path2,mwkr1,mwkr2 = scheduler_list[nb].adaptive_run(est_placeholder[nb],
-                                                                                                     fin_placeholder[nb],
-                                                                                                     mwkr_placeholder1[nb],
-                                                                                                     mwkr_placeholder2[nb],
-                                                                                                     )
-                    #print(empty_zero.shape, critical_path.shape)
-                    empty_zero[nb, :] = torch.tensor(critical_path.reshape(-1)).to(device)# 안중요
-                    empty_zero2[nb, :] = torch.tensor(critical_path2.reshape(-1)).to(device)  # 안중요
-                    est_placeholder[nb] = est
-                    fin_placeholder[nb] = fin
-                    mwkr_placeholder1[nb] = mwkr1
-                    mwkr_placeholder2[nb] = mwkr2
+
+                    if cfg.state_feature_selection == False:
+                        c_max, est, fin, critical_path, critical_path2,mwkr1,mwkr2 = scheduler_list[nb].adaptive_run(est_placeholder[nb],
+                                                                                                         fin_placeholder[nb],
+                                                                                                         mwkr_placeholder1[nb],
+                                                                                                         mwkr_placeholder2[nb],
+                                                                                                         )
+                        empty_zero[nb, :] = torch.tensor(critical_path.reshape(-1)).to(device)# 안중요
+                        empty_zero2[nb, :] = torch.tensor(critical_path2.reshape(-1)).to(device)  # 안중요
+                        est_placeholder[nb] = est
+                        fin_placeholder[nb] = fin
+                        mwkr_placeholder1[nb] = mwkr1
+                        mwkr_placeholder2[nb] = mwkr2
+                    else:
+                        if cfg.state_feature_group == 'light-version':
+                            est, fin, critical_path = scheduler_list[nb].adaptive_run_light(
+                                                 est_placeholder[nb],
+                                                 fin_placeholder[nb]
+                                                 )
+                            empty_zero[nb, :] = torch.tensor(critical_path.reshape(-1)).to(device)  # 안중요
+                            est_placeholder[nb] = est
+                            fin_placeholder[nb] = fin
+                        else:
+                            c_max, est, fin, critical_path, critical_path2, mwkr1, mwkr2 = scheduler_list[
+                                nb].adaptive_run(est_placeholder[nb],
+                                                 fin_placeholder[nb],
+                                                 mwkr_placeholder1[nb],
+                                                 mwkr_placeholder2[nb],
+                                                 )
+                            empty_zero[nb, :] = torch.tensor(critical_path.reshape(-1)).to(device)  # 안중요
+                            empty_zero2[nb, :] = torch.tensor(critical_path2.reshape(-1)).to(device)  # 안중요
+                            est_placeholder[nb] = est
+                            fin_placeholder[nb] = fin
+                            mwkr_placeholder1[nb] = mwkr1
+                            mwkr_placeholder2[nb] = mwkr2
 
 
 
@@ -454,49 +474,83 @@ class PtrNet1(nn.Module):
                 cp_list = []
                 for nb in range(batch_size):
                     if old_sequence != None:
-                        #print(old_sequence.shape)
                         next_b = old_sequence[nb, i].item()
                     else:
                         next_b = next_job[nb].item()
-                    c_max, est, fin, critical_path, critical_path2,mwkr1,mwkr2  = scheduler_list[nb].adaptive_run(
-                        est_placeholder[nb], fin_placeholder[nb],
-                        mwkr_placeholder1[nb],
-                        mwkr_placeholder2[nb],
-                        i = next_b) # next_b는 이전 스텝에서 선택된 Job이고, Adaptive Run이라는 것은 선택된 Job에 따라 update한 다음에 EST, EFIN을 구하라는 의미
+                    if cfg.state_feature_selection == False:
+                        c_max, est, fin, critical_path, critical_path2,mwkr1,mwkr2  = scheduler_list[nb].adaptive_run(
+                            est_placeholder[nb], fin_placeholder[nb],
+                            mwkr_placeholder1[nb],
+                            mwkr_placeholder2[nb],
+                            i = next_b) # next_b는 이전 스텝에서 선택된 Job이고, Adaptive Run이라는 것은 선택된 Job에 따라 update한 다음에 EST, EFIN을 구하라는 의미
 
-                    empty_zero[nb, :]  = torch.tensor(critical_path.reshape(-1)).to(device)
-                    empty_zero2[nb, :] = torch.tensor(critical_path2.reshape(-1)).to(device)  # 안중요
-                    est_placeholder[nb] = est
-                    fin_placeholder[nb] = fin
-                    # print("전",est[0])
-                    # print("후",est_placeholder[nb][0])
-                    # print('====================')
-                    mwkr_placeholder1[nb] = mwkr1
-                    mwkr_placeholder2[nb] = mwkr2
-                    """
-                    
-                    Branch and Cut 로직에 따라 masking을 수행함
-                    모두 다 masking 처리할 수도 있으므로, 모두다 masking할 경우에는 mask로 복원 (if 1 not in mask)
-                    
-                    """
+                        empty_zero[nb, :]  = torch.tensor(critical_path.reshape(-1)).to(device)
+                        empty_zero2[nb, :] = torch.tensor(critical_path2.reshape(-1)).to(device)  # 안중요
+                        est_placeholder[nb] = est
+                        fin_placeholder[nb] = fin
+                        mwkr_placeholder1[nb] = mwkr1
+                        mwkr_placeholder2[nb] = mwkr2
+                    else:
+                        if cfg.state_feature_group == 'light-version':
+                            est, fin, critical_path = scheduler_list[nb].adaptive_run_light(
+                                est_placeholder[nb], fin_placeholder[nb],
+                                i=next_b)  # next_b는 이전 스텝에서 선택된 Job이고, Adaptive Run이라는 것은 선택된 Job에 따라 update한 다음에 EST, EFIN을 구하라는 의미
 
-            est_placeholder = est_placeholder.reshape(batch_size, -1).unsqueeze(2)
-            fin_placeholder = fin_placeholder.reshape(batch_size, -1).unsqueeze(2)
-            mwkr_placeholder1 = mwkr_placeholder1.reshape(batch_size, -1).unsqueeze(2)
-            mwkr_placeholder2 = mwkr_placeholder2.reshape(batch_size, -1).unsqueeze(2)
-            empty_zero = empty_zero.unsqueeze(2)
-            empty_zero2 = empty_zero2.unsqueeze(2)
-           # print(est_placeholder.shape, mwkr_placeholder2.shape)
+                            empty_zero[nb, :] = torch.tensor(critical_path.reshape(-1)).to(device)
+
+                            est_placeholder[nb] = est
+                            fin_placeholder[nb] = fin
+                        else:
+                            c_max, est, fin, critical_path, critical_path2, mwkr1, mwkr2 = scheduler_list[
+                                nb].adaptive_run(
+                                est_placeholder[nb], fin_placeholder[nb],
+                                mwkr_placeholder1[nb],
+                                mwkr_placeholder2[nb],
+                                i=next_b)  # next_b는 이전 스텝에서 선택된 Job이고, Adaptive Run이라는 것은 선택된 Job에 따라 update한 다음에 EST, EFIN을 구하라는 의미
+
+                            empty_zero[nb, :] = torch.tensor(critical_path.reshape(-1)).to(device)
+                            empty_zero2[nb, :] = torch.tensor(critical_path2.reshape(-1)).to(device)  # 안중요
+                            est_placeholder[nb] = est
+                            fin_placeholder[nb] = fin
+                            mwkr_placeholder1[nb] = mwkr1
+                            mwkr_placeholder2[nb] = mwkr2
+
+
 
             if cfg.state_feature_selection==False:
+                est_placeholder = est_placeholder.reshape(batch_size, -1).unsqueeze(2)
+                fin_placeholder = fin_placeholder.reshape(batch_size, -1).unsqueeze(2)
+                mwkr_placeholder1 = mwkr_placeholder1.reshape(batch_size, -1).unsqueeze(2)
+                mwkr_placeholder2 = mwkr_placeholder2.reshape(batch_size, -1).unsqueeze(2)
+                empty_zero = empty_zero.unsqueeze(2)
+                empty_zero2 = empty_zero2.unsqueeze(2)
+
                 r_temp = torch.concat([est_placeholder, fin_placeholder, empty_zero, empty_zero2, mwkr_placeholder1,mwkr_placeholder2], dim=2)  # extended node embedding을 만드는 부분(z_t_i에 해당)
             else:
                 if cfg.state_feature_group=='group1':
-                    r_temp = torch.concat([est_placeholder, fin_placeholder, empty_zero, empty_zero2, mwkr_placeholder1, mwkr_placeholder2], dim=2)
+                    mwkr_placeholder1 = mwkr_placeholder1.reshape(batch_size, -1).unsqueeze(2)
+                    mwkr_placeholder2 = mwkr_placeholder2.reshape(batch_size, -1).unsqueeze(2)
+                    empty_zero = empty_zero.unsqueeze(2)
+                    empty_zero2 = empty_zero2.unsqueeze(2)
+                    r_temp = torch.concat([empty_zero, empty_zero2, mwkr_placeholder1, mwkr_placeholder2], dim=2)
                 elif cfg.state_feature_group == 'group2':
+                    est_placeholder = est_placeholder.reshape(batch_size, -1).unsqueeze(2)
+                    fin_placeholder = fin_placeholder.reshape(batch_size, -1).unsqueeze(2)
+                    mwkr_placeholder1 = mwkr_placeholder1.reshape(batch_size, -1).unsqueeze(2)
+                    mwkr_placeholder2 = mwkr_placeholder2.reshape(batch_size, -1).unsqueeze(2)
                     r_temp = torch.concat([est_placeholder, fin_placeholder, mwkr_placeholder1,  mwkr_placeholder2], dim=2)
                 elif cfg.state_feature_group == 'group3':
+                    est_placeholder = est_placeholder.reshape(batch_size, -1).unsqueeze(2)
+                    fin_placeholder = fin_placeholder.reshape(batch_size, -1).unsqueeze(2)
+                    empty_zero = empty_zero.unsqueeze(2)
+                    empty_zero2 = empty_zero2.unsqueeze(2)
                     r_temp = torch.concat([est_placeholder, fin_placeholder, empty_zero, empty_zero2], dim=2)
+                elif cfg.state_feature_group == 'light-version':
+                    est_placeholder = est_placeholder.reshape(batch_size, -1).unsqueeze(2)
+                    fin_placeholder = fin_placeholder.reshape(batch_size, -1).unsqueeze(2)
+                    empty_zero = empty_zero.unsqueeze(2)
+                    r_temp = torch.concat([est_placeholder, fin_placeholder, empty_zero], dim=2)
+
 
             r_temp = r_temp.reshape([batch*num_operations, -1])
             r_temp = self.ex_embedding(r_temp)

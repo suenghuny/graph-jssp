@@ -435,6 +435,109 @@ class AdaptiveScheduler:
 
         return makespan, est_holder, fin_holder, critical_path_list, critical_path_ij_list, mwkr_holder1, mwkr_holder2
 
+    def adaptive_run_light(self, est_holder, fin_holder, i=None):
+        if i is not None:
+            gen_t = int(self.pt[i][self.key_count[i]])
+            gen_m = int(self.ms[i][self.key_count[i]])
+            self.j_count[i] = self.j_count[i] + gen_t
+            self.m_count[gen_m] = self.m_count[gen_m] + gen_t
+            self.total_processing_time_by_machine[gen_m - 1] -= gen_t
+            self.total_processing_time_by_job[i] -= gen_t
+            if self.m_count[gen_m] < self.j_count[i]:
+                self.m_count[gen_m] = self.j_count[i]
+            elif self.m_count[gen_m] > self.j_count[i]:
+                self.j_count[i] = self.m_count[gen_m]
+            self.key_count[i] = self.key_count[i] + 1
+
+        # ── 로컬 alias ────────────────────────────────────────────────────
+        key_count = self.key_count
+        j_count = self.j_count
+        m_count = self.m_count
+        pt = self.pt
+        ms = self.ms
+        num_mc = self.num_mc
+        num_job = self.num_job
+        tpm = self.total_processing_time_by_machine
+        tpj = self.total_processing_time_by_job
+
+        # ── 첫 pass: estI / gentI 수집 (정규화용 max 확정) ────────────────
+        incomplete_jobs = []  # (j_prime, i_prime, gen_tI, gen_mI, estI)
+        estI_list = []
+        gentI_list = []
+
+        for j_prime, i_prime in key_count.items():
+            if i_prime != num_mc:
+                gen_tI = int(pt[j_prime][i_prime])
+                gen_mI = int(ms[j_prime][i_prime])
+                estI = max(j_count[j_prime], m_count[gen_mI])
+                estI_list.append(estI)
+                gentI_list.append(estI + gen_tI)
+                incomplete_jobs.append((j_prime, i_prime, gen_tI, gen_mI, estI))
+
+        max_estI = max(estI_list) if estI_list else 0
+        max_gentI = max(gentI_list) if gentI_list else 0
+
+        critical_path_list = np.zeros([num_job, num_mc])
+
+        # ── 두 번째 pass ──────────────────────────────────────────────────
+        for j_prime, i_prime, gen_tI, gen_mI, estI in incomplete_jobs:
+
+            # est / fin holder
+            if max_estI != 0:
+                est_holder[j_prime][i_prime] = estI / max_estI
+                fin_holder[j_prime][i_prime] = (estI + gen_tI) / max_gentI
+
+            # ── in-place 뮤테이션 (critical_path_list inner loop 용) ──────
+            orig_jc = j_count[j_prime]
+            orig_mc = m_count[gen_mI]
+            orig_tpm = tpm[gen_mI - 1]
+            orig_tpj = tpj[j_prime]
+
+            new_val = max(orig_jc, orig_mc) + gen_tI
+            j_count[j_prime] = new_val
+            m_count[gen_mI] = new_val
+            tpm[gen_mI - 1] -= gen_tI
+            tpj[j_prime] -= gen_tI
+            key_count[j_prime] = i_prime + 1
+
+            # ── inner loop: critical_path_list ─────────────────────────────
+            # max over j of max(term1_j, term2_j)
+            #   term1_j = m_count[ms[j][kc_j]] + tpm[ms[j][kc_j]-1]
+            #   term2_j = j_count[j] + tpj[j_prime]   (tpj[j_prime]는 상수)
+            max_term1 = -1
+            max_jcount = -1
+            has_incomplete = False
+
+            for j, kc_j in key_count.items():
+                if kc_j != num_mc:
+                    has_incomplete = True
+                    gm_inner = ms[j][kc_j]
+                    t1 = m_count[gm_inner] + tpm[gm_inner - 1]
+                    if t1 > max_term1:
+                        max_term1 = t1
+                    jc_j = j_count[j]
+                    if jc_j > max_jcount:
+                        max_jcount = jc_j
+
+            if has_incomplete:
+                max_term2 = max_jcount + tpj[j_prime]
+                critical_path_list[j_prime][i_prime] = max(max_term1, max_term2)
+
+            # ── in-place 복원 ─────────────────────────────────────────────
+            j_count[j_prime] = orig_jc
+            m_count[gen_mI] = orig_mc
+            tpm[gen_mI - 1] = orig_tpm
+            tpj[j_prime] = orig_tpj
+            key_count[j_prime] = i_prime
+
+        # 정규화
+        max_cp = np.max(critical_path_list)
+        if max_cp != 0:
+            critical_path_list /= max_cp
+
+        return est_holder, fin_holder, critical_path_list
+
+
     def check_avail_ops(self, avail_ops):
         empty2 = list()
         for j_prime, i_prime in self.key_count.items():
