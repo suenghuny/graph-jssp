@@ -56,8 +56,8 @@ opt_list = [1059, 888, 1005, 1005, 887, 1010, 397, 899, 934, 944]
 orb_list = []
 
 if cfg.additional_validation == True:
-    for i in ["ta21", "ta22", "dmu46", "dmu47", "ta61", "ta62", "dmu76", "dmu77"]:
-        df = pd.read_excel("eval_dataset.xlsx", sheet_name=i, engine='openpyxl')
+    for i in ["ta71", "ta72", "dmu76", "dmu77"]:
+        df = pd.read_excel("eval_dataset2.xlsx", sheet_name=i, engine='openpyxl')
         orb_data = list()  #
         for row, column in df.iterrows():
             job = []
@@ -66,7 +66,6 @@ if cfg.additional_validation == True:
                 job.append(element)
             orb_data.append(job)
         orb_list.append(orb_data)
-
 else:
     for i in ["ta61", "ta62", "dmu76", "dmu77"]:
         df = pd.read_excel("eval_dataset.xlsx", sheet_name=i, engine='openpyxl')
@@ -233,7 +232,7 @@ def train_model(params, selected_param, log_path=None):
     c_max = list()
     b = 0
     if cfg.additional_validation == True:
-        problem_list = [1, 2, 3, 4, 5, 6, 7, 8]
+        problem_list = [1, 2, 3, 4]
     else:
         problem_list = [1, 2, 3, 4]
     validation_records_min = [[] for _ in problem_list]
@@ -266,29 +265,13 @@ def train_model(params, selected_param, log_path=None):
                     if cfg.additional_validation == True:
                         if p == 1:
                             mean_makespan21 = mean_makespan1
-                            print("TA21", min_makespan, mean_makespan)
+                            print("TA71", min_makespan, mean_makespan)
                             empty_records[p - 1].append(mean_makespan)
                         elif p == 2:
                             mean_makespan22 = mean_makespan1
-                            print("TA22", min_makespan, mean_makespan)
+                            print("TA72", min_makespan, mean_makespan)
                             empty_records[p - 1].append(mean_makespan)
                         elif p == 3:
-                            mean_makespan46 = mean_makespan1
-                            print("DMU46", min_makespan, mean_makespan)
-                            empty_records[p - 1].append(mean_makespan)
-                        elif p == 4:
-                            mean_makespan47 = mean_makespan1
-                            print("DMU47", min_makespan, mean_makespan)
-                            empty_records[p - 1].append(mean_makespan)
-                        elif p == 5:
-                            mean_makespan61 = mean_makespan1
-                            print("TA61", min_makespan, mean_makespan)
-                            empty_records[p - 1].append(mean_makespan)
-                        elif p == 6:
-                            mean_makespan62 = mean_makespan1
-                            print("TA62", min_makespan, mean_makespan)
-                            empty_records[p - 1].append(mean_makespan)
-                        elif p == 7:
                             mean_makespan76 = mean_makespan1
                             print("DMU76", min_makespan, mean_makespan)
                             empty_records[p - 1].append(mean_makespan)
@@ -405,23 +388,19 @@ def train_model(params, selected_param, log_path=None):
                         min_makespan = min_makespan1
                         mean_makespan = mean_makespan1
                         if p == 1:
-                            mean_makespan61 = mean_makespan1
-                            min_makespan61 = min_makespan1
-                            print("TA61", min_makespan, mean_makespan)
+                            mean_makespan21 = mean_makespan1
+                            print("TA71", min_makespan, mean_makespan)
                             empty_records[p - 1].append(mean_makespan)
                         elif p == 2:
-                            mean_makespan62 = mean_makespan1
-                            min_makespan62 = min_makespan1
-                            print("TA62", min_makespan, mean_makespan)
+                            mean_makespan22 = mean_makespan1
+                            print("TA72", min_makespan, mean_makespan)
                             empty_records[p - 1].append(mean_makespan)
                         elif p == 3:
                             mean_makespan76 = mean_makespan1
-                            min_makespan76 = min_makespan1
                             print("DMU76", min_makespan, mean_makespan)
                             empty_records[p - 1].append(mean_makespan)
                         else:
                             mean_makespan77 = mean_makespan1
-                            min_makespan77 = min_makespan1
                             print("DMU77", min_makespan, mean_makespan)
                             empty_records[p - 1].append(mean_makespan)
 
