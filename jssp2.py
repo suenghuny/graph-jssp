@@ -579,7 +579,6 @@ class AdaptiveScheduler:
         max_estI = max(estI_list) if estI_list else 0
         max_gentI = max(gentI_list) if gentI_list else 0
 
-        critical_path_list = np.zeros([num_job, num_mc])
 
         # ── 두 번째 pass ──────────────────────────────────────────────────
         for j_prime, i_prime, gen_tI, gen_mI, estI in incomplete_jobs:
@@ -589,7 +588,7 @@ class AdaptiveScheduler:
                 fin_holder[j_prime][i_prime] = (estI + gen_tI) / max_gentI
 
 
-        return est_holder, fin_holder, critical_path_list
+        return est_holder, fin_holder
 
 
     def check_avail_ops(self, avail_ops):
