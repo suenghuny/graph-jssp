@@ -500,7 +500,7 @@ def train_model(params, selected_param, log_path=None):
                                 'ave_cri_loss': 0,
                                 'ave_makespan': ave_makespan},
 
-                               params["model_dir"] + '/seperation_after_rep_{}_{}_step_{}_mean_makespan_{}.pt'.format(
+                               params["model_dir"] + '/light_version2_seperation_after_rep_{}_{}_step_{}_mean_makespan_{}.pt'.format(
                                    s_latent, selected_param, s,
                                    mean_makespan61))
         policy_epoch_duration_start = time()

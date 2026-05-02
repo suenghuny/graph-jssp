@@ -81,6 +81,8 @@ class PtrNet1(nn.Module):
         else:
             if cfg.state_feature_group=='light-version':
                 self.ex_embedding = ExEmbedding(raw_feature_size=3, feature_size=params["n_hidden"])
+            elif cfg.state_feature_group=='light-version2':
+                self.ex_embedding = ExEmbedding(raw_feature_size=2, feature_size=params["n_hidden"])
             else:
                 self.ex_embedding = ExEmbedding(raw_feature_size=4, feature_size=params["n_hidden"])
 
@@ -447,6 +449,14 @@ class PtrNet1(nn.Module):
                             empty_zero[nb, :] = torch.tensor(critical_path.reshape(-1)).to(device)  # 안중요
                             est_placeholder[nb] = est
                             fin_placeholder[nb] = fin
+                        elif cfg.state_feature_group == 'light-version2':
+                            est, fin = scheduler_list[nb].adaptive_run_light2(
+                                                 est_placeholder[nb],
+                                                 fin_placeholder[nb]
+                                                 )
+                            #empty_zero[nb, :] = torch.tensor(critical_path.reshape(-1)).to(device)  # 안중요
+                            est_placeholder[nb] = est
+                            fin_placeholder[nb] = fin
                         else:
                             c_max, est, fin, critical_path, critical_path2, mwkr1, mwkr2 = scheduler_list[
                                 nb].adaptive_run(est_placeholder[nb],
@@ -500,6 +510,14 @@ class PtrNet1(nn.Module):
 
                             est_placeholder[nb] = est
                             fin_placeholder[nb] = fin
+                        elif cfg.state_feature_group == 'light-version2':
+                            est, fin = scheduler_list[nb].adaptive_run_light2(
+                                est_placeholder[nb], fin_placeholder[nb],
+                                i=next_b)  # next_b는 이전 스텝에서 선택된 Job이고, Adaptive Run이라는 것은 선택된 Job에 따라 update한 다음에 EST, EFIN을 구하라는 의미
+
+
+                            est_placeholder[nb] = est
+                            fin_placeholder[nb] = fin
                         else:
                             c_max, est, fin, critical_path, critical_path2, mwkr1, mwkr2 = scheduler_list[
                                 nb].adaptive_run(
@@ -550,6 +568,10 @@ class PtrNet1(nn.Module):
                     fin_placeholder = fin_placeholder.reshape(batch_size, -1).unsqueeze(2)
                     empty_zero = empty_zero.unsqueeze(2)
                     r_temp = torch.concat([est_placeholder, fin_placeholder, empty_zero], dim=2)
+                elif cfg.state_feature_group == 'light-version2':
+                    est_placeholder = est_placeholder.reshape(batch_size, -1).unsqueeze(2)
+                    fin_placeholder = fin_placeholder.reshape(batch_size, -1).unsqueeze(2)
+                    r_temp = torch.concat([est_placeholder, fin_placeholder], dim=2)
 
 
             r_temp = r_temp.reshape([batch*num_operations, -1])
