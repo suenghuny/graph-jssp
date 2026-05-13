@@ -302,7 +302,7 @@ class FixedLatentModel(nn.Module):
         z_dim,
         hidden_units=(256, 256),
         ):
-        super(LatentModel, self).__init__()
+        super(FixedLatentModel, self).__init__()
 
         self.current_num_edges = 100
         # p(z) = N(0, I)
