@@ -424,9 +424,14 @@ def train_model(params, selected_param, log_path=None):
 
                             t1 = time()
                             if cfg.beta_vae == False:
-                                mean_m.to_csv('seperation_after_rep_{}_{}_mean_makespan_{}.csv'.format(
-                                    s_latent, selected_param,
-                                    mean_makespan61))
+                                if cfg.fixed_VG2S == False:
+                                    mean_m.to_csv('seperation_after_rep_{}_{}_mean_makespan_{}.csv'.format(
+                                        s_latent, selected_param,
+                                        mean_makespan61))
+                                else:
+                                    mean_m.to_csv('fixed_VG2S_seperation_after_rep_{}_{}_mean_makespan_{}.csv'.format(
+                                        s_latent, selected_param,
+                                        mean_makespan61))
                             else:
                                 mean_m.to_csv('beta_kld_{}_seperation_after_rep_{}_{}_mean_makespan_{}.csv'.format(
                                     cfg.beta_kld,
@@ -479,7 +484,7 @@ def train_model(params, selected_param, log_path=None):
                                 'ave_cri_loss': 0,
                                 'ave_makespan': ave_makespan},
 
-                               params["model_dir"] + '/light_version2_seperation_after_rep_{}_{}_step_{}_mean_makespan_{}.pt'.format(
+                               params["model_dir"] + '1234_seperation_after_rep_{}_{}_step_{}_mean_makespan_{}.pt'.format(
                                    s_latent, selected_param, s,
                                    mean_makespan61))
         policy_epoch_duration_start = time()
@@ -572,7 +577,13 @@ def train_model(params, selected_param, log_path=None):
             3. Update 하기(act_optim.step)
 
             """
-            latent_loss = edge_loss + node_loss + loss_kld
+            if cfg.fixed_VG2S == True:
+                latent_loss = edge_loss + node_loss
+            else:
+                latent_loss = edge_loss + node_loss + loss_kld
+
+
+
             act_loss = -(ll_old * adv.detach() + entropy_loss).mean()  # loss 구하는 부분 /  ll_old의 의미 log_theta (pi | s)
 
             if params['w_representation_learning'] == True:
@@ -618,7 +629,10 @@ def train_model(params, selected_param, log_path=None):
                                                                           num_job=num_job
                                                                           )
                 if cfg.beta_vae == False:
-                    latent_loss = edge_loss + node_loss + loss_kld
+                    if cfg.fixed_VG2S == True:
+                        latent_loss = edge_loss + node_loss
+                    else:
+                        latent_loss = edge_loss + node_loss + loss_kld
                 else:
                     latent_loss = edge_loss + node_loss + cfg.beta_kld*loss_kld
                 total_loss = latent_loss

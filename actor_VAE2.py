@@ -7,6 +7,7 @@ from copy import deepcopy
 cfg = cfg.get_cfg()
 from model import GCRN
 from latent import LatentModel
+from fixed_latent import FixedLatentModel
 device = torch.device(cfg.device if torch.cuda.is_available() else 'cpu')
 
 
@@ -73,7 +74,10 @@ class PtrNet1(nn.Module):
         num_edge_cat = 3
         z_dim = params["n_hidden"]
         self.critic = Critic(z_dim)
-        self.Latent = LatentModel(z_dim=z_dim, params = params).to(device)
+        if cfg.fixed_VG2S == False:
+            self.Latent = LatentModel(z_dim=z_dim, params = params).to(device)
+        else:
+            self.Latent = FixedLatentModel(z_dim=z_dim, params=params).to(device)
         augmented_hidden_size = params["n_hidden"]
 
         if cfg.state_feature_selection==False:
