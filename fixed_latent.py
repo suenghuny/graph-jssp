@@ -38,7 +38,7 @@ class Gaussian(nn.Module):
 
         self.net = build_mlp(
             input_dim=input_dim,
-            output_dim=output_dim*2,
+            output_dim=output_dim,
             hidden_units=hidden_units,
             hidden_activation=nn.LeakyReLU(0.2),
         ).apply(initialize_weight)
