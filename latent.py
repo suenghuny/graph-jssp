@@ -331,9 +331,9 @@ class LatentModel(nn.Module):
         )
         # p(G | z)
         if cfg.feature_selection_mode == True:
-            self.decoder = GraphVAEDecoder(z_dim, edge_types=3, node_types=5, hidden_dims=[128, 256, 512])
+            self.decoder = GraphVAEDecoder(z_dim, edge_types=num_edge_cat, node_types=5, hidden_dims=[128, 256, 512])
         else:
-            self.decoder = GraphVAEDecoder(z_dim, edge_types=3, node_types=6, hidden_dims=[128, 256, 512])
+            self.decoder = GraphVAEDecoder(z_dim, edge_types=num_edge_cat, node_types=6, hidden_dims=[128, 256, 512])
 
 
     def sample_prior(self, x):
