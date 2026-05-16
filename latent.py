@@ -67,7 +67,7 @@ class Gaussian(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, params):
+    def __init__(self, params, num_edge_cat):
         super().__init__()
         device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.n_multi_head = params["n_multi_head"]
@@ -79,7 +79,7 @@ class Encoder(nn.Module):
         self.params = params
         self.k_hop = params["k_hop"]
         self.aggr = params["aggr"]
-        num_edge_cat = 3
+        num_edge_cat = num_edge_cat
 
         self.GraphEmbedding = GCRN(
                                    feature_size =  params["n_hidden"],
@@ -303,6 +303,7 @@ class LatentModel(nn.Module):
         self,
         params,
         z_dim,
+            num_edge_cat,
         hidden_units=(256, 256),
         ):
         super(LatentModel, self).__init__()
@@ -312,7 +313,7 @@ class LatentModel(nn.Module):
         self.z_prior = FixedGaussian(z_dim, 1.0)
 
         # x = encoder(G)
-        self.encoder = Encoder(params)
+        self.encoder = Encoder(params, num_edge_cat)
         # q(z | x)
         if params['aggr']== 'mean':
             aug_input_dim = z_dim

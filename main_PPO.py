@@ -122,7 +122,10 @@ def evaluation(act_model, baseline_model, p, eval_number, device):
     edge_precedence = scheduler.get_edge_index_precedence()
     edge_antiprecedence = scheduler.get_edge_index_antiprecedence()
     edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
-    heterogeneous_edges = (edge_precedence, edge_antiprecedence, edge_machine_sharing)
+    if cfg.edge_feature_selection == True:
+        heterogeneous_edges = (edge_precedence, edge_machine_sharing)  # 세종류의 엑지들을 하나의 변수로 참조시킴
+    else:
+        heterogeneous_edges = (edge_precedence, edge_antiprecedence, edge_machine_sharing)  # 세종류의 엑지들을 하나의 변수로 참조시킴
     heterogeneous_edges = [heterogeneous_edges for _ in range(eval_number)]
     input_data = (node_feature, heterogeneous_edges)
     pred_seq, ll_old, _, _, _, _, _ = act_model(input_data,
@@ -160,7 +163,10 @@ def evaluation(act_model, baseline_model, p, eval_number, device, upperbound=Non
     edge_precedence = scheduler.get_edge_index_precedence()
     edge_antiprecedence = scheduler.get_edge_index_antiprecedence()
     edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
-    heterogeneous_edges = (edge_precedence, edge_antiprecedence, edge_machine_sharing)
+    if cfg.edge_feature_selection == True:
+        heterogeneous_edges = (edge_precedence, edge_machine_sharing)  # 세종류의 엑지들을 하나의 변수로 참조시킴
+    else:
+        heterogeneous_edges = (edge_precedence, edge_antiprecedence, edge_machine_sharing)  # 세종류의 엑지들을 하나의 변수로 참조시킴
     heterogeneous_edges = [heterogeneous_edges for _ in range(eval_number)]
     input_data = (node_feature, heterogeneous_edges)
     pred_seq, ll_old, _, _, _, _, _ = act_model(input_data,
@@ -447,6 +453,17 @@ def train_model(params, selected_param, log_path=None):
                                    s_latent, selected_param,
                                    mean_makespan61))
 
+                            if cfg.edge_feature_selection == True:
+                                mean_m.to_csv(
+                                    'edge_selection_mode_{}_seperation_after_rep_{}_{}_mean_makespan_{}.csv'.format(
+                                   cfg.exclude_feature,
+                                   s_latent, selected_param,
+                                   mean_makespan61))
+                            else:
+                                mean_m.to_csv('seperation_after_rep_{}_{}_mean_makespan_{}.csv'.format(
+                                    s_latent, selected_param,
+                                    mean_makespan61))
+
 
                             if cfg.feature_selection_mode==True:
                                 mean_m.to_csv(
@@ -533,7 +550,11 @@ def train_model(params, selected_param, log_path=None):
             edge_precedence = scheduler.get_edge_index_precedence()
             edge_antiprecedence = scheduler.get_edge_index_antiprecedence()
             edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
-            heterogeneous_edge = (edge_precedence, edge_antiprecedence, edge_machine_sharing)  # 세종류의 엑지들을 하나의 변수로 참조시킴
+
+            if cfg.edge_feature_selection == True:
+                heterogeneous_edge = (edge_precedence, edge_machine_sharing)  # 세종류의 엑지들을 하나의 변수로 참조시킴
+            else:
+                heterogeneous_edge = (edge_precedence, edge_antiprecedence, edge_machine_sharing)  # 세종류의 엑지들을 하나의 변수로 참조시킴
             heterogeneous_edges.append(heterogeneous_edge)
         input_data = (node_features, heterogeneous_edges)
         act_model.train()
@@ -1014,7 +1035,11 @@ def train_model_with_freezed_encoder(params, selected_param, log_path=None):
             edge_precedence = scheduler.get_edge_index_precedence()
             edge_antiprecedence = scheduler.get_edge_index_antiprecedence()
             edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
-            heterogeneous_edge = (edge_precedence, edge_antiprecedence, edge_machine_sharing)  # 세종류의 엑지들을 하나의 변수로 참조시킴
+            if cfg.edge_feature_selection == True:
+                heterogeneous_edge = (edge_precedence, edge_machine_sharing)  # 세종류의 엑지들을 하나의 변수로 참조시킴
+            else:
+                heterogeneous_edge = (
+                edge_precedence, edge_antiprecedence, edge_machine_sharing)  # 세종류의 엑지들을 하나의 변수로 참조시킴
             heterogeneous_edges.append(heterogeneous_edge)
         input_data = (node_features, heterogeneous_edges)
         act_model.train()
@@ -1203,7 +1228,10 @@ def test(act_model, baseline_model, p, eval_number, device, problems, upperbound
     edge_precedence = scheduler.get_edge_index_precedence()
     edge_antiprecedence = scheduler.get_edge_index_antiprecedence()
     edge_machine_sharing = scheduler.get_machine_sharing_edge_index()
-    heterogeneous_edges = (edge_precedence, edge_antiprecedence, edge_machine_sharing)
+    if cfg.edge_feature_selection == True:
+        heterogeneous_edges = (edge_precedence, edge_machine_sharing)  # 세종류의 엑지들을 하나의 변수로 참조시킴
+    else:
+        heterogeneous_edges = (edge_precedence, edge_antiprecedence, edge_machine_sharing)  # 세종류의 엑지들을 하나의 변수로 참조시킴
     heterogeneous_edges = [heterogeneous_edges for _ in range(eval_number)]
     input_data = (node_feature, heterogeneous_edges)
     pred_seq, ll_old, _, _, _, _, _ = act_model(input_data,

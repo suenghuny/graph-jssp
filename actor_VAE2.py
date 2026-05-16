@@ -71,11 +71,14 @@ class PtrNet1(nn.Module):
         self.params = params
         self.k_hop = params["k_hop"]
 
-        num_edge_cat = 3
+        if cfg.edge_feature_selection == False:
+            num_edge_cat = 3
+        else:
+            num_edge_cat = 2
         z_dim = params["n_hidden"]
         self.critic = Critic(z_dim)
         if cfg.fixed_VG2S == False:
-            self.Latent = LatentModel(z_dim=z_dim, params = params).to(device)
+            self.Latent = LatentModel(z_dim=z_dim, params = params, num_edge_cat=num_edge_cat).to(device)
         else:
             self.Latent = FixedLatentModel(z_dim=z_dim, params=params).to(device)
         augmented_hidden_size = params["n_hidden"]
