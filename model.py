@@ -357,10 +357,11 @@ class GCRN(nn.Module):
                     zero_vec = -9e15 * torch.ones_like(E)
                     a = torch.where(E > 0, a, zero_vec)
 
-                    if e ==0:
-                        print(a)
+
 
                     a = F.softmax(a, dim=1)
+                    if e ==0:
+                        print(a)
                     H =  F.elu(torch.matmul(a, Wh))
                     if final == False:
                         empty[b, :, e, :] = H
