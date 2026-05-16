@@ -360,8 +360,6 @@ class GCRN(nn.Module):
 
 
                     a = F.softmax(a, dim=1)
-                    if e ==0:
-                        print(a)
                     H =  F.elu(torch.matmul(a, Wh))
                     if final == False:
                         empty[b, :, e, :] = H
