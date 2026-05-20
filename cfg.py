@@ -54,5 +54,7 @@ def get_cfg():
     parser.add_argument("--freezed_encoder_path", type=str, default='seperation_after_rep_80000_param2_step_80001_mean_makespan_13235.0', help="")
     parser.add_argument("--edge_feature_selection", type=bool, default=False, help="")
 
+    parser.add_argument("--self_loop", type=bool, default=True, help="")
+
     return parser.parse_args()
 ##

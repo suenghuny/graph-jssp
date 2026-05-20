@@ -375,19 +375,27 @@ class GCRN(nn.Module):
             H = placeholder_for_multi_head.reshape(batch_size, num_nodes, self.n_multi_head * self.num_edge_cat * self.graph_embedding_size)
             H = H.reshape(batch_size*num_nodes, -1)
             H = self.Embedding1(H)
-            X = X.reshape(batch_size*num_nodes, -1)
-            H = self.BN1((1 - self.alpha)*H + self.alpha*X)
+            if cfg.self_loop == True:
+                X = X.reshape(batch_size*num_nodes, -1)
+                H = self.BN1((1 - self.alpha)*H + self.alpha*X)
+            else:pass
         else:
             H = empty.reshape(batch_size, num_nodes, self.num_edge_cat * self.graph_embedding_size)
             H = H.reshape(batch_size * num_nodes, -1)
             H = self.Embedding1_mean(H)
-            X = X.reshape(batch_size * num_nodes, -1)
-            H = self.BN1((1 - self.alpha)*H + self.alpha*X)
+            if cfg.self_loop == True:
+                X = X.reshape(batch_size * num_nodes, -1)
+                H = self.BN1((1 - self.alpha) * H + self.alpha * X)
+            else:
+                pass
 
         if self.aggr == 'mean':
-            Z = self.Embedding2(H)
-            Z = self.BN2(H + Z)
-            Z = Z.reshape(batch_size, num_nodes, -1)
+            if cfg.self_loop == True:
+                Z = self.Embedding2(H)
+                Z = self.BN2(H + Z)
+                Z = Z.reshape(batch_size, num_nodes, -1)
+            else:
+                pass
         else:
             Z = self.Embedding2(H)
             Z = Z.reshape(batch_size, num_nodes, -1)
